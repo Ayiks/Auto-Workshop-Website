@@ -1,0 +1,169 @@
+// Prisma Schema for Auto Workshop System
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           Int       @id @default(autoincrement())
+  username     String    @unique @db.VarChar(50)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  role         Role
+  fullName     String?   @map("full_name") @db.VarChar(100)
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastLogin    DateTime? @map("last_login")
+
+  // Relations
+  materialsCreated Material[]
+  salesMade        Sale[]
+  jobsAssigned     Job[]
+  invoicesCreated  Invoice[]
+
+  @@map("users")
+}
+
+enum Role {
+  admin
+  sales
+  mechanic
+}
+
+model Material {
+  id            Int      @id @default(autoincrement())
+  name          String   @db.VarChar(100)
+  costPrice     Decimal  @map("cost_price") @db.Decimal(10, 2)
+  sellingPrice  Decimal  @map("selling_price") @db.Decimal(10, 2)
+  quantity      Int      @default(0)
+  lowStockLevel Int      @default(10) @map("low_stock_level")
+  createdById   Int?     @map("created_by")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+  isActive      Boolean  @default(true) @map("is_active")
+
+  // Relations
+  createdBy User?      @relation(fields: [createdById], references: [id])
+  saleItems SaleItem[]
+
+  @@map("materials")
+}
+
+model Sale {
+  id          Int      @id @default(autoincrement())
+  saleDate    DateTime @default(now()) @map("sale_date")
+  totalAmount Decimal  @map("total_amount") @db.Decimal(10, 2)
+  totalProfit Decimal  @map("total_profit") @db.Decimal(10, 2)
+  soldById    Int?     @map("sold_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  soldBy User?      @relation(fields: [soldById], references: [id])
+  items  SaleItem[]
+
+  @@map("sales")
+}
+
+model SaleItem {
+  id         Int     @id @default(autoincrement())
+  saleId     Int     @map("sale_id")
+  materialId Int     @map("material_id")
+  quantity   Int
+  unitPrice  Decimal @map("unit_price") @db.Decimal(10, 2)
+  costPrice  Decimal @map("cost_price") @db.Decimal(10, 2)
+  subtotal   Decimal @db.Decimal(10, 2)
+  profit     Decimal @db.Decimal(10, 2)
+
+  // Relations
+  sale     Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id])
+
+  @@map("sale_items")
+}
+
+model Job {
+  id                 Int      @id @default(autoincrement())
+  clientName         String   @map("client_name") @db.VarChar(100)
+  clientPhone        String?  @map("client_phone") @db.VarChar(20)
+  clientEmail        String?  @map("client_email") @db.VarChar(100)
+  carMake            String?  @map("car_make") @db.VarChar(50)
+  carModel           String?  @map("car_model") @db.VarChar(50)
+  carRegNumber       String?  @map("car_reg_number") @db.VarChar(20)
+  problemDescription String   @map("problem_description") @db.Text
+  status             JobStatus @default(pending)
+  mechanicId         Int?     @map("mechanic_id")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  mechanic      User?         @relation(fields: [mechanicId], references: [id])
+  materials     JobMaterial[]
+  invoice       Invoice?
+
+  @@map("jobs")
+}
+
+enum JobStatus {
+  pending
+  in_progress
+  completed
+  invoiced
+}
+
+model JobMaterial {
+  id            Int      @id @default(autoincrement())
+  jobId         Int      @map("job_id")
+  materialName  String   @map("material_name") @db.VarChar(100)
+  quantity      Int
+  estimatedCost Decimal? @map("estimated_cost") @db.Decimal(10, 2)
+  isPurchased   Boolean  @default(false) @map("is_purchased")
+
+  // Relations
+  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@map("job_materials")
+}
+
+model Invoice {
+  id            Int      @id @default(autoincrement())
+  jobId         Int      @unique @map("job_id")
+  invoiceNumber String   @unique @map("invoice_number") @db.VarChar(50)
+  materialsCost Decimal  @default(0) @map("materials_cost") @db.Decimal(10, 2)
+  labourCost    Decimal  @default(0) @map("labour_cost") @db.Decimal(10, 2)
+  totalAmount   Decimal  @map("total_amount") @db.Decimal(10, 2)
+  invoiceDate   DateTime @default(now()) @map("invoice_date")
+  createdById   Int?     @map("created_by")
+  notes         String?  @db.Text
+
+  // Relations
+  job       Job   @relation(fields: [jobId], references: [id])
+  createdBy User? @relation(fields: [createdById], references: [id])
+
+  @@map("invoices")
+}
+
+model Booking {
+  id            Int           @id @default(autoincrement())
+  clientName    String        @map("client_name") @db.VarChar(100)
+  clientEmail   String?       @map("client_email") @db.VarChar(100)
+  clientPhone   String        @map("client_phone") @db.VarChar(20)
+  serviceType   String?       @map("service_type") @db.VarChar(100)
+  preferredDate DateTime?     @map("preferred_date") @db.Date
+  message       String?       @db.Text
+  status        BookingStatus @default(new)
+  createdAt     DateTime      @default(now()) @map("created_at")
+
+  @@map("bookings")
+}
+
+enum BookingStatus {
+  new
+  contacted
+  scheduled
+  completed
+  cancelled
+}

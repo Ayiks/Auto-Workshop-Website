@@ -6,11 +6,16 @@ import { AppError } from '../middleware/errorHandler.js';
 // @access  Private (Admin, Sales)
 export const createSale = async (req, res, next) => {
   try {
-    const { items } = req.body;
+    const { items, paymentMethod = 'cash' } = req.body;
 
     // Validate input
     if (!items || !Array.isArray(items) || items.length === 0) {
       throw new AppError('At least one item is required', 400, 'VALIDATION_ERROR');
+    }
+
+    // Validate payment method
+    if (!['cash', 'momo', 'cheque'].includes(paymentMethod)) {
+      throw new AppError('Invalid payment method', 400, 'VALIDATION_ERROR');
     }
 
     // Start transaction
@@ -89,6 +94,7 @@ export const createSale = async (req, res, next) => {
         data: {
           totalAmount,
           totalProfit,
+          paymentMethod,
           soldById: req.user.id,
           items: {
             create: saleItems.map(item => ({
@@ -109,6 +115,13 @@ export const createSale = async (req, res, next) => {
                   name: true,
                 },
               },
+            },
+          },
+          soldBy: {
+            select: {
+              id: true,
+              username: true,
+              fullName: true,
             },
           },
         },
@@ -257,7 +270,8 @@ export const getDailyReport = async (req, res, next) => {
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    const sales = await prisma.sale.findMany({
+    // Get material sales
+    const materialSales = await prisma.sale.findMany({
       where: {
         saleDate: {
           gte: startOfDay,
@@ -274,23 +288,93 @@ export const getDailyReport = async (req, res, next) => {
             },
           },
         },
+        soldBy: {
+          select: {
+            fullName: true,
+            username: true,
+          },
+        },
       },
     });
 
+    // Get paid invoices (job sales)
+    const jobSales = await prisma.invoice.findMany({
+      where: {
+        paymentStatus: 'paid',
+        paidDate: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+      include: {
+        job: {
+          include: {
+            materials: true,
+            mechanic: {
+              select: {
+                fullName: true,
+                username: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // Get expenses
+    const expenses = await prisma.expense.findMany({
+      where: {
+        expenseDate: {
+          gte: startOfDay,
+          lte: endOfDay,
+        },
+      },
+    });
+
+    // Calculate material sales summary
+    const materialSalesSummary = {
+      transactionCount: materialSales.length,
+      totalSales: materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0),
+      totalProfit: materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalProfit), 0),
+    };
+
+    // Calculate job sales summary
+    const jobSalesSummary = {
+      transactionCount: jobSales.length,
+      totalSales: jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0),
+      totalProfit: jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalProfit), 0),
+    };
+
+    // Calculate expenses summary
+    const expensesSummary = {
+      transactionCount: expenses.length,
+      totalExpenses: expenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0),
+      byCategory: expenses.reduce((acc, exp) => {
+        if (!acc[exp.category]) {
+          acc[exp.category] = 0;
+        }
+        acc[exp.category] += parseFloat(exp.amount);
+        return acc;
+      }, {}),
+    };
+
+    // Calculate overall summary
     const summary = {
       date: targetDate.toISOString().split('T')[0],
-      transactionCount: sales.length,
-      totalSales: sales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0),
-      totalProfit: sales.reduce((sum, sale) => sum + parseFloat(sale.totalProfit), 0),
-      averageTransaction: sales.length > 0 
-        ? sales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0) / sales.length 
-        : 0,
+      materialSales: materialSalesSummary,
+      jobSales: jobSalesSummary,
+      totalRevenue: materialSalesSummary.totalSales + jobSalesSummary.totalSales,
+      grossProfit: materialSalesSummary.totalProfit + jobSalesSummary.totalProfit,
+      expenses: expensesSummary,
+      netProfit: (materialSalesSummary.totalProfit + jobSalesSummary.totalProfit) - expensesSummary.totalExpenses,
     };
 
     res.json({
       success: true,
       summary,
-      sales,
+      materialSales,
+      jobSales,
+      expenses,
     });
   } catch (error) {
     next(error);
@@ -316,7 +400,8 @@ export const getWeeklyReport = async (req, res, next) => {
     weekEnd.setDate(weekStart.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
 
-    const sales = await prisma.sale.findMany({
+    // Get material sales
+    const materialSales = await prisma.sale.findMany({
       where: {
         saleDate: {
           gte: weekStart,
@@ -325,12 +410,50 @@ export const getWeeklyReport = async (req, res, next) => {
       },
     });
 
+    // Get paid invoices
+    const jobSales = await prisma.invoice.findMany({
+      where: {
+        paymentStatus: 'paid',
+        paidDate: {
+          gte: weekStart,
+          lte: weekEnd,
+        },
+      },
+    });
+
+    // Get expenses
+    const expenses = await prisma.expense.findMany({
+      where: {
+        expenseDate: {
+          gte: weekStart,
+          lte: weekEnd,
+        },
+      },
+    });
+
+    const materialSalesTotal = materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0);
+    const materialProfitTotal = materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalProfit), 0);
+    const jobSalesTotal = jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0);
+    const jobProfitTotal = jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalProfit), 0);
+    const expensesTotal = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+
     const summary = {
       weekStart: weekStart.toISOString().split('T')[0],
       weekEnd: weekEnd.toISOString().split('T')[0],
-      transactionCount: sales.length,
-      totalSales: sales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0),
-      totalProfit: sales.reduce((sum, sale) => sum + parseFloat(sale.totalProfit), 0),
+      materialSales: {
+        transactionCount: materialSales.length,
+        totalSales: materialSalesTotal,
+        totalProfit: materialProfitTotal,
+      },
+      jobSales: {
+        transactionCount: jobSales.length,
+        totalSales: jobSalesTotal,
+        totalProfit: jobProfitTotal,
+      },
+      totalRevenue: materialSalesTotal + jobSalesTotal,
+      grossProfit: materialProfitTotal + jobProfitTotal,
+      totalExpenses: expensesTotal,
+      netProfit: (materialProfitTotal + jobProfitTotal) - expensesTotal,
     };
 
     res.json({
@@ -354,7 +477,8 @@ export const getMonthlyReport = async (req, res, next) => {
     const monthStart = new Date(targetYear, targetMonth, 1);
     const monthEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
 
-    const sales = await prisma.sale.findMany({
+    // Get material sales
+    const materialSales = await prisma.sale.findMany({
       where: {
         saleDate: {
           gte: monthStart,
@@ -363,13 +487,51 @@ export const getMonthlyReport = async (req, res, next) => {
       },
     });
 
+    // Get paid invoices
+    const jobSales = await prisma.invoice.findMany({
+      where: {
+        paymentStatus: 'paid',
+        paidDate: {
+          gte: monthStart,
+          lte: monthEnd,
+        },
+      },
+    });
+
+    // Get expenses
+    const expenses = await prisma.expense.findMany({
+      where: {
+        expenseDate: {
+          gte: monthStart,
+          lte: monthEnd,
+        },
+      },
+    });
+
+    const materialSalesTotal = materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0);
+    const materialProfitTotal = materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalProfit), 0);
+    const jobSalesTotal = jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0);
+    const jobProfitTotal = jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalProfit), 0);
+    const expensesTotal = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+
     const summary = {
       year: targetYear,
       month: targetMonth + 1,
       monthName: monthStart.toLocaleString('default', { month: 'long' }),
-      transactionCount: sales.length,
-      totalSales: sales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0),
-      totalProfit: sales.reduce((sum, sale) => sum + parseFloat(sale.totalProfit), 0),
+      materialSales: {
+        transactionCount: materialSales.length,
+        totalSales: materialSalesTotal,
+        totalProfit: materialProfitTotal,
+      },
+      jobSales: {
+        transactionCount: jobSales.length,
+        totalSales: jobSalesTotal,
+        totalProfit: jobProfitTotal,
+      },
+      totalRevenue: materialSalesTotal + jobSalesTotal,
+      grossProfit: materialProfitTotal + jobProfitTotal,
+      totalExpenses: expensesTotal,
+      netProfit: (materialProfitTotal + jobProfitTotal) - expensesTotal,
     };
 
     res.json({

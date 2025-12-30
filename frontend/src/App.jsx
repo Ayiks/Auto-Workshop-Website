@@ -14,10 +14,12 @@ import Login from './pages/auth/Login';
 import AdminDashboard from './pages/admin/Dashboard';
 import Materials from './pages/admin/Materials';
 import Reports from './pages/admin/Reports';
+import Expenses from './pages/admin/Expenses';
 import SalesInterface from './pages/sales/SalesInterface';
 import SalesHistory from './pages/sales/SalesHistory';
 import Jobs from './pages/mechanic/Jobs';
 import CreateJob from './pages/mechanic/CreateJob';
+import JobDetails from './pages/mechanic/JobDetails';
 import Invoice from './pages/mechanic/Invoice';
 
 // Components
@@ -69,6 +71,14 @@ function App() {
           </ProtectedRoute>
         }
       />
+      <Route
+        path="/expenses"
+        element={
+          <ProtectedRoute allowedRoles={['admin']}>
+            <Expenses />
+          </ProtectedRoute>
+        }
+      />
 
       {/* Sales routes */}
       <Route
@@ -102,6 +112,22 @@ function App() {
         element={
           <ProtectedRoute allowedRoles={['admin', 'mechanic']}>
             <CreateJob />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/jobs/:id"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'mechanic']}>
+            <JobDetails />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/jobs/:id/invoice"
+        element={
+          <ProtectedRoute allowedRoles={['admin', 'mechanic']}>
+            <JobDetails />
           </ProtectedRoute>
         }
       />

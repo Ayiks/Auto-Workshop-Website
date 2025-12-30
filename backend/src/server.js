@@ -10,6 +10,7 @@ import materialsRoutes from './routes/materials.routes.js';
 import salesRoutes from './routes/sales.routes.js';
 import jobsRoutes from './routes/jobs.routes.js';
 import invoicesRoutes from './routes/invoices.routes.js';
+import expensesRoutes from './routes/expenses.routes.js';
 import publicRoutes from './routes/public.routes.js';
 
 // Import middleware
@@ -49,6 +50,7 @@ app.use('/api/materials', materialsRoutes);
 app.use('/api/sales', salesRoutes);
 app.use('/api/jobs', jobsRoutes);
 app.use('/api/invoices', invoicesRoutes);
+app.use('/api/expenses', expensesRoutes);
 app.use('/api/public', publicRoutes);
 
 // 404 handler

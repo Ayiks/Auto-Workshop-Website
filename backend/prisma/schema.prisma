@@ -24,6 +24,7 @@ model User {
   salesMade        Sale[]
   jobsAssigned     Job[]
   invoicesCreated  Invoice[]
+  expenses         Expense[]
 
   @@map("users")
 }
@@ -47,8 +48,9 @@ model Material {
   isActive      Boolean  @default(true) @map("is_active")
 
   // Relations
-  createdBy User?      @relation(fields: [createdById], references: [id])
-  saleItems SaleItem[]
+  createdBy    User?         @relation(fields: [createdById], references: [id])
+  saleItems    SaleItem[]
+  jobMaterials JobMaterial[]
 
   @@map("materials")
 }
@@ -58,6 +60,7 @@ model Sale {
   saleDate    DateTime @default(now()) @map("sale_date")
   totalAmount Decimal  @map("total_amount") @db.Decimal(10, 2)
   totalProfit Decimal  @map("total_profit") @db.Decimal(10, 2)
+  paymentMethod String @default("cash") @map("payment_method") @db.VarChar(20) // cash, momo, cheque
   soldById    Int?     @map("sold_by")
   createdAt   DateTime @default(now()) @map("created_at")
 
@@ -117,13 +120,17 @@ enum JobStatus {
 model JobMaterial {
   id            Int      @id @default(autoincrement())
   jobId         Int      @map("job_id")
+  materialId    Int?     @map("material_id") // NULL if manual entry
   materialName  String   @map("material_name") @db.VarChar(100)
   quantity      Int
-  estimatedCost Decimal? @map("estimated_cost") @db.Decimal(10, 2)
+  unitPrice     Decimal  @map("unit_price") @db.Decimal(10, 2) // Actual price used
+  costPrice     Decimal? @map("cost_price") @db.Decimal(10, 2) // For profit calculation
+  subtotal      Decimal  @db.Decimal(10, 2)
   isPurchased   Boolean  @default(false) @map("is_purchased")
 
   // Relations
-  job Job @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  job      Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  material Material? @relation(fields: [materialId], references: [id])
 
   @@map("job_materials")
 }
@@ -133,9 +140,14 @@ model Invoice {
   jobId         Int      @unique @map("job_id")
   invoiceNumber String   @unique @map("invoice_number") @db.VarChar(50)
   materialsCost Decimal  @default(0) @map("materials_cost") @db.Decimal(10, 2)
+  materialsProfit Decimal @default(0) @map("materials_profit") @db.Decimal(10, 2) // Profit from materials
   labourCost    Decimal  @default(0) @map("labour_cost") @db.Decimal(10, 2)
   totalAmount   Decimal  @map("total_amount") @db.Decimal(10, 2)
+  totalProfit   Decimal  @map("total_profit") @db.Decimal(10, 2) // Materials profit only (labour is 100% profit)
+  paymentMethod String   @default("cash") @map("payment_method") @db.VarChar(20)
+  paymentStatus String   @default("unpaid") @map("payment_status") @db.VarChar(20) // unpaid, paid
   invoiceDate   DateTime @default(now()) @map("invoice_date")
+  paidDate      DateTime? @map("paid_date")
   createdById   Int?     @map("created_by")
   notes         String?  @db.Text
 
@@ -158,6 +170,22 @@ model Booking {
   createdAt     DateTime      @default(now()) @map("created_at")
 
   @@map("bookings")
+}
+
+model Expense {
+  id          Int      @id @default(autoincrement())
+  description String   @db.VarChar(200)
+  category    String   @db.VarChar(50) // rent, utilities, salaries, maintenance, supplies, other
+  amount      Decimal  @db.Decimal(10, 2)
+  expenseDate DateTime @default(now()) @map("expense_date")
+  recordedBy  Int?     @map("recorded_by")
+  notes       String?  @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user User? @relation(fields: [recordedBy], references: [id])
+
+  @@map("expenses")
 }
 
 enum BookingStatus {

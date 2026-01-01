@@ -1,4 +1,13 @@
 import express from 'express';
+import {
+  createInvoice,
+  getAllInvoices,
+  getInvoice,
+  getInvoiceByNumber,
+  deleteInvoice,
+  updatePaymentStatus,
+  checkInventoryAvailability,
+} from '../controllers/invoice.controller.js';
 import { authenticate, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
@@ -6,17 +15,13 @@ const router = express.Router();
 // All routes require authentication
 router.use(authenticate);
 
-// Placeholder routes - Will implement in Week 2
-router.get('/', authorize('admin', 'mechanic'), (req, res) => {
-  res.json({ success: true, message: 'Invoices routes - Coming soon', invoices: [] });
-});
-
-router.post('/', authorize('admin', 'mechanic'), (req, res) => {
-  res.json({ success: true, message: 'Create invoice - Coming soon' });
-});
-
-router.get('/:id', authorize('admin', 'mechanic'), (req, res) => {
-  res.json({ success: true, message: 'Get invoice - Coming soon' });
-});
+// Invoice routes
+router.post('/', authorize('admin', 'mechanic'), createInvoice);
+router.get('/', authorize('admin', 'mechanic'), getAllInvoices);
+router.get('/number/:invoiceNumber', authorize('admin', 'mechanic'), getInvoiceByNumber);
+router.get('/:id', authorize('admin', 'mechanic'), getInvoice);
+router.put('/:id/payment', authorize('admin', 'mechanic'), updatePaymentStatus);
+router.delete('/:id', authorize('admin'), deleteInvoice);
+router.post('/:id/check-inventory', authorize('admin', 'mechanic'), checkInventoryAvailability);
 
 export default router;

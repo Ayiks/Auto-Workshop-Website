@@ -3,13 +3,18 @@ import { useParams, Link } from 'react-router-dom';
 import DashboardLayout from '../../components/layout/DashboardLayout';
 import api from '../../services/api';
 import { format } from 'date-fns';
+import useAuthStore from '../../store/authStore';
 
 export default function Invoice() {
   const { id } = useParams();
+  const { user } = useAuthStore();
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [inventoryCheck, setInventoryCheck] = useState(null);
+  const [showForceConfirm, setShowForceConfirm] = useState(false);
+  const [processing, setProcessing] = useState(false);
   const printRef = useRef();
 
   useEffect(() => {
@@ -29,17 +34,62 @@ export default function Invoice() {
     }
   };
 
-  const handleMarkAsPaid = async () => {
+  const checkInventory = async () => {
     try {
-      await api.put(`/invoices/${id}/payment`, {
+      setProcessing(true);
+      const response = await api.post(`/invoices/${id}/check-inventory`);
+      setInventoryCheck(response);
+      
+      if (response.canProceed) {
+        // No issues, show payment modal
+        setShowPaymentModal(true);
+      } else {
+        // Insufficient stock, show warning
+        setShowPaymentModal(true);
+      }
+    } catch (error) {
+      alert(error.error?.message || 'Failed to check inventory');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
+  const handleMarkAsPaid = async (forcePayment = false) => {
+    try {
+      setProcessing(true);
+      const response = await api.put(`/invoices/${id}/payment`, {
         paymentStatus: 'paid',
         paymentMethod,
+        forcePayment,
       });
-      alert('Invoice marked as paid!');
+
+      if (response.requiresConfirmation) {
+        // Admin needs to confirm force payment
+        setShowForceConfirm(true);
+        setInventoryCheck({
+          canProceed: false,
+          insufficientStock: response.insufficientStock,
+        });
+        setProcessing(false);
+        return;
+      }
+
+      alert('Invoice marked as paid! Inventory and sales records updated.');
       fetchInvoice();
       setShowPaymentModal(false);
+      setShowForceConfirm(false);
+      setInventoryCheck(null);
     } catch (error) {
-      alert(error.error?.message || 'Failed to update payment status');
+      if (error.error?.code === 'INSUFFICIENT_STOCK') {
+        setInventoryCheck({
+          canProceed: false,
+          insufficientStock: error.error.details?.insufficientStock || [],
+        });
+      } else {
+        alert(error.error?.message || 'Failed to update payment status');
+      }
+    } finally {
+      setProcessing(false);
     }
   };
 
@@ -67,6 +117,9 @@ export default function Invoice() {
     );
   }
 
+  const inventoryMaterials = invoice.job.materials.filter(m => m.materialId);
+  const manualMaterials = invoice.job.materials.filter(m => !m.materialId);
+
   return (
     <DashboardLayout>
       <div className="max-w-4xl mx-auto space-y-6">
@@ -77,8 +130,12 @@ export default function Invoice() {
           </Link>
           <div className="flex space-x-2">
             {invoice.paymentStatus === 'unpaid' && (
-              <button onClick={() => setShowPaymentModal(true)} className="btn-success">
-                💰 Mark as Paid
+              <button 
+                onClick={checkInventory} 
+                className="btn-success"
+                disabled={processing}
+              >
+                {processing ? 'Checking...' : '💰 Mark as Paid'}
               </button>
             )}
             <button onClick={handlePrint} className="btn-primary">
@@ -94,6 +151,7 @@ export default function Invoice() {
             <div className="bg-green-100 border-2 border-green-500 text-green-800 p-4 rounded-lg mb-4 print:hidden">
               <p className="font-bold">✓ PAID</p>
               <p className="text-sm">Payment received on {format(new Date(invoice.paidDate), 'MMM dd, yyyy')}</p>
+              <p className="text-xs text-green-700 mt-1">Inventory updated • Sales recorded</p>
             </div>
           )}
           {invoice.paymentStatus === 'unpaid' && (
@@ -136,6 +194,9 @@ export default function Invoice() {
               <p className="text-sm text-gray-600 mt-1">
                 <span className="font-medium">Job ID:</span> #{invoice.jobId}
               </p>
+              <p className="text-sm text-gray-600 mt-1">
+                <span className="font-medium">Payment Method:</span> {invoice.paymentMethod.toUpperCase()}
+              </p>
             </div>
           </div>
 
@@ -162,19 +223,59 @@ export default function Invoice() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {/* Materials */}
-                {invoice.job.materials && invoice.job.materials.map((material) => (
-                  <tr key={material.id}>
-                    <td className="py-3">{material.materialName}</td>
-                    <td className="py-3 text-center">{material.quantity}</td>
-                    <td className="py-3 text-right">
-                      {parseFloat(material.unitPrice).toFixed(2)}
-                    </td>
-                    <td className="py-3 text-right">
-                      {parseFloat(material.subtotal).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
+                {/* Materials from Inventory */}
+                {inventoryMaterials.length > 0 && (
+                  <>
+                    <tr className="bg-blue-50">
+                      <td colSpan="4" className="py-2 px-3 text-sm font-semibold text-blue-900">
+                        Materials from Workshop Inventory
+                      </td>
+                    </tr>
+                    {inventoryMaterials.map((material) => (
+                      <tr key={material.id}>
+                        <td className="py-3">
+                          {material.materialName}
+                          <span className="text-xs text-gray-500 ml-2">
+                            (Stock: {material.material?.quantity || 'N/A'})
+                          </span>
+                        </td>
+                        <td className="py-3 text-center">{material.quantity}</td>
+                        <td className="py-3 text-right">
+                          {parseFloat(material.unitPrice).toFixed(2)}
+                        </td>
+                        <td className="py-3 text-right">
+                          {parseFloat(material.subtotal).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                )}
+
+                {/* Manual Materials (not from inventory) */}
+                {manualMaterials.length > 0 && (
+                  <>
+                    <tr className="bg-gray-50">
+                      <td colSpan="4" className="py-2 px-3 text-sm font-semibold text-gray-700">
+                        Materials Sourced Externally
+                      </td>
+                    </tr>
+                    {manualMaterials.map((material) => (
+                      <tr key={material.id} className="text-gray-600">
+                        <td className="py-3">
+                          {material.materialName}
+                          <span className="text-xs text-gray-400 ml-2">(External)</span>
+                        </td>
+                        <td className="py-3 text-center">{material.quantity}</td>
+                        <td className="py-3 text-right">
+                          {parseFloat(material.unitPrice).toFixed(2)}
+                        </td>
+                        <td className="py-3 text-right">
+                          {parseFloat(material.subtotal).toFixed(2)}
+                        </td>
+                      </tr>
+                    ))}
+                  </>
+                )}
                 
                 {/* Materials Subtotal */}
                 <tr className="bg-gray-100 font-medium">
@@ -254,13 +355,69 @@ export default function Invoice() {
       {/* Payment Modal */}
       {showPaymentModal && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
+          <div className="bg-white rounded-lg max-w-2xl w-full p-6 max-h-[90vh] overflow-y-auto">
             <h2 className="text-2xl font-bold mb-4">Mark Invoice as Paid</h2>
             
             <div className="space-y-4">
               <div className="bg-blue-50 p-4 rounded">
                 <p className="font-bold text-lg">Total Amount: GH₵ {parseFloat(invoice.totalAmount).toFixed(2)}</p>
               </div>
+
+              {/* Inventory Check Results */}
+              {inventoryCheck && !inventoryCheck.canProceed && (
+                <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
+                  <h3 className="font-bold text-red-900 mb-2">⚠️ Insufficient Stock</h3>
+                  <p className="text-sm text-red-800 mb-3">
+                    The following materials do not have enough stock:
+                  </p>
+                  <div className="space-y-2">
+                    {inventoryCheck.insufficientStock.map((item, idx) => (
+                      <div key={idx} className="bg-white p-3 rounded border border-red-200">
+                        <p className="font-medium text-red-900">{item.materialName}</p>
+                        <div className="text-sm text-red-700 mt-1">
+                          <span className="mr-4">Required: {item.required}</span>
+                          <span className="mr-4">Available: {item.available}</span>
+                          <span className="text-red-900 font-semibold">Shortage: {item.shortage}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {user?.role === 'admin' && (
+                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-300 rounded">
+                      <p className="text-sm text-yellow-900 font-medium">
+                        As an admin, you can force this payment to proceed. However, this will result in negative stock quantities.
+                      </p>
+                    </div>
+                  )}
+
+                  {user?.role !== 'admin' && (
+                    <div className="mt-4 p-3 bg-gray-50 rounded">
+                      <p className="text-sm text-gray-700">
+                        Please restock these materials or contact an administrator.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {inventoryCheck && inventoryCheck.canProceed && (
+                <div className="bg-green-50 border-2 border-green-300 rounded-lg p-4">
+                  <h3 className="font-bold text-green-900 mb-2">✓ Inventory Check Passed</h3>
+                  <p className="text-sm text-green-800">
+                    All materials are available in stock. Ready to proceed with payment.
+                  </p>
+                  {inventoryCheck.availableMaterials && inventoryCheck.availableMaterials.length > 0 && (
+                    <div className="mt-3 space-y-1">
+                      {inventoryCheck.availableMaterials.map((item, idx) => (
+                        <div key={idx} className="text-sm text-green-700">
+                          {item.materialName}: {item.required} units (Available: {item.available})
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -277,22 +434,49 @@ export default function Invoice() {
                 </select>
               </div>
 
-              <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
-                <p className="text-sm text-yellow-800">
-                  ⚠️ This will mark the invoice as paid and update the job status.
-                </p>
-              </div>
+              {(!inventoryCheck || inventoryCheck.canProceed) && (
+                <div className="bg-blue-50 p-3 rounded border border-blue-200">
+                  <p className="text-sm text-blue-800">
+                    ℹ️ When marked as paid:
+                  </p>
+                  <ul className="text-sm text-blue-700 mt-2 space-y-1 ml-4 list-disc">
+                    <li>Inventory materials will be deducted from stock</li>
+                    <li>A sales record will be created (materials + labour)</li>
+                    <li>Job status will be updated to "Invoiced"</li>
+                    <li>This action cannot be reversed</li>
+                  </ul>
+                </div>
+              )}
 
               <div className="flex space-x-3 pt-4">
+                {(!inventoryCheck || inventoryCheck.canProceed) && (
+                  <button
+                    onClick={() => handleMarkAsPaid(false)}
+                    className="flex-1 btn-success"
+                    disabled={processing}
+                  >
+                    {processing ? 'Processing...' : 'Confirm Payment'}
+                  </button>
+                )}
+
+                {inventoryCheck && !inventoryCheck.canProceed && user?.role === 'admin' && (
+                  <button
+                    onClick={() => handleMarkAsPaid(true)}
+                    className="flex-1 bg-orange-600 text-white px-4 py-2 rounded hover:bg-orange-700"
+                    disabled={processing}
+                  >
+                    {processing ? 'Processing...' : 'Force Payment (Admin)'}
+                  </button>
+                )}
+
                 <button
-                  onClick={handleMarkAsPaid}
-                  className="flex-1 btn-success"
-                >
-                  Confirm Payment
-                </button>
-                <button
-                  onClick={() => setShowPaymentModal(false)}
+                  onClick={() => {
+                    setShowPaymentModal(false);
+                    setInventoryCheck(null);
+                    setShowForceConfirm(false);
+                  }}
                   className="flex-1 btn-secondary"
+                  disabled={processing}
                 >
                   Cancel
                 </button>

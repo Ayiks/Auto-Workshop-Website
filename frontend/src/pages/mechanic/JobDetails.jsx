@@ -22,6 +22,7 @@ export default function JobDetails() {
     try {
       setLoading(true);
       const response = await api.get(`/jobs/${id}`);
+      console.log('Fetched job details:', response.job);
       setJob(response.job);
     } catch (error) {
       console.error('Error fetching job:', error);
@@ -248,7 +249,10 @@ export default function JobDetails() {
                       <td className="px-4 py-3 font-medium">{material.materialName}</td>
                       <td className="px-4 py-3">{material.quantity}</td>
                       <td className="px-4 py-3">
-                        {material.estimatedCost ? `GH₵ ${parseFloat(material.estimatedCost).toFixed(2)}` : '-'}
+                        {material.unitPrice ? `GH₵ ${parseFloat(material.unitPrice).toFixed(2)}` : '-'}
+                      </td>
+                      <td className="px-4 py-3">
+                        GH₵ {parseFloat(material.subtotal).toFixed(2)}
                       </td>
                       <td className="px-4 py-3">
                         <span className={`px-2 py-1 text-xs rounded-full ${

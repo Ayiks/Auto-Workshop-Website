@@ -6,10 +6,15 @@ import { format } from 'date-fns';
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
-    todaySales: 0,
+    todayRevenue: 0,
     todayProfit: 0,
+    todayExpenses: 0,
+    netProfit: 0,
     lowStockCount: 0,
+    materialSalesCount: 0,
+    jobSalesCount: 0,
     recentSales: [],
+    recentJobs: [],
   });
   const [loading, setLoading] = useState(true);
 
@@ -28,14 +33,25 @@ export default function AdminDashboard() {
       // Fetch low stock materials
       const lowStockResponse = await api.get('/materials/low-stock');
       
-      // Fetch recent sales
-      const salesResponse = await api.get('/sales?limit=10');
+      // Fetch recent sales (material sales)
+      const salesResponse = await api.get('/sales?limit=5');
+
+      // Fetch recent paid invoices (job sales)
+      const invoicesResponse = await api.get('/invoices?paymentStatus=paid&limit=5');
+
+      const summary = reportResponse.summary || {};
+      console.log('Dashboard Summary:', summary);
 
       setStats({
-        todaySales: reportResponse.summary?.totalSales || 0,
-        todayProfit: reportResponse.summary?.totalProfit || 0,
+        todayRevenue: summary.totalRevenue || 0,
+        todayProfit: summary.grossProfit || 0,
+        todayExpenses: summary.expenses?.totalExpenses || 0,
+        netProfit: summary.netProfit || 0,
         lowStockCount: lowStockResponse.count || 0,
+        materialSalesCount: summary.materialSales?.transactionCount || 0,
+        jobSalesCount: summary.jobSales?.transactionCount || 0,
         recentSales: salesResponse.sales || [],
+        recentJobs: invoicesResponse.invoices || [],
       });
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -68,31 +84,55 @@ export default function AdminDashboard() {
           </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Today's Sales */}
+        {/* Stats Cards - Top Row */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          {/* Today's Revenue */}
           <div className="card bg-gradient-to-br from-blue-500 to-blue-600 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium">Today's Sales</p>
+                <p className="text-blue-100 text-sm font-medium">Today's Revenue</p>
                 <p className="text-3xl font-bold mt-2">
-                  GH₵ {parseFloat(stats.todaySales).toFixed(2)}
+                  GH₵ {parseFloat(stats.todayRevenue).toFixed(2)}
+                </p>
+                <p className="text-xs text-blue-100 mt-1">
+                  {stats.materialSalesCount} materials + {stats.jobSalesCount} jobs
                 </p>
               </div>
               <div className="text-5xl opacity-20">💰</div>
             </div>
           </div>
 
-          {/* Today's Profit */}
+          {/* Gross Profit */}
           <div className="card bg-gradient-to-br from-green-500 to-green-600 text-white">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-green-100 text-sm font-medium">Today's Profit</p>
+                <p className="text-green-100 text-sm font-medium">Gross Profit</p>
                 <p className="text-3xl font-bold mt-2">
                   GH₵ {parseFloat(stats.todayProfit).toFixed(2)}
                 </p>
+                <p className="text-xs text-green-100 mt-1">Before expenses</p>
               </div>
               <div className="text-5xl opacity-20">📈</div>
+            </div>
+          </div>
+
+          {/* Net Profit */}
+          <div className={`card ${
+            stats.netProfit >= 0 
+              ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' 
+              : 'bg-gradient-to-br from-red-500 to-red-600'
+          } text-white`}>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-white text-sm font-medium">Net Profit</p>
+                <p className="text-3xl font-bold mt-2">
+                  GH₵ {parseFloat(stats.netProfit).toFixed(2)}
+                </p>
+                <p className="text-xs text-white mt-1">
+                  After GH₵{parseFloat(stats.todayExpenses).toFixed(2)} expenses
+                </p>
+              </div>
+              <div className="text-5xl opacity-20">💎</div>
             </div>
           </div>
 
@@ -105,10 +145,10 @@ export default function AdminDashboard() {
             } text-white hover:scale-105 transition-transform cursor-pointer`}>
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-red-100 text-sm font-medium">Low Stock Items</p>
+                  <p className="text-white text-sm font-medium">Low Stock Items</p>
                   <p className="text-3xl font-bold mt-2">{stats.lowStockCount}</p>
                   {stats.lowStockCount > 0 && (
-                    <p className="text-xs text-red-100 mt-1">Click to view</p>
+                    <p className="text-xs text-white mt-1">Click to view</p>
                   )}
                 </div>
                 <div className="text-5xl opacity-20">⚠️</div>
@@ -133,63 +173,137 @@ export default function AdminDashboard() {
           </Link>
         </div>
 
-        {/* Recent Sales */}
-        <div className="card">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-900">Recent Sales</h2>
-            <Link to="/sales/history" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-              View All →
-            </Link>
+        {/* Recent Activity - Two Columns */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Recent Material Sales */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">
+                Recent Material Sales
+              </h2>
+              <Link to="/sales/history" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                View All →
+              </Link>
+            </div>
+
+            {stats.recentSales.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No material sales today</p>
+            ) : (
+              <div className="space-y-3">
+                {stats.recentSales.map((sale) => (
+                  <div key={sale.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {sale.items?.length || 0} items
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {format(new Date(sale.saleDate), 'MMM dd, HH:mm')}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-900">
+                          GH₵ {parseFloat(sale.totalAmount).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-green-600 font-medium">
+                          +GH₵ {parseFloat(sale.totalProfit).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      By: {sale.soldBy?.fullName || sale.soldBy?.username || 'N/A'}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
-          {stats.recentSales.length === 0 ? (
-            <p className="text-gray-500 text-center py-8">No sales yet today</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date & Time
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Items
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Amount
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Profit
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Sold By
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {stats.recentSales.slice(0, 5).map((sale) => (
-                    <tr key={sale.id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {format(new Date(sale.saleDate), 'MMM dd, HH:mm')}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {sale.items?.length || 0} items
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        GH₵ {parseFloat(sale.totalAmount).toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-green-600">
-                        GH₵ {parseFloat(sale.totalProfit).toFixed(2)}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {sale.soldBy?.fullName || sale.soldBy?.username || 'N/A'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          {/* Recent Job Sales (Paid Invoices) */}
+          <div className="card">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-gray-900">
+                Recent Job Sales
+              </h2>
+              <Link to="/jobs?status=invoiced" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
+                View All →
+              </Link>
             </div>
-          )}
+
+            {stats.recentJobs.length === 0 ? (
+              <p className="text-gray-500 text-center py-8">No job sales today</p>
+            ) : (
+              <div className="space-y-3">
+                {stats.recentJobs.map((invoice) => (
+                  <Link
+                    key={invoice.id}
+                    to={`/invoices/${invoice.id}`}
+                    className="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
+                  >
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="text-sm font-medium text-gray-900">
+                          {invoice.job?.clientName || 'N/A'}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          {invoice.invoiceNumber}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {invoice.paidDate && format(new Date(invoice.paidDate), 'MMM dd, HH:mm')}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-bold text-gray-900">
+                          GH₵ {parseFloat(invoice.totalAmount).toFixed(2)}
+                        </p>
+                        <p className="text-xs text-green-600 font-medium">
+                          +GH₵ {parseFloat(invoice.totalProfit).toFixed(2)}
+                        </p>
+                      </div>
+                    </div>
+                    {invoice.job?.carMake && (
+                      <p className="text-xs text-gray-500 mt-2">
+                        {invoice.job.carMake} {invoice.job.carModel}
+                      </p>
+                    )}
+                  </Link>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Today's Breakdown */}
+        <div className="card">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Today's Breakdown</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Material Sales */}
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <p className="text-sm font-medium text-blue-900">Material Sales</p>
+              <p className="text-2xl font-bold text-blue-900 mt-2">
+                {stats.materialSalesCount}
+              </p>
+              <p className="text-xs text-blue-700 mt-1">transactions</p>
+            </div>
+
+            {/* Job Sales */}
+            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <p className="text-sm font-medium text-purple-900">Job Sales</p>
+              <p className="text-2xl font-bold text-purple-900 mt-2">
+                {stats.jobSalesCount}
+              </p>
+              <p className="text-xs text-purple-700 mt-1">completed & paid</p>
+            </div>
+
+            {/* Total Expenses */}
+            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
+              <p className="text-sm font-medium text-red-900">Expenses</p>
+              <p className="text-2xl font-bold text-red-900 mt-2">
+                GH₵ {parseFloat(stats.todayExpenses).toFixed(2)}
+              </p>
+              <p className="text-xs text-red-700 mt-1">total spent</p>
+            </div>
+          </div>
         </div>
       </div>
     </DashboardLayout>

@@ -35,7 +35,11 @@ export const createInvoice = async (req, res, next) => {
     const job = await prisma.job.findUnique({
       where: { id: parseInt(jobId) },
       include: {
-        materials: true,
+        materials: {
+          include: {
+            material: true, // Include full material details for stock check
+          },
+        },
         invoice: true,
       },
     });
@@ -81,22 +85,388 @@ export const createInvoice = async (req, res, next) => {
       attempts++;
     }
 
-    // Create invoice and keep job status as pending (for client approval)
-    const invoice = await prisma.$transaction(async (tx) => {
-      const newInvoice = await tx.invoice.create({
-        data: {
-          jobId: parseInt(jobId),
-          invoiceNumber,
-          materialsCost,
-          materialsProfit,
-          labourCost: parseFloat(labourCost),
-          totalAmount,
-          totalProfit,
-          paymentMethod,
-          paymentStatus: 'unpaid',
-          createdById: req.user.id,
-          notes: notes?.trim(),
+    // Create invoice
+    const invoice = await prisma.invoice.create({
+      data: {
+        jobId: parseInt(jobId),
+        invoiceNumber,
+        materialsCost,
+        materialsProfit,
+        labourCost: parseFloat(labourCost),
+        totalAmount,
+        totalProfit,
+        paymentMethod,
+        paymentStatus: 'unpaid',
+        createdById: req.user.id,
+        notes: notes?.trim(),
+      },
+      include: {
+        job: {
+          include: {
+            materials: {
+              include: {
+                material: {
+                  select: {
+                    id: true,
+                    name: true,
+                    quantity: true,
+                  },
+                },
+              },
+            },
+            mechanic: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+              },
+            },
+          },
         },
+        createdBy: {
+          select: {
+            id: true,
+            username: true,
+            fullName: true,
+          },
+        },
+      },
+    });
+
+    res.status(201).json({
+      success: true,
+      message: 'Invoice created successfully',
+      invoice,
+    });
+  } catch (error) {
+    console.log('Error creating invoice:', error);
+    next(error);
+  }
+};
+
+// @desc    Check inventory availability before payment
+// @route   POST /api/invoices/:id/check-inventory
+// @access  Private (Admin, Mechanic)
+export const checkInventoryAvailability = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        job: {
+          include: {
+            materials: {
+              include: {
+                material: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404, 'RESOURCE_NOT_FOUND');
+    }
+
+    // Check stock for inventory materials only
+    const insufficientStock = [];
+    const availableMaterials = [];
+
+    for (const jobMaterial of invoice.job.materials) {
+      // Only check materials from inventory (materialId not null)
+      if (jobMaterial.materialId && jobMaterial.material) {
+        const currentStock = jobMaterial.material.quantity;
+        const requiredQty = jobMaterial.quantity;
+
+        if (currentStock < requiredQty) {
+          insufficientStock.push({
+            materialId: jobMaterial.materialId,
+            materialName: jobMaterial.materialName,
+            required: requiredQty,
+            available: currentStock,
+            shortage: requiredQty - currentStock,
+          });
+        } else {
+          availableMaterials.push({
+            materialId: jobMaterial.materialId,
+            materialName: jobMaterial.materialName,
+            required: requiredQty,
+            available: currentStock,
+          });
+        }
+      }
+    }
+
+    res.json({
+      success: true,
+      canProceed: insufficientStock.length === 0,
+      insufficientStock,
+      availableMaterials,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Update invoice payment status
+// @route   PUT /api/invoices/:id/payment
+// @access  Private (Admin, Mechanic)
+export const updatePaymentStatus = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { paymentStatus, paymentMethod, forcePayment = false } = req.body;
+
+    // Check if invoice exists
+    const invoice = await prisma.invoice.findUnique({
+      where: { id: parseInt(id) },
+      include: {
+        job: {
+          include: {
+            materials: {
+              include: {
+                material: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (!invoice) {
+      throw new AppError('Invoice not found', 404, 'RESOURCE_NOT_FOUND');
+    }
+
+    // Mechanics can only update invoices for their jobs
+    if (req.user.role === 'mechanic' && invoice.job.mechanicId !== req.user.id) {
+      throw new AppError('Access denied', 403, 'ACCESS_DENIED');
+    }
+
+    // Prevent marking as unpaid once paid (data integrity)
+    if (invoice.paymentStatus === 'paid' && paymentStatus === 'unpaid') {
+      throw new AppError(
+        'Cannot mark invoice as unpaid once payment is recorded. Contact admin for corrections.',
+        400,
+        'PAYMENT_LOCKED'
+      );
+    }
+
+    // Validate payment status
+    if (paymentStatus && !['paid', 'unpaid'].includes(paymentStatus)) {
+      throw new AppError('Invalid payment status', 400, 'VALIDATION_ERROR');
+    }
+
+    // Validate payment method
+    if (paymentMethod && !['cash', 'momo', 'cheque'].includes(paymentMethod)) {
+      throw new AppError('Invalid payment method', 400, 'VALIDATION_ERROR');
+    }
+
+    // If marking as paid, check inventory and create sale
+    if (paymentStatus === 'paid' && invoice.paymentStatus === 'unpaid') {
+      // Check inventory availability for materials from our shop
+      const insufficientStock = [];
+      
+      for (const jobMaterial of invoice.job.materials) {
+        if (jobMaterial.materialId && jobMaterial.material) {
+          const currentStock = jobMaterial.material.quantity;
+          const requiredQty = jobMaterial.quantity;
+
+          if (currentStock < requiredQty) {
+            insufficientStock.push({
+              materialName: jobMaterial.materialName,
+              required: requiredQty,
+              available: currentStock,
+              shortage: requiredQty - currentStock,
+            });
+          }
+        }
+      }
+
+      // Block payment if insufficient stock (unless force override by admin)
+      if (insufficientStock.length > 0 && !forcePayment) {
+        if (req.user.role !== 'admin') {
+          throw new AppError(
+            'Insufficient stock for some materials. Contact admin.',
+            400,
+            'INSUFFICIENT_STOCK',
+            { insufficientStock }
+          );
+        } else {
+          // Admin can force, but we still return warning
+          return res.json({
+            success: false,
+            requiresConfirmation: true,
+            message: 'Insufficient stock detected. Confirm to proceed anyway.',
+            insufficientStock,
+          });
+        }
+      }
+
+      // All checks passed - process payment
+      const result = await prisma.$transaction(async (tx) => {
+        // 1. Update invoice payment status
+        const updatedInvoice = await tx.invoice.update({
+          where: { id: parseInt(id) },
+          data: {
+            paymentStatus: 'paid',
+            paidDate: new Date(),
+            ...(paymentMethod && { paymentMethod }),
+          },
+        });
+
+        // 2. Update job status to 'invoiced'
+        await tx.job.update({
+          where: { id: updatedInvoice.jobId },
+          data: { status: 'invoiced' },
+        });
+
+        // 3. Prepare sale items (only inventory materials + labour)
+        const saleItems = [];
+        let totalSaleAmount = 0;
+        let totalSaleProfit = 0;
+
+        // Add inventory materials to sale
+        for (const jobMaterial of invoice.job.materials) {
+          // Only materials from our inventory (materialId not null)
+          if (jobMaterial.materialId && jobMaterial.material) {
+            const itemProfit = (parseFloat(jobMaterial.unitPrice) - parseFloat(jobMaterial.costPrice)) * jobMaterial.quantity;
+            
+            saleItems.push({
+              materialId: jobMaterial.materialId,
+              quantity: jobMaterial.quantity,
+              unitPrice: parseFloat(jobMaterial.unitPrice),
+              costPrice: parseFloat(jobMaterial.costPrice),
+              subtotal: parseFloat(jobMaterial.subtotal),
+              profit: itemProfit,
+            });
+
+            totalSaleAmount += parseFloat(jobMaterial.subtotal);
+            totalSaleProfit += itemProfit;
+
+            // Update inventory - deduct stock
+            await tx.material.update({
+              where: { id: jobMaterial.materialId },
+              data: {
+                quantity: {
+                  decrement: jobMaterial.quantity,
+                },
+              },
+            });
+          }
+        }
+
+        // Add labour as a separate sale item (100% profit)
+        // We'll create a virtual "Labour/Workmanship" material for this
+        const labourCost = parseFloat(invoice.labourCost);
+        if (labourCost > 0) {
+          // Check if "Labour/Workmanship" material exists, create if not
+          let labourMaterial = await tx.material.findFirst({
+            where: { name: 'Labour/Workmanship' },
+          });
+
+          if (!labourMaterial) {
+            labourMaterial = await tx.material.create({
+              data: {
+                name: 'Labour/Workmanship',
+                costPrice: 0, // Labour has no cost
+                sellingPrice: 0, // Variable pricing
+                quantity: 999999, // Virtual item, infinite quantity
+                lowStockLevel: 0,
+                isActive: true,
+                createdById: req.user.id,
+              },
+            });
+          }
+
+          saleItems.push({
+            materialId: labourMaterial.id,
+            quantity: 1,
+            unitPrice: labourCost,
+            costPrice: 0, // No cost for labour
+            subtotal: labourCost,
+            profit: labourCost, // 100% profit
+          });
+
+          totalSaleAmount += labourCost;
+          totalSaleProfit += labourCost;
+        }
+
+        // 4. Create sale record
+        const sale = await tx.sale.create({
+          data: {
+            totalAmount: totalSaleAmount,
+            totalProfit: totalSaleProfit,
+            paymentMethod: updatedInvoice.paymentMethod,
+            soldById: req.user.id,
+            items: {
+              create: saleItems,
+            },
+          },
+          include: {
+            items: {
+              include: {
+                material: true,
+              },
+            },
+          },
+        });
+
+        // Return updated invoice with all relations
+        const finalInvoice = await tx.invoice.findUnique({
+          where: { id: parseInt(id) },
+          include: {
+            job: {
+              include: {
+                materials: {
+                  include: {
+                    material: {
+                      select: {
+                        id: true,
+                        name: true,
+                        quantity: true,
+                      },
+                    },
+                  },
+                },
+                mechanic: {
+                  select: {
+                    id: true,
+                    username: true,
+                    fullName: true,
+                  },
+                },
+              },
+            },
+            createdBy: {
+              select: {
+                id: true,
+                username: true,
+                fullName: true,
+              },
+            },
+          },
+        });
+
+        return { invoice: finalInvoice, sale };
+      });
+
+      res.json({
+        success: true,
+        message: 'Payment recorded successfully. Inventory and sales updated.',
+        invoice: result.invoice,
+        sale: result.sale,
+      });
+    } else {
+      // Just update payment method without changing status
+      const updateData = {};
+      if (paymentMethod) {
+        updateData.paymentMethod = paymentMethod;
+      }
+
+      const updatedInvoice = await prisma.invoice.update({
+        where: { id: parseInt(id) },
+        data: updateData,
         include: {
           job: {
             include: {
@@ -130,17 +500,12 @@ export const createInvoice = async (req, res, next) => {
         },
       });
 
-      // Job status remains 'pending' until payment is made
-      // Don't update status here - client needs to see and approve first
-
-      return newInvoice;
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Invoice created successfully',
-      invoice,
-    });
+      res.json({
+        success: true,
+        message: 'Invoice updated successfully',
+        invoice: updatedInvoice,
+      });
+    }
   } catch (error) {
     next(error);
   }
@@ -151,7 +516,7 @@ export const createInvoice = async (req, res, next) => {
 // @access  Private (Admin, Mechanic)
 export const getAllInvoices = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, startDate, endDate } = req.query;
+    const { page = 1, limit = 20, startDate, endDate, paymentStatus } = req.query;
 
     const where = {};
 
@@ -164,6 +529,11 @@ export const getAllInvoices = async (req, res, next) => {
         end.setHours(23, 59, 59, 999);
         where.invoiceDate.lte = end;
       }
+    }
+
+    // Payment status filter
+    if (paymentStatus) {
+      where.paymentStatus = paymentStatus;
     }
 
     // Mechanics can only see invoices for their jobs
@@ -187,6 +557,7 @@ export const getAllInvoices = async (req, res, next) => {
               carMake: true,
               carModel: true,
               carRegNumber: true,
+              status: true,
               mechanic: {
                 select: {
                   id: true,
@@ -233,7 +604,17 @@ export const getInvoice = async (req, res, next) => {
       include: {
         job: {
           include: {
-            materials: true,
+            materials: {
+              include: {
+                material: {
+                  select: {
+                    id: true,
+                    name: true,
+                    quantity: true,
+                  },
+                },
+              },
+            },
             mechanic: {
               select: {
                 id: true,
@@ -283,7 +664,17 @@ export const getInvoiceByNumber = async (req, res, next) => {
       include: {
         job: {
           include: {
-            materials: true,
+            materials: {
+              include: {
+                material: {
+                  select: {
+                    id: true,
+                    name: true,
+                    quantity: true,
+                  },
+                },
+              },
+            },
             mechanic: {
               select: {
                 id: true,
@@ -321,7 +712,7 @@ export const getInvoiceByNumber = async (req, res, next) => {
   }
 };
 
-// @desc    Delete invoice
+// @desc    Delete invoice (Admin only, only if unpaid)
 // @route   DELETE /api/invoices/:id
 // @access  Private (Admin only)
 export const deleteInvoice = async (req, res, next) => {
@@ -336,6 +727,15 @@ export const deleteInvoice = async (req, res, next) => {
 
     if (!invoice) {
       throw new AppError('Invoice not found', 404, 'RESOURCE_NOT_FOUND');
+    }
+
+    // Prevent deletion of paid invoices (data integrity)
+    if (invoice.paymentStatus === 'paid') {
+      throw new AppError(
+        'Cannot delete paid invoices. Contact system administrator.',
+        400,
+        'PAYMENT_LOCKED'
+      );
     }
 
     // Delete invoice and update job status in transaction
@@ -353,101 +753,6 @@ export const deleteInvoice = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Invoice deleted successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Update invoice payment status
-// @route   PUT /api/invoices/:id/payment
-// @access  Private (Admin, Mechanic)
-export const updatePaymentStatus = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { paymentStatus, paymentMethod } = req.body;
-
-    // Check if invoice exists
-    const invoice = await prisma.invoice.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        job: true,
-      },
-    });
-
-    if (!invoice) {
-      throw new AppError('Invoice not found', 404, 'RESOURCE_NOT_FOUND');
-    }
-
-    // Mechanics can only update invoices for their jobs
-    if (req.user.role === 'mechanic' && invoice.job.mechanicId !== req.user.id) {
-      throw new AppError('Access denied', 403, 'ACCESS_DENIED');
-    }
-
-    // Validate payment status
-    if (paymentStatus && !['paid', 'unpaid'].includes(paymentStatus)) {
-      throw new AppError('Invalid payment status', 400, 'VALIDATION_ERROR');
-    }
-
-    // Validate payment method
-    if (paymentMethod && !['cash', 'momo', 'cheque'].includes(paymentMethod)) {
-      throw new AppError('Invalid payment method', 400, 'VALIDATION_ERROR');
-    }
-
-    const updateData = {};
-    if (paymentStatus) {
-      updateData.paymentStatus = paymentStatus;
-      if (paymentStatus === 'paid') {
-        updateData.paidDate = new Date();
-      }
-    }
-    if (paymentMethod) {
-      updateData.paymentMethod = paymentMethod;
-    }
-
-    // Update invoice and job status in transaction
-    const result = await prisma.$transaction(async (tx) => {
-      const updatedInvoice = await tx.invoice.update({
-        where: { id: parseInt(id) },
-        data: updateData,
-        include: {
-          job: {
-            include: {
-              materials: true,
-              mechanic: {
-                select: {
-                  id: true,
-                  username: true,
-                  fullName: true,
-                },
-              },
-            },
-          },
-          createdBy: {
-            select: {
-              id: true,
-              username: true,
-              fullName: true,
-            },
-          },
-        },
-      });
-
-      // If marked as paid, update job status to 'invoiced'
-      if (paymentStatus === 'paid') {
-        await tx.job.update({
-          where: { id: updatedInvoice.jobId },
-          data: { status: 'invoiced' },
-        });
-      }
-
-      return updatedInvoice;
-    });
-
-    res.json({
-      success: true,
-      message: 'Payment status updated successfully',
-      invoice: result,
     });
   } catch (error) {
     next(error);

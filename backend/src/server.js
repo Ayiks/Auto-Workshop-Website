@@ -76,7 +76,7 @@ process.on('SIGINT', async () => {
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🚀 Server running on http://localhost:${PORT}`);
+  console.log(`🚀 Server running on ${process.env.NODE_ENV === 'production' ? process.env.HOST_URL : 'http://localhost'}:${PORT}`);
   console.log(`📊 Environment: ${process.env.NODE_ENV}`);
   console.log(`🔗 API Documentation: http://localhost:${PORT}/api`);
 });

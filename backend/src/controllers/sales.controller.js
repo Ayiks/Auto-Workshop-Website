@@ -270,8 +270,8 @@ export const getDailyReport = async (req, res, next) => {
     const endOfDay = new Date(targetDate);
     endOfDay.setHours(23, 59, 59, 999);
 
-    // Get material sales
-    const materialSales = await prisma.sale.findMany({
+    // Get ALL material sales (counter + job inventory materials)
+    const allMaterialSales = await prisma.sale.findMany({
       where: {
         saleDate: {
           gte: startOfDay,
@@ -297,8 +297,8 @@ export const getDailyReport = async (req, res, next) => {
       },
     });
 
-    // Get paid invoices (job sales)
-    const jobSales = await prisma.invoice.findMany({
+    // Get paid invoices for job analysis
+    const paidInvoices = await prisma.invoice.findMany({
       where: {
         paymentStatus: 'paid',
         paidDate: {
@@ -331,18 +331,86 @@ export const getDailyReport = async (req, res, next) => {
       },
     });
 
-    // Calculate material sales summary
+    // Separate counter sales from job sales
+    // Note: Labour material has name "Labour/Workmanship"
+    const counterSales = [];
+    const jobMaterialSales = [];
+
+    for (const sale of allMaterialSales) {
+      // Check if this sale has Labour/Workmanship (indicates it's from a job)
+      const hasLabour = sale.items.some(item => item.material.name === 'Labour/Workmanship');
+      
+      if (hasLabour) {
+        // This is from a job - separate materials and labour
+        const materials = sale.items.filter(item => item.material.name !== 'Labour/Workmanship');
+        const labour = sale.items.find(item => item.material.name === 'Labour/Workmanship');
+        
+        if (materials.length > 0) {
+          jobMaterialSales.push({
+            ...sale,
+            items: materials,
+            totalAmount: materials.reduce((sum, item) => sum + parseFloat(item.subtotal), 0),
+            totalProfit: materials.reduce((sum, item) => sum + parseFloat(item.profit), 0),
+          });
+        }
+      } else {
+        // Regular counter sale
+        counterSales.push(sale);
+      }
+    }
+
+    // Calculate material sales summary (counter + job materials)
+    const allMaterialsTotal = allMaterialSales.reduce((sum, sale) => {
+      // Exclude labour from totals
+      const nonLabourTotal = sale.items
+        .filter(item => item.material.name !== 'Labour/Workmanship')
+        .reduce((itemSum, item) => itemSum + parseFloat(item.subtotal), 0);
+      return sum + nonLabourTotal;
+    }, 0);
+
+    const allMaterialsProfit = allMaterialSales.reduce((sum, sale) => {
+      // Exclude labour from profit
+      const nonLabourProfit = sale.items
+        .filter(item => item.material.name !== 'Labour/Workmanship')
+        .reduce((itemSum, item) => itemSum + parseFloat(item.profit), 0);
+      return sum + nonLabourProfit;
+    }, 0);
+
     const materialSalesSummary = {
-      transactionCount: materialSales.length,
-      totalSales: materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0),
-      totalProfit: materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalProfit), 0),
+      transactionCount: allMaterialSales.length,
+      counterSalesCount: counterSales.length,
+      jobMaterialsCount: jobMaterialSales.length,
+      totalSales: allMaterialsTotal,
+      totalProfit: allMaterialsProfit,
+      breakdown: {
+        fromCounter: counterSales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0),
+        fromJobs: jobMaterialSales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0),
+      },
     };
 
-    // Calculate job sales summary
+    // Calculate job sales summary (labour + external materials for display)
+    let totalLabourRevenue = 0;
+    let totalLabourProfit = 0;
+    let totalExternalMaterials = 0;
+
+    for (const invoice of paidInvoices) {
+      // Labour revenue (from invoice)
+      totalLabourRevenue += parseFloat(invoice.labourCost);
+      totalLabourProfit += parseFloat(invoice.labourCost); // 100% profit
+
+      // External materials (for display only - not counted in revenue)
+      const externalMaterialsCost = invoice.job.materials
+        .filter(m => !m.materialId) // Manual/external materials
+        .reduce((sum, m) => sum + parseFloat(m.subtotal), 0);
+      
+      totalExternalMaterials += externalMaterialsCost;
+    }
+
     const jobSalesSummary = {
-      transactionCount: jobSales.length,
-      totalSales: jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0),
-      totalProfit: jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalProfit), 0),
+      transactionCount: paidInvoices.length,
+      labourRevenue: totalLabourRevenue,
+      labourProfit: totalLabourProfit,
+      externalMaterialsTotal: totalExternalMaterials, // Display only
     };
 
     // Calculate expenses summary
@@ -359,21 +427,29 @@ export const getDailyReport = async (req, res, next) => {
     };
 
     // Calculate overall summary
+    // IMPORTANT: totalRevenue excludes external materials
+    const totalRevenue = materialSalesSummary.totalSales + jobSalesSummary.labourRevenue;
+    const grossProfit = materialSalesSummary.totalProfit + jobSalesSummary.labourProfit;
+    const netProfit = grossProfit - expensesSummary.totalExpenses;
+
     const summary = {
       date: targetDate.toISOString().split('T')[0],
       materialSales: materialSalesSummary,
       jobSales: jobSalesSummary,
-      totalRevenue: materialSalesSummary.totalSales + jobSalesSummary.totalSales,
-      grossProfit: materialSalesSummary.totalProfit + jobSalesSummary.totalProfit,
+      totalRevenue, // Materials + Labour only (no external)
+      grossProfit,
       expenses: expensesSummary,
-      netProfit: (materialSalesSummary.totalProfit + jobSalesSummary.totalProfit) - expensesSummary.totalExpenses,
+      netProfit,
+      note: 'External materials shown on invoices but excluded from revenue (money does not come to us)',
     };
 
     res.json({
       success: true,
       summary,
-      materialSales,
-      jobSales,
+      materialSales: allMaterialSales,
+      counterSales,
+      jobMaterialSales,
+      jobSales: paidInvoices,
       expenses,
     });
   } catch (error) {
@@ -400,23 +476,41 @@ export const getWeeklyReport = async (req, res, next) => {
     weekEnd.setDate(weekStart.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
 
-    // Get material sales
-    const materialSales = await prisma.sale.findMany({
+    // Get all material sales
+    const allMaterialSales = await prisma.sale.findMany({
       where: {
         saleDate: {
           gte: weekStart,
           lte: weekEnd,
         },
       },
+      include: {
+        items: {
+          include: {
+            material: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     // Get paid invoices
-    const jobSales = await prisma.invoice.findMany({
+    const paidInvoices = await prisma.invoice.findMany({
       where: {
         paymentStatus: 'paid',
         paidDate: {
           gte: weekStart,
           lte: weekEnd,
+        },
+      },
+      include: {
+        job: {
+          include: {
+            materials: true,
+          },
         },
       },
     });
@@ -431,29 +525,55 @@ export const getWeeklyReport = async (req, res, next) => {
       },
     });
 
-    const materialSalesTotal = materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0);
-    const materialProfitTotal = materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalProfit), 0);
-    const jobSalesTotal = jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0);
-    const jobProfitTotal = jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalProfit), 0);
+    // Calculate material sales (exclude labour)
+    const materialSalesTotal = allMaterialSales.reduce((sum, sale) => {
+      const nonLabourTotal = sale.items
+        .filter(item => item.material.name !== 'Labour/Workmanship')
+        .reduce((itemSum, item) => itemSum + parseFloat(item.subtotal), 0);
+      return sum + nonLabourTotal;
+    }, 0);
+
+    const materialProfitTotal = allMaterialSales.reduce((sum, sale) => {
+      const nonLabourProfit = sale.items
+        .filter(item => item.material.name !== 'Labour/Workmanship')
+        .reduce((itemSum, item) => itemSum + parseFloat(item.profit), 0);
+      return sum + nonLabourProfit;
+    }, 0);
+
+    // Calculate job sales (labour only for revenue)
+    const labourTotal = paidInvoices.reduce((sum, inv) => sum + parseFloat(inv.labourCost), 0);
+    const externalMaterialsTotal = paidInvoices.reduce((sum, inv) => {
+      const external = inv.job.materials
+        .filter(m => !m.materialId)
+        .reduce((s, m) => s + parseFloat(m.subtotal), 0);
+      return sum + external;
+    }, 0);
+
     const expensesTotal = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+
+    // Total revenue = materials + labour (NO external)
+    const totalRevenue = materialSalesTotal + labourTotal;
+    const grossProfit = materialProfitTotal + labourTotal;
+    const netProfit = grossProfit - expensesTotal;
 
     const summary = {
       weekStart: weekStart.toISOString().split('T')[0],
       weekEnd: weekEnd.toISOString().split('T')[0],
       materialSales: {
-        transactionCount: materialSales.length,
+        transactionCount: allMaterialSales.length,
         totalSales: materialSalesTotal,
         totalProfit: materialProfitTotal,
       },
       jobSales: {
-        transactionCount: jobSales.length,
-        totalSales: jobSalesTotal,
-        totalProfit: jobProfitTotal,
+        transactionCount: paidInvoices.length,
+        labourRevenue: labourTotal,
+        labourProfit: labourTotal,
+        externalMaterialsTotal, // Display only
       },
-      totalRevenue: materialSalesTotal + jobSalesTotal,
-      grossProfit: materialProfitTotal + jobProfitTotal,
+      totalRevenue,
+      grossProfit,
       totalExpenses: expensesTotal,
-      netProfit: (materialProfitTotal + jobProfitTotal) - expensesTotal,
+      netProfit,
     };
 
     res.json({
@@ -477,23 +597,41 @@ export const getMonthlyReport = async (req, res, next) => {
     const monthStart = new Date(targetYear, targetMonth, 1);
     const monthEnd = new Date(targetYear, targetMonth + 1, 0, 23, 59, 59, 999);
 
-    // Get material sales
-    const materialSales = await prisma.sale.findMany({
+    // Get all material sales
+    const allMaterialSales = await prisma.sale.findMany({
       where: {
         saleDate: {
           gte: monthStart,
           lte: monthEnd,
         },
       },
+      include: {
+        items: {
+          include: {
+            material: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
     });
 
     // Get paid invoices
-    const jobSales = await prisma.invoice.findMany({
+    const paidInvoices = await prisma.invoice.findMany({
       where: {
         paymentStatus: 'paid',
         paidDate: {
           gte: monthStart,
           lte: monthEnd,
+        },
+      },
+      include: {
+        job: {
+          include: {
+            materials: true,
+          },
         },
       },
     });
@@ -508,30 +646,56 @@ export const getMonthlyReport = async (req, res, next) => {
       },
     });
 
-    const materialSalesTotal = materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalAmount), 0);
-    const materialProfitTotal = materialSales.reduce((sum, sale) => sum + parseFloat(sale.totalProfit), 0);
-    const jobSalesTotal = jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0);
-    const jobProfitTotal = jobSales.reduce((sum, inv) => sum + parseFloat(inv.totalProfit), 0);
+    // Calculate material sales (exclude labour)
+    const materialSalesTotal = allMaterialSales.reduce((sum, sale) => {
+      const nonLabourTotal = sale.items
+        .filter(item => item.material.name !== 'Labour/Workmanship')
+        .reduce((itemSum, item) => itemSum + parseFloat(item.subtotal), 0);
+      return sum + nonLabourTotal;
+    }, 0);
+
+    const materialProfitTotal = allMaterialSales.reduce((sum, sale) => {
+      const nonLabourProfit = sale.items
+        .filter(item => item.material.name !== 'Labour/Workmanship')
+        .reduce((itemSum, item) => itemSum + parseFloat(item.profit), 0);
+      return sum + nonLabourProfit;
+    }, 0);
+
+    // Calculate job sales (labour only for revenue)
+    const labourTotal = paidInvoices.reduce((sum, inv) => sum + parseFloat(inv.labourCost), 0);
+    const externalMaterialsTotal = paidInvoices.reduce((sum, inv) => {
+      const external = inv.job.materials
+        .filter(m => !m.materialId)
+        .reduce((s, m) => s + parseFloat(m.subtotal), 0);
+      return sum + external;
+    }, 0);
+
     const expensesTotal = expenses.reduce((sum, exp) => sum + parseFloat(exp.amount), 0);
+
+    // Total revenue = materials + labour (NO external)
+    const totalRevenue = materialSalesTotal + labourTotal;
+    const grossProfit = materialProfitTotal + labourTotal;
+    const netProfit = grossProfit - expensesTotal;
 
     const summary = {
       year: targetYear,
       month: targetMonth + 1,
       monthName: monthStart.toLocaleString('default', { month: 'long' }),
       materialSales: {
-        transactionCount: materialSales.length,
+        transactionCount: allMaterialSales.length,
         totalSales: materialSalesTotal,
         totalProfit: materialProfitTotal,
       },
       jobSales: {
-        transactionCount: jobSales.length,
-        totalSales: jobSalesTotal,
-        totalProfit: jobProfitTotal,
+        transactionCount: paidInvoices.length,
+        labourRevenue: labourTotal,
+        labourProfit: labourTotal,
+        externalMaterialsTotal, // Display only
       },
-      totalRevenue: materialSalesTotal + jobSalesTotal,
-      grossProfit: materialProfitTotal + jobProfitTotal,
+      totalRevenue,
+      grossProfit,
       totalExpenses: expensesTotal,
-      netProfit: (materialProfitTotal + jobProfitTotal) - expensesTotal,
+      netProfit,
     };
 
     res.json({

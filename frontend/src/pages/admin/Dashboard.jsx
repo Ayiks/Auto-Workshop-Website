@@ -40,7 +40,6 @@ export default function AdminDashboard() {
       const invoicesResponse = await api.get('/invoices?paymentStatus=paid&limit=5');
 
       const summary = reportResponse.summary || {};
-      console.log('Dashboard Summary:', summary);
 
       setStats({
         todayRevenue: summary.totalRevenue || 0,
@@ -60,13 +59,13 @@ export default function AdminDashboard() {
     }
   };
 
+  // Modern Minimal Loader
   if (loading) {
     return (
       <DashboardLayout>
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600 mx-auto"></div>
-            <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        <div className="flex items-center justify-center h-[80vh]">
+          <div className="relative">
+            <div className="h-16 w-16 rounded-full border-t-2 border-b-2 border-gray-900 animate-spin"></div>
           </div>
         </div>
       </DashboardLayout>
@@ -75,234 +74,264 @@ export default function AdminDashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">
-            Welcome back! Here's what's happening today.
-          </p>
+      <div className="max-w-7xl mx-auto space-y-8 pb-10">
+        {/* Minimal Header */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Overview</h1>
+            <p className="text-gray-500 text-sm mt-1">
+              {format(new Date(), 'EEEE, MMMM do, yyyy')}
+            </p>
+          </div>
+          <div className="flex gap-3">
+             {/* Contextual Action Button could go here */}
+          </div>
         </div>
 
-        {/* Stats Cards - Top Row */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        {/* Stats Grid - Modern Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {/* Today's Revenue */}
-          <div className="card bg-gradient-to-br from-blue-500 to-blue-600 text-white">
-            <div className="flex items-center justify-between">
+          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-blue-100 text-sm font-medium">Today's Revenue</p>
-                <p className="text-3xl font-bold mt-2">
+                <p className="text-gray-500 text-xs font-medium uppercase tracking-wider">Revenue</p>
+                <h3 className="text-2xl font-bold text-gray-900 mt-2 tracking-tight">
                   GH₵ {parseFloat(stats.todayRevenue).toFixed(2)}
-                </p>
-                <p className="text-xs text-blue-100 mt-1">
-                  {stats.materialSalesCount} materials + {stats.jobSalesCount} jobs
-                </p>
+                </h3>
               </div>
-              <div className="text-5xl opacity-20">💰</div>
+              <div className="p-3 bg-blue-50 rounded-full text-xl">💰</div>
+            </div>
+            <div className="mt-4 flex items-center text-xs text-gray-400">
+              <span>Materials + Labour</span>
             </div>
           </div>
 
           {/* Gross Profit */}
-          <div className="card bg-gradient-to-br from-green-500 to-green-600 text-white">
-            <div className="flex items-center justify-between">
+          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-green-100 text-sm font-medium">Gross Profit</p>
-                <p className="text-3xl font-bold mt-2">
+                <p className="text-gray-500 text-xs font-medium uppercase tracking-wider">Gross Profit</p>
+                <h3 className="text-2xl font-bold text-gray-900 mt-2 tracking-tight">
                   GH₵ {parseFloat(stats.todayProfit).toFixed(2)}
-                </p>
-                <p className="text-xs text-green-100 mt-1">Before expenses</p>
+                </h3>
               </div>
-              <div className="text-5xl opacity-20">📈</div>
+              <div className="p-3 bg-green-50 rounded-full text-xl">📈</div>
+            </div>
+            <div className="mt-4 flex items-center text-xs text-green-600 font-medium">
+              <span>Gross Income</span>
             </div>
           </div>
 
           {/* Net Profit */}
-          <div className={`card ${
-            stats.netProfit >= 0 
-              ? 'bg-gradient-to-br from-emerald-500 to-emerald-600' 
-              : 'bg-gradient-to-br from-red-500 to-red-600'
-          } text-white`}>
-            <div className="flex items-center justify-between">
+          <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm hover:shadow-md transition-shadow">
+            <div className="flex items-start justify-between">
               <div>
-                <p className="text-white text-sm font-medium">Net Profit</p>
-                <p className="text-3xl font-bold mt-2">
+                <p className="text-gray-500 text-xs font-medium uppercase tracking-wider">Net Profit</p>
+                <h3 className={`text-2xl font-bold mt-2 tracking-tight ${stats.netProfit >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
                   GH₵ {parseFloat(stats.netProfit).toFixed(2)}
-                </p>
-                <p className="text-xs text-white mt-1">
-                  After GH₵{parseFloat(stats.todayExpenses).toFixed(2)} expenses
-                </p>
+                </h3>
               </div>
-              <div className="text-5xl opacity-20">💎</div>
+              <div className={`p-3 rounded-full text-xl ${stats.netProfit >= 0 ? 'bg-emerald-50' : 'bg-red-50'}`}>
+                💎
+              </div>
+            </div>
+            <div className="mt-4 flex items-center text-xs text-gray-400">
+              <span>After Expenses</span>
             </div>
           </div>
 
           {/* Low Stock Alert */}
-          <Link to="/materials" className="block">
-            <div className={`card ${
+          <Link to="/materials" className="group">
+            <div className={`h-full rounded-2xl p-6 border shadow-sm transition-all duration-200 ${
               stats.lowStockCount > 0 
-                ? 'bg-gradient-to-br from-red-500 to-red-600' 
-                : 'bg-gradient-to-br from-gray-500 to-gray-600'
-            } text-white hover:scale-105 transition-transform cursor-pointer`}>
-              <div className="flex items-center justify-between">
+                ? 'bg-red-50 border-red-100 hover:border-red-200' 
+                : 'bg-white border-gray-100 hover:border-gray-200'
+            }`}>
+              <div className="flex items-start justify-between">
                 <div>
-                  <p className="text-white text-sm font-medium">Low Stock Items</p>
-                  <p className="text-3xl font-bold mt-2">{stats.lowStockCount}</p>
-                  {stats.lowStockCount > 0 && (
-                    <p className="text-xs text-white mt-1">Click to view</p>
-                  )}
+                  <p className={`${stats.lowStockCount > 0 ? 'text-red-600' : 'text-gray-500'} text-xs font-medium uppercase tracking-wider`}>
+                    Stock Alert
+                  </p>
+                  <h3 className={`text-2xl font-bold mt-2 tracking-tight ${stats.lowStockCount > 0 ? 'text-red-700' : 'text-gray-900'}`}>
+                    {stats.lowStockCount}
+                  </h3>
                 </div>
-                <div className="text-5xl opacity-20">⚠️</div>
+                <div className={`p-3 rounded-full text-xl ${stats.lowStockCount > 0 ? 'bg-white/80' : 'bg-gray-50'}`}>
+                  ⚠️
+                </div>
+              </div>
+              <div className="mt-4 flex items-center text-xs">
+                 <span className={`${stats.lowStockCount > 0 ? 'text-red-600 font-semibold group-hover:translate-x-1 transition-transform' : 'text-gray-400'}`}>
+                   {stats.lowStockCount > 0 ? 'View Items →' : 'All good'}
+                 </span>
               </div>
             </div>
           </Link>
         </div>
 
-        {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Link to="/materials" className="btn-primary btn-touch text-center">
+        {/* Quick Actions - Floating Pills */}
+        <div className="flex flex-wrap gap-3">
+          <Link to="/materials" className="px-6 py-3 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-95">
             📦 Manage Materials
           </Link>
-          <Link to="/sales" className="btn-success btn-touch text-center">
+          <Link to="/sales" className="px-6 py-3 bg-gray-900 border border-gray-900 rounded-xl shadow-sm text-sm font-medium text-white hover:bg-gray-800 transition-all active:scale-95">
             💰 New Sale
           </Link>
-          <Link to="/reports" className="btn-secondary btn-touch text-center">
-            📊 View Reports
+          <Link to="/reports" className="px-6 py-3 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-95">
+            📊 Reports
           </Link>
-          <Link to="/jobs" className="btn-secondary btn-touch text-center">
-            🔧 View Jobs
+          <Link to="/jobs" className="px-6 py-3 bg-white border border-gray-200 rounded-xl shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all active:scale-95">
+            🔧 Jobs
           </Link>
         </div>
 
-        {/* Recent Activity - Two Columns */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Recent Material Sales */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                Recent Material Sales
-              </h2>
-              <Link to="/sales/history" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-                View All →
-              </Link>
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          
+          {/* Recent Sales Column (Takes up 2 cols on large screens) */}
+          <div className="lg:col-span-2 space-y-8">
+            
+            {/* Sales Section */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-gray-50 flex justify-between items-center">
+                <h3 className="font-semibold text-gray-900">Recent Sales</h3>
+                <Link to="/sales/history" className="text-xs font-medium text-gray-500 hover:text-gray-900">View All</Link>
+              </div>
+              
+              <div className="divide-y divide-gray-50">
+                {stats.recentSales.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 text-sm">No sales recorded today</div>
+                ) : (
+                  stats.recentSales.map((sale) => {
+                    const hasLabour = sale.items?.some(i => i.material?.name === 'Labour/Workmanship');
+                    const nonLabourItems = sale.items?.filter(i => i.material?.name !== 'Labour/Workmanship') || [];
+                    const nonLabourTotal = nonLabourItems.reduce((s, i) => s + parseFloat(i.subtotal), 0);
+                    
+                    if (nonLabourItems.length === 0) return null;
+
+                    return (
+                      <div key={sale.id} className="p-4 hover:bg-gray-50 transition-colors flex justify-between items-center group">
+                        <div className="flex items-center gap-4">
+                          <div className="h-10 w-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 text-sm font-bold">
+                            {(sale.soldBy?.username || "S").charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-gray-900">
+                              {nonLabourItems.length} Item{nonLabourItems.length !== 1 && 's'}
+                              {hasLabour && <span className="ml-2 text-[10px] bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full">JOB</span>}
+                            </p>
+                            <p className="text-xs text-gray-400">
+                              {format(new Date(sale.saleDate), 'h:mm a')} • {sale.soldBy?.fullName || sale.soldBy?.username}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">GH₵ {nonLabourTotal.toFixed(2)}</p>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
             </div>
 
-            {stats.recentSales.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No material sales today</p>
-            ) : (
-              <div className="space-y-3">
-                {stats.recentSales.map((sale) => (
-                  <div key={sale.id} className="border border-gray-200 rounded-lg p-4 hover:bg-gray-50">
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {sale.items?.length || 0} items
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {format(new Date(sale.saleDate), 'MMM dd, HH:mm')}
-                        </p>
+            {/* Jobs Section */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="px-6 py-5 border-b border-gray-50 flex justify-between items-center">
+                <h3 className="font-semibold text-gray-900">Recent Completed Jobs</h3>
+                <Link to="/jobs?status=invoiced" className="text-xs font-medium text-gray-500 hover:text-gray-900">View All</Link>
+              </div>
+
+              <div className="divide-y divide-gray-50">
+                {stats.recentJobs.length === 0 ? (
+                  <div className="p-8 text-center text-gray-400 text-sm">No jobs completed today</div>
+                ) : (
+                  stats.recentJobs.map((invoice) => (
+                    <Link key={invoice.id} to={`/invoices/${invoice.id}`} className="block p-4 hover:bg-gray-50 transition-colors group">
+                      <div className="flex justify-between items-start">
+                        <div className="flex items-center gap-4">
+                           <div className="h-10 w-10 rounded-full bg-purple-50 flex items-center justify-center text-purple-600 text-lg">
+                             🔧
+                           </div>
+                           <div>
+                             <p className="text-sm font-medium text-gray-900">{invoice.job?.clientName || 'Unknown Client'}</p>
+                             <p className="text-xs text-gray-400">
+                               {invoice.job?.carMake} {invoice.job?.carModel} • {invoice.invoiceNumber}
+                             </p>
+                           </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm font-semibold text-gray-900">GH₵ {parseFloat(invoice.totalAmount).toFixed(2)}</p>
+                          <p className="text-[10px] text-green-600 font-medium">
+                            Profit: +{parseFloat(invoice.totalProfit).toFixed(2)}
+                          </p>
+                        </div>
                       </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900">
-                          GH₵ {parseFloat(sale.totalAmount).toFixed(2)}
-                        </p>
-                        <p className="text-xs text-green-600 font-medium">
-                          +GH₵ {parseFloat(sale.totalProfit).toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                      By: {sale.soldBy?.fullName || sale.soldBy?.username || 'N/A'}
-                    </p>
+                    </Link>
+                  ))
+                )}
+              </div>
+            </div>
+
+          </div>
+
+          {/* Right Sidebar: Breakdown & Notes */}
+          <div className="space-y-8">
+            
+            {/* Daily Breakdown */}
+            <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+              <h3 className="font-semibold text-gray-900 mb-6">Today's Pulse</h3>
+              <div className="space-y-6">
+                
+                {/* Meter: Sales */}
+                <div>
+                  <div className="flex justify-between text-xs mb-2">
+                    <span className="text-gray-500">Material Transactions</span>
+                    <span className="font-bold text-gray-900">{stats.materialSalesCount}</span>
                   </div>
-                ))}
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-blue-500 h-2 rounded-full" style={{ width: '100%' }}></div>
+                  </div>
+                </div>
+
+                {/* Meter: Jobs */}
+                <div>
+                  <div className="flex justify-between text-xs mb-2">
+                    <span className="text-gray-500">Jobs Invoiced</span>
+                    <span className="font-bold text-gray-900">{stats.jobSalesCount}</span>
+                  </div>
+                  <div className="w-full bg-gray-100 rounded-full h-2">
+                    <div className="bg-purple-500 h-2 rounded-full" style={{ width: `${stats.jobSalesCount > 0 ? '100%' : '5%'}` }}></div>
+                  </div>
+                </div>
+
+                {/* Meter: Expenses */}
+                <div className="pt-4 border-t border-gray-50">
+                  <div className="flex justify-between items-center">
+                     <div>
+                        <p className="text-xs text-gray-500">Total Expenses</p>
+                        <p className="text-lg font-bold text-gray-900 mt-1">GH₵ {parseFloat(stats.todayExpenses).toFixed(2)}</p>
+                     </div>
+                     <div className="h-8 w-8 rounded-full bg-red-50 flex items-center justify-center text-xs">💸</div>
+                  </div>
+                </div>
+
               </div>
-            )}
-          </div>
-
-          {/* Recent Job Sales (Paid Invoices) */}
-          <div className="card">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-gray-900">
-                Recent Job Sales
-              </h2>
-              <Link to="/jobs?status=invoiced" className="text-primary-600 hover:text-primary-700 text-sm font-medium">
-                View All →
-              </Link>
             </div>
 
-            {stats.recentJobs.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No job sales today</p>
-            ) : (
-              <div className="space-y-3">
-                {stats.recentJobs.map((invoice) => (
-                  <Link
-                    key={invoice.id}
-                    to={`/invoices/${invoice.id}`}
-                    className="block border border-gray-200 rounded-lg p-4 hover:bg-gray-50"
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm font-medium text-gray-900">
-                          {invoice.job?.clientName || 'N/A'}
-                        </p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          {invoice.invoiceNumber}
-                        </p>
-                        <p className="text-xs text-gray-500">
-                          {invoice.paidDate && format(new Date(invoice.paidDate), 'MMM dd, HH:mm')}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-bold text-gray-900">
-                          GH₵ {parseFloat(invoice.totalAmount).toFixed(2)}
-                        </p>
-                        <p className="text-xs text-green-600 font-medium">
-                          +GH₵ {parseFloat(invoice.totalProfit).toFixed(2)}
-                        </p>
-                      </div>
-                    </div>
-                    {invoice.job?.carMake && (
-                      <p className="text-xs text-gray-500 mt-2">
-                        {invoice.job.carMake} {invoice.job.carModel}
-                      </p>
-                    )}
-                  </Link>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Today's Breakdown */}
-        <div className="card">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Today's Breakdown</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            {/* Material Sales */}
-            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-              <p className="text-sm font-medium text-blue-900">Material Sales</p>
-              <p className="text-2xl font-bold text-blue-900 mt-2">
-                {stats.materialSalesCount}
-              </p>
-              <p className="text-xs text-blue-700 mt-1">transactions</p>
+            {/* Note Card */}
+            <div className="bg-amber-50 rounded-2xl p-6 border border-amber-100">
+               <div className="flex gap-3">
+                 <span className="text-amber-500 mt-0.5">ℹ️</span>
+                 <div>
+                   <p className="text-sm font-semibold text-amber-900">Revenue Note</p>
+                   <p className="text-xs text-amber-800/80 mt-2 leading-relaxed">
+                     Total Revenue includes material sales and labour. External materials on invoices are excluded from revenue calculations.
+                   </p>
+                 </div>
+               </div>
             </div>
 
-            {/* Job Sales */}
-            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-              <p className="text-sm font-medium text-purple-900">Job Sales</p>
-              <p className="text-2xl font-bold text-purple-900 mt-2">
-                {stats.jobSalesCount}
-              </p>
-              <p className="text-xs text-purple-700 mt-1">completed & paid</p>
-            </div>
-
-            {/* Total Expenses */}
-            <div className="bg-red-50 p-4 rounded-lg border border-red-200">
-              <p className="text-sm font-medium text-red-900">Expenses</p>
-              <p className="text-2xl font-bold text-red-900 mt-2">
-                GH₵ {parseFloat(stats.todayExpenses).toFixed(2)}
-              </p>
-              <p className="text-xs text-red-700 mt-1">total spent</p>
-            </div>
           </div>
         </div>
       </div>

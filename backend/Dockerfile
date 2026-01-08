@@ -1,13 +1,18 @@
-# Stage 1: Build dependencies
-FROM node:22-alpine AS builder
+FROM node:22-alpine
 WORKDIR /app
+
+# Install dependencies
 COPY package*.json ./
 RUN npm install
 
-# Stage 2: Runtime
-FROM node:22-alpine
-WORKDIR /app
-COPY --from=builder /app/node_modules ./node_modules
-COPY . .
+# Copy Prisma schema and generate
+COPY prisma ./prisma/
+RUN npx prisma generate
+
+# Copy the rest of the application
+COPY . . 
+
 EXPOSE 5000
-CMD ["npm", "start"]
+
+# Ensure the database is ready before starting
+CMD ["sh", "-c", "npx prisma migrate deploy && npm start"]

@@ -85,15 +85,6 @@ export default function Login() {
             {isLoading ? 'Logging in...' : 'Login'}
           </button>
         </form>
-
-        <div className="mt-6 text-center text-sm text-gray-600">
-          <p>Default credentials for testing:</p>
-          <p className="mt-2">
-            <span className="font-semibold">Admin:</span> admin / admin123<br />
-            <span className="font-semibold">Sales:</span> sales / sales123<br />
-            <span className="font-semibold">Mechanic:</span> mechanic / mechanic123
-          </p>
-        </div>
       </div>
     </div>
   );

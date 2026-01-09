@@ -1,14 +1,17 @@
-name: Deploy to VPS
+name: Deploy to Hostinger
 on:
   push:
     branches: [ main ]
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy to Hostinger VPS
+      - name: Deploy to VPS
         uses: hostinger/deploy-on-vps@v1
         with:
-          api_key: ${{ secrets.HOSTINGER_API_KEY }}
-          vm_id: ${{ secrets.HOSTINGER_VM_ID }}
-          # This triggers the "Update" action in your Docker Manager
+          # Use dashes (-), not underscores (_)
+          api-key: ${{ secrets.HOSTINGER_API_KEY }}
+          virtual-machine: ${{ secrets.HOSTINGER_VM_ID }}
+          # Recommended: specify your project name as it appears in Hostinger Docker Manager
+          project-name: "auto-workshop-website" 

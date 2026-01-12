@@ -109,3 +109,5 @@ project-root/
 ├── frontend/         # Public website & internal UI
 ├── backend/          # API, business logic, authentication
 └── README.md
+
+to be updared soon

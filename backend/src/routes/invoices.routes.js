@@ -1,27 +1,34 @@
 import express from 'express';
 import {
-  createInvoice,
-  getAllInvoices,
+  generateInvoice,
+  getInvoices,
   getInvoice,
   getInvoiceByNumber,
-  deleteInvoice,
-  updatePaymentStatus,
-  checkInventoryAvailability,
+  getOutstandingInvoices,
+  updateInvoice,
+  getInvoiceStats,
 } from '../controllers/invoice.controller.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { protect, requirePermission, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // All routes require authentication
-router.use(authenticate);
+router.use(protect);
 
-// Invoice routes
-router.post('/', authorize('admin', 'mechanic'), createInvoice);
-router.get('/', authorize('admin', 'mechanic'), getAllInvoices);
-router.get('/number/:invoiceNumber', authorize('admin', 'mechanic'), getInvoiceByNumber);
-router.get('/:id', authorize('admin', 'mechanic'), getInvoice);
-router.put('/:id/payment', authorize('admin', 'mechanic'), updatePaymentStatus);
-router.delete('/:id', authorize('admin'), deleteInvoice);
-router.post('/:id/check-inventory', authorize('admin', 'mechanic'), checkInventoryAvailability);
+// Special routes (before /:id to avoid conflict)
+router.get('/stats', getInvoiceStats);
+router.get('/outstanding', getOutstandingInvoices);
+router.get('/number/:invoiceNumber', getInvoiceByNumber);
+
+// CRUD routes
+router
+  .route('/')
+  .get(getInvoices)
+  .post(generateInvoice);
+
+router
+  .route('/:id')
+  .get(getInvoice)
+  .put(authorize('admin'), updateInvoice);
 
 export default router;

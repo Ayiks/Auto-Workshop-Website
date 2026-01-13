@@ -1,26 +1,43 @@
 import express from 'express';
 import {
   createExpense,
-  getAllExpenses,
+  getExpenses,
   getExpense,
   updateExpense,
   deleteExpense,
-  getExpensesSummary,
+  getExpensesByCategory,
+  getCOGSExpenses,
 } from '../controllers/expenses.controller.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { protect, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// All routes require authentication and admin role
-router.use(authenticate);
-router.use(authorize('admin'));
+// All routes require authentication
+router.use(protect);
 
-// Expense routes
-router.post('/', createExpense);
-router.get('/', getAllExpenses);
-router.get('/summary/category', getExpensesSummary);
-router.get('/:id', getExpense);
-router.put('/:id', updateExpense);
-router.delete('/:id', deleteExpense);
+// Special routes (before /:id to avoid conflict)
+router.get(
+  '/by-category',
+  requirePermission('expenses', 'view'),
+  getExpensesByCategory
+);
+
+router.get(
+  '/cogs',
+  requirePermission('expenses', 'view'),
+  getCOGSExpenses
+);
+
+// CRUD routes
+router
+  .route('/')
+  .get(requirePermission('expenses', 'view'), getExpenses)
+  .post(requirePermission('expenses', 'create'), createExpense);
+
+router
+  .route('/:id')
+  .get(requirePermission('expenses', 'view'), getExpense)
+  .put(requirePermission('expenses', 'edit'), updateExpense)
+  .delete(requirePermission('expenses', 'delete'), deleteExpense);
 
 export default router;

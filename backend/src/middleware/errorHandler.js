@@ -1,107 +1,92 @@
-import { Prisma } from '@prisma/client';
-
-export const errorHandler = (err, req, res, next) => {
-  console.error('Error:', err);
-
-  // Prisma validation error
-  if (err instanceof Prisma.PrismaClientValidationError) {
-    return res.status(400).json({
-      success: false,
-      error: {
-        code: 'VALIDATION_ERROR',
-        message: 'Invalid data provided',
-        details: err.message
-      }
-    });
-  }
-
-  // Prisma known request error
-  if (err instanceof Prisma.PrismaClientKnownRequestError) {
-    // Unique constraint violation
-    if (err.code === 'P2002') {
-      return res.status(409).json({
-        success: false,
-        error: {
-          code: 'DUPLICATE_ENTRY',
-          message: `A record with this ${err.meta?.target?.[0] || 'field'} already exists`
-        }
-      });
-    }
-
-    // Foreign key constraint violation
-    if (err.code === 'P2003') {
-      return res.status(400).json({
-        success: false,
-        error: {
-          code: 'INVALID_REFERENCE',
-          message: 'Referenced record does not exist'
-        }
-      });
-    }
-
-    // Record not found
-    if (err.code === 'P2025') {
-      return res.status(404).json({
-        success: false,
-        error: {
-          code: 'RESOURCE_NOT_FOUND',
-          message: 'The requested resource was not found'
-        }
-      });
-    }
-  }
-
-  // JWT errors
-  if (err.name === 'JsonWebTokenError') {
-    return res.status(401).json({
-      success: false,
-      error: {
-        code: 'AUTH_INVALID',
-        message: 'Invalid authentication token'
-      }
-    });
-  }
-
-  if (err.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      error: {
-        code: 'AUTH_EXPIRED',
-        message: 'Authentication token has expired'
-      }
-    });
-  }
-
-  // Custom application errors
-  if (err.statusCode) {
-    return res.status(err.statusCode).json({
-      success: false,
-      error: {
-        code: err.code || 'APPLICATION_ERROR',
-        message: err.message
-      }
-    });
-  }
-
-  // Default server error
-  res.status(500).json({
-    success: false,
-    error: {
-      code: 'INTERNAL_SERVER_ERROR',
-      message: process.env.NODE_ENV === 'production' 
-        ? 'An unexpected error occurred' 
-        : err.message
-    }
-  });
-};
-
-// Custom error class
+// Custom Error Class
 export class AppError extends Error {
-  constructor(message, statusCode, code) {
+  constructor(message, statusCode = 500, code = 'INTERNAL_ERROR', details = null) {
     super(message);
     this.statusCode = statusCode;
     this.code = code;
+    this.details = details;
     this.isOperational = true;
     Error.captureStackTrace(this, this.constructor);
   }
 }
+
+// Error Handler Middleware
+export const errorHandler = (err, req, res, next) => {
+  let error = { ...err };
+  error.message = err.message;
+  error.stack = err.stack;
+
+  // Log error
+  console.error('Error:', {
+    message: err.message,
+    code: err.code,
+    stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
+  });
+
+  // Prisma Errors
+  if (err.code === 'P2002') {
+    error = new AppError(
+      'Duplicate entry. This record already exists.',
+      400,
+      'DUPLICATE_ENTRY',
+      { field: err.meta?.target }
+    );
+  }
+
+  if (err.code === 'P2025') {
+    error = new AppError(
+      'Record not found',
+      404,
+      'NOT_FOUND'
+    );
+  }
+
+  if (err.code === 'P2003') {
+    error = new AppError(
+      'Invalid reference. Related record not found.',
+      400,
+      'INVALID_REFERENCE'
+    );
+  }
+
+  // Validation Errors
+  if (err.name === 'ValidationError') {
+    const message = Object.values(err.errors).map(val => val.message).join(', ');
+    error = new AppError(message, 400, 'VALIDATION_ERROR');
+  }
+
+  // JWT Errors
+  if (err.name === 'JsonWebTokenError') {
+    error = new AppError('Invalid token', 401, 'INVALID_TOKEN');
+  }
+
+  if (err.name === 'TokenExpiredError') {
+    error = new AppError('Token expired', 401, 'TOKEN_EXPIRED');
+  }
+
+  // Send response
+  res.status(error.statusCode || 500).json({
+    success: false,
+    error: {
+      code: error.code || 'INTERNAL_ERROR',
+      message: error.message || 'Something went wrong',
+      ...(error.details && { details: error.details }),
+      ...(process.env.NODE_ENV === 'development' && { stack: error.stack }),
+    },
+  });
+};
+
+// Not Found Handler
+export const notFound = (req, res, next) => {
+  const error = new AppError(
+    `Route not found: ${req.originalUrl}`,
+    404,
+    'NOT_FOUND'
+  );
+  next(error);
+};
+
+// Async Handler Wrapper
+export const asyncHandler = (fn) => (req, res, next) => {
+  Promise.resolve(fn(req, res, next)).catch(next);
+};

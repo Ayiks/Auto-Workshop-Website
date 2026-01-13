@@ -1,29 +1,61 @@
 import express from 'express';
 import {
   createJob,
-  getAllJobs,
+  getJobs,
   getJob,
   updateJob,
-  addJobMaterials,
-  updateJobMaterial,
-  deleteJobMaterial,
+  addJobMaterial,
+  removeJobMaterial,
+  completeJob,
+  deleteJob,
+  getJobStats,
 } from '../controllers/jobs.controller.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { 
+  protect, 
+  canAccessResource, 
+  requirePermission,
+  requireJobTypeAccess 
+} from '../middleware/auth.js';
 
 const router = express.Router();
 
 // All routes require authentication
-router.use(authenticate);
+router.use(protect);
 
-// Job CRUD
-router.post('/', authorize('admin', 'mechanic'), createJob);
-router.get('/', authorize('admin', 'mechanic'), getAllJobs);
-router.get('/:id', authorize('admin', 'mechanic'), getJob);
-router.put('/:id', authorize('admin', 'mechanic'), updateJob);
+// Stats route (before /:id to avoid conflict)
+router.get('/stats', canAccessResource('jobs', 'view'), getJobStats);
+
+// CRUD routes
+router
+  .route('/')
+  .get(requireJobTypeAccess, canAccessResource('jobs', 'view'), getJobs)
+  .post(requireJobTypeAccess, canAccessResource('jobs', 'create'), createJob);
+
+// Job actions
+router.put(
+  '/:id/complete',
+  requireJobTypeAccess,
+  canAccessResource('jobs', 'edit'),
+  completeJob
+);
 
 // Job materials management
-router.post('/:id/materials', authorize('admin', 'mechanic'), addJobMaterials);
-router.put('/:jobId/materials/:materialId', authorize('admin', 'mechanic'), updateJobMaterial);
-router.delete('/:jobId/materials/:materialId', authorize('admin', 'mechanic'), deleteJobMaterial);
+router
+  .route('/:id/materials')
+  .post(requireJobTypeAccess, canAccessResource('jobs', 'edit'), addJobMaterial);
+
+router.delete(
+  '/:id/materials/:materialId',
+  requireJobTypeAccess,
+  canAccessResource('jobs', 'edit'),
+  removeJobMaterial
+);
+
+// Single job routes
+router
+  .route('/:id')
+  .get(requireJobTypeAccess, canAccessResource('jobs', 'view'), getJob)
+  .put(requireJobTypeAccess, canAccessResource('jobs', 'edit'), updateJob)
+  .delete(requirePermission('jobs', 'delete'), deleteJob);
 
 export default router;

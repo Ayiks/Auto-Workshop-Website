@@ -1,52 +1,55 @@
 import axios from 'axios';
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 // Create axios instance
-const api = axios.create({
-  baseURL: API_URL,
+const apiClient = axios.create({
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 30000, // 30 seconds
 });
 
 // Request interceptor - Add auth token
-api.interceptors.request.use(
+apiClient.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('auth_token');
+    const token = localStorage.getItem('token');
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     return config;
   },
-  (error) => Promise.reject(error)
-);
-
-// Response interceptor - Handle errors
-api.interceptors.response.use(
-  (response) => response.data,
   (error) => {
-    if (error.response) {
-      // Handle 401 Unauthorized
-      if (error.response.status === 401) {
-        localStorage.removeItem('auth_token');
-        localStorage.removeItem('auth_user');
-        window.location.href = '/login';
-      }
-      
-      // Return error response
-      return Promise.reject(error.response.data);
-    }
-    
-    // Network or other error
-    return Promise.reject({
-      success: false,
-      error: {
-        code: 'NETWORK_ERROR',
-        message: error.message || 'Network error occurred',
-      },
-    });
+    return Promise.reject(error);
   }
 );
 
-export default api;
+// Response interceptor - Handle errors
+apiClient.interceptors.response.use(
+  (response) => {
+    return response.data; // Return only data
+  },
+  (error) => {
+    const message = error.response?.data?.error?.message || error.message || 'An error occurred';
+    const code = error.response?.data?.error?.code || 'UNKNOWN_ERROR';
+    const status = error.response?.status;
+
+    // Handle 401 - Unauthorized
+    if (status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.location.href = '/login';
+    }
+
+    // Create custom error object
+    const customError = new Error(message);
+    customError.code = code;
+    customError.status = status;
+    customError.details = error.response?.data?.error?.details;
+
+    return Promise.reject(customError);
+  }
+);
+
+export default apiClient;

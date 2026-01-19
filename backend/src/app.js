@@ -1,0 +1,97 @@
+import express from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import { errorHandler, notFound } from './middleware/errorHandler.js';
+
+// Import routes
+import authRoutes from './routes/auth.routes.js';
+import materialRoutes from './routes/materials.routes.js';  
+import saleRoutes from './routes/sales.routes.js';           
+import jobRoutes from './routes/jobs.routes.js';            
+import invoiceRoutes from './routes/invoices.routes.js';     
+import paymentRoutes from './routes/payment.routes.js';
+import expenseRoutes from './routes/expenses.routes.js';     
+import reportRoutes from './routes/report.routes.js';
+import receiptRoutes from './routes/receipt.routes.js';
+import bookingRoutes from './routes/bookings.routes.js';
+import userRoutes from './routes/user.routes.js';
+import settingsRoutes from './routes/settings.routes.js';
+
+const app = express();
+
+// ============================================
+// SECURITY & MIDDLEWARE
+// ============================================
+
+// Security headers
+app.use(helmet());
+
+// Body parser
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// CORS
+app.use(cors({
+  origin: [
+    process.env.CLIENT_URL || 'http://localhost:3000',
+    process.env.PUBLIC_WEBSITE_URL || 'http://localhost:3001'
+  ],
+  credentials: true,
+  optionsSuccessStatus: 200,
+}));
+
+// Logging middleware
+if (process.env.NODE_ENV === 'development') {
+  app.use(morgan('dev'));
+} else {
+  app.use(morgan('combined'));
+}
+
+// Request timestamp
+app.use((req, res, next) => {
+  req.requestTime = new Date().toISOString();
+  next();
+});
+
+// ============================================
+// ROUTES
+// ============================================
+
+// Health check
+app.get('/health', (req, res) => {
+  res.json({
+    success: true,
+    message: 'Auto Workshop API is running',
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV,
+  });
+});
+
+// API routes (v1)
+const API_PREFIX = '/api';
+
+app.use(`${API_PREFIX}/auth`, authRoutes);
+app.use(`${API_PREFIX}/materials`, materialRoutes);
+app.use(`${API_PREFIX}/sales`, saleRoutes);
+app.use(`${API_PREFIX}/jobs`, jobRoutes);
+app.use(`${API_PREFIX}/invoices`, invoiceRoutes);
+app.use(`${API_PREFIX}/payments`, paymentRoutes);
+app.use(`${API_PREFIX}/receipts`, receiptRoutes);
+app.use(`${API_PREFIX}/expenses`, expenseRoutes);
+app.use(`${API_PREFIX}/reports`, reportRoutes);
+app.use(`${API_PREFIX}/bookings`, bookingRoutes);
+app.use(`${API_PREFIX}/users`, userRoutes);
+app.use(`${API_PREFIX}/settings`, settingsRoutes);
+
+// ============================================
+// ERROR HANDLING
+// ============================================
+
+// 404 handler (must be after all routes)
+app.use(notFound);
+
+// Global error handler (must be last)
+app.use(errorHandler);
+
+export default app;

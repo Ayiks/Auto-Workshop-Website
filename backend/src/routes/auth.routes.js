@@ -1,6 +1,6 @@
 import express from 'express';
-import { login, verifyToken, logout, changePassword } from '../controllers/auth.controller.js';
-import { authenticate } from '../middleware/auth.js';
+import { login, logout, getMe, changePassword } from '../controllers/auth.controller.js';
+import { protect } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -8,8 +8,8 @@ const router = express.Router();
 router.post('/login', login);
 
 // Protected routes
-router.get('/verify', authenticate, verifyToken);
-router.post('/logout', authenticate, logout);
-router.post('/change-password', authenticate, changePassword);
+router.get('/me', protect, getMe);
+router.post('/logout', protect, logout);
+router.put('/change-password', protect, changePassword);
 
 export default router;

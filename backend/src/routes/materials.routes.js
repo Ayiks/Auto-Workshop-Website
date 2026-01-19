@@ -1,27 +1,38 @@
 import express from 'express';
 import {
-  getAllMaterials,
+  getMaterials,
   getMaterial,
   createMaterial,
   updateMaterial,
   deleteMaterial,
   getLowStockMaterials,
+  reorderMaterial,
+  getMaterialReorders,
 } from '../controllers/materials.controller.js';
-import { authenticate, authorize } from '../middleware/auth.js';
+import { protect, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
 // All routes require authentication
-router.use(authenticate);
+router.use(protect);
 
-// Routes accessible by admin and sales
-router.get('/', authorize('admin', 'sales'), getAllMaterials);
-router.get('/low-stock', authorize('admin'), getLowStockMaterials);
-router.get('/:id', authorize('admin', 'sales'), getMaterial);
+// Get low stock materials (before /:id to avoid conflict)
+router.get('/low-stock', requirePermission('materials', 'view'), getLowStockMaterials);
 
-// Admin-only routes
-router.post('/', authorize('admin'), createMaterial);
-router.put('/:id', authorize('admin'), updateMaterial);
-router.delete('/:id', authorize('admin'), deleteMaterial);
+// Reorder routes
+router.post('/:id/reorder', requirePermission('materials', 'reorder'), reorderMaterial);
+router.get('/:id/reorders', requirePermission('materials', 'view'), getMaterialReorders);
+
+// CRUD routes
+router
+  .route('/')
+  .get(requirePermission('materials', 'view'), getMaterials)
+  .post(requirePermission('materials', 'create'), createMaterial);
+
+router
+  .route('/:id')
+  .get(requirePermission('materials', 'view'), getMaterial)
+  .put(requirePermission('materials', 'edit'), updateMaterial)
+  .delete(requirePermission('materials', 'delete'), deleteMaterial);
 
 export default router;

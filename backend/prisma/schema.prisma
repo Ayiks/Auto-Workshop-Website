@@ -1,4 +1,5 @@
-// Prisma Schema for Auto Workshop System
+// Prisma Schema v2.2 - Auto Workshop Management System
+// Based on PRD v2.2 & EDD v1.0
 
 generator client {
   provider = "prisma-client-js"
@@ -9,22 +10,30 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ============================================
+// USERS & AUTHENTICATION
+// ============================================
+
 model User {
   id           Int       @id @default(autoincrement())
   username     String    @unique @db.VarChar(50)
   passwordHash String    @map("password_hash") @db.VarChar(255)
-  role         Role
   fullName     String?   @map("full_name") @db.VarChar(100)
+  email        String?   @db.VarChar(100)
+  phone        String?   @db.VarChar(20)
+  role         Role
+  permissions  Json      @default("{}") // Nested object: {materials: ['view', 'create'], ...}
   isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at")
   lastLogin    DateTime? @map("last_login")
 
   // Relations
-  materialsCreated Material[]
-  salesMade        Sale[]
-  jobsAssigned     Job[]
-  invoicesCreated  Invoice[]
-  expenses         Expense[]
+  salesMade         Sale[]
+  jobsAssigned      Job[]
+  expensesRecorded  Expense[]
+  reordersCreated   MaterialReorder[]
+  paymentsReceived  Payment[]
+  receiptsIssued    Receipt[]
 
   @@map("users")
 }
@@ -33,40 +42,89 @@ enum Role {
   admin
   sales
   mechanic
+  sprayer
+  bodyworks
 }
 
+// ============================================
+// MATERIALS & INVENTORY
+// ============================================
+
 model Material {
-  id            Int      @id @default(autoincrement())
-  name          String   @db.VarChar(100)
-  costPrice     Decimal  @map("cost_price") @db.Decimal(10, 2)
-  sellingPrice  Decimal  @map("selling_price") @db.Decimal(10, 2)
-  quantity      Int      @default(0)
-  lowStockLevel Int      @default(10) @map("low_stock_level")
-  createdById   Int?     @map("created_by")
-  createdAt     DateTime @default(now()) @map("created_at")
-  updatedAt     DateTime @updatedAt @map("updated_at")
-  isActive      Boolean  @default(true) @map("is_active")
+  id                Int      @id @default(autoincrement())
+  name              String   @db.VarChar(100)
+  quantity          Int      @default(0)
+  unitCost          Decimal  @map("unit_cost") @db.Decimal(10, 2)
+  sellingPrice      Decimal  @map("selling_price") @db.Decimal(10, 2)
+  lowStockThreshold Int      @default(10) @map("low_stock_threshold")
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
 
   // Relations
-  createdBy    User?         @relation(fields: [createdById], references: [id])
-  saleItems    SaleItem[]
-  jobMaterials JobMaterial[]
+  saleItems      SaleItem[]
+  jobMaterials   JobMaterial[]
+  reorders       MaterialReorder[]
 
   @@map("materials")
 }
 
-model Sale {
-  id          Int      @id @default(autoincrement())
-  saleDate    DateTime @default(now()) @map("sale_date")
-  totalAmount Decimal  @map("total_amount") @db.Decimal(10, 2)
-  totalProfit Decimal  @map("total_profit") @db.Decimal(10, 2)
-  paymentMethod String @default("cash") @map("payment_method") @db.VarChar(20) // cash, momo, cheque
-  soldById    Int?     @map("sold_by")
-  createdAt   DateTime @default(now()) @map("created_at")
+model MaterialReorder {
+  id              Int      @id @default(autoincrement())
+  materialId      Int      @map("material_id")
+  materialName    String   @db.VarChar(100)
+  quantityOrdered Int      @map("quantity_ordered")
+  unitCost        Decimal  @map("unit_cost") @db.Decimal(10, 2)
+  totalCost       Decimal  @map("total_cost") @db.Decimal(10, 2)
+  reorderedBy     Int      @map("reordered_by")
+  reorderDate     DateTime @default(now()) @map("reorder_date")
+  notes           String?  @db.Text
+  
+  // Automatically links to generated expense
+  expenseId       Int?     @unique @map("expense_id")
 
   // Relations
-  soldBy User?      @relation(fields: [soldById], references: [id])
-  items  SaleItem[]
+  material   Material  @relation(fields: [materialId], references: [id])
+  user       User      @relation(fields: [reorderedBy], references: [id])
+  expense    Expense?  @relation(fields: [expenseId], references: [id])
+
+  @@map("material_reorders")
+}
+
+// ============================================
+// SERVICES (BOOTH)
+// ============================================
+
+model Service {
+  id        Int      @id @default(autoincrement())
+  type      String   @default("booth") @db.VarChar(20) // Future: could add other service types
+  price     Decimal  @db.Decimal(10, 2)
+  isActive  Boolean  @default(true) @map("is_active")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  saleItems SaleItem[]
+
+  @@map("services")
+}
+
+// ============================================
+// SALES (COUNTER SALES)
+// ============================================
+
+model Sale {
+  id            Int      @id @default(autoincrement())
+  saleDate      DateTime @default(now()) @map("sale_date")
+  totalAmount   Decimal  @map("total_amount") @db.Decimal(10, 2)
+  paymentMethod String   @default("cash") @map("payment_method") @db.VarChar(20) // cash, momo, cheque
+  soldBy        Int      @map("sold_by")
+  status        String   @default("completed") @db.VarChar(20) // draft, completed
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user    User       @relation(fields: [soldBy], references: [id])
+  items   SaleItem[]
+  receipt Receipt?
 
   @@map("sales")
 }
@@ -74,59 +132,71 @@ model Sale {
 model SaleItem {
   id         Int     @id @default(autoincrement())
   saleId     Int     @map("sale_id")
-  materialId Int     @map("material_id")
-  quantity   Int
+  itemType   String  @map("item_type") @db.VarChar(20) // 'material' | 'booth'
+  
+  // Material fields (null if booth)
+  materialId   Int?    @map("material_id")
+  materialName String? @db.VarChar(100)
+  quantity     Int?
+  
+  // Service fields (null if material)
+  serviceId    Int?    @map("service_id")
+  
+  // Common fields
   unitPrice  Decimal @map("unit_price") @db.Decimal(10, 2)
-  costPrice  Decimal @map("cost_price") @db.Decimal(10, 2)
   subtotal   Decimal @db.Decimal(10, 2)
-  profit     Decimal @db.Decimal(10, 2)
 
   // Relations
-  sale     Sale     @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  material Material @relation(fields: [materialId], references: [id])
+  sale     Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  material Material? @relation(fields: [materialId], references: [id])
+  service  Service?  @relation(fields: [serviceId], references: [id])
 
   @@map("sale_items")
 }
 
+// ============================================
+// JOBS & INVOICES
+// ============================================
+
 model Job {
   id                 Int      @id @default(autoincrement())
+  jobType            String   @map("job_type") @db.VarChar(20) // mechanic, sprayer, bodyworks
   clientName         String   @map("client_name") @db.VarChar(100)
   clientPhone        String?  @map("client_phone") @db.VarChar(20)
   clientEmail        String?  @map("client_email") @db.VarChar(100)
-  carMake            String?  @map("car_make") @db.VarChar(50)
-  carModel           String?  @map("car_model") @db.VarChar(50)
-  carRegNumber       String?  @map("car_reg_number") @db.VarChar(20)
+  vehicleMake        String?  @map("vehicle_make") @db.VarChar(50)
+  vehicleModel       String?  @map("vehicle_model") @db.VarChar(50)
+  vehicleRegNumber   String?  @map("vehicle_reg_number") @db.VarChar(20)
+  problemType        String   @map("problem_type") @db.VarChar(100)
   problemDescription String   @map("problem_description") @db.Text
-  status             JobStatus @default(pending)
-  mechanicId         Int?     @map("mechanic_id")
+  labourCost         Decimal  @map("labour_cost") @db.Decimal(10, 2)
+  totalCost          Decimal  @map("total_cost") @db.Decimal(10, 2) // materials + labour
+  assignedTo         Int      @map("assigned_to")
+  status             String   @default("pending") @db.VarChar(20) // pending, in_progress, completed, invoiced
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
   // Relations
-  mechanic      User?         @relation(fields: [mechanicId], references: [id])
-  materials     JobMaterial[]
-  invoice       Invoice?
+  user      User          @relation(fields: [assignedTo], references: [id])
+  materials JobMaterial[]
+  invoice   Invoice?
 
   @@map("jobs")
 }
 
-enum JobStatus {
-  pending
-  in_progress
-  completed
-  invoiced
-}
-
 model JobMaterial {
-  id            Int      @id @default(autoincrement())
-  jobId         Int      @map("job_id")
-  materialId    Int?     @map("material_id") // NULL if manual entry
-  materialName  String   @map("material_name") @db.VarChar(100)
-  quantity      Int
-  unitPrice     Decimal  @map("unit_price") @db.Decimal(10, 2) // Actual price used
-  costPrice     Decimal? @map("cost_price") @db.Decimal(10, 2) // For profit calculation
-  subtotal      Decimal  @db.Decimal(10, 2)
-  isPurchased   Boolean  @default(false) @map("is_purchased")
+  id           Int     @id @default(autoincrement())
+  jobId        Int     @map("job_id")
+  
+  // For inventory materials
+  materialId   Int?    @map("material_id")
+  
+  // Common fields (for both inventory and external)
+  materialName String  @map("material_name") @db.VarChar(100)
+  quantity     Int
+  unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
+  subtotal     Decimal @db.Decimal(10, 2)
+  isExternal   Boolean @default(false) @map("is_external") // true = external, false = from inventory
 
   // Relations
   job      Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
@@ -136,62 +206,192 @@ model JobMaterial {
 }
 
 model Invoice {
-  id            Int      @id @default(autoincrement())
-  jobId         Int      @unique @map("job_id")
-  invoiceNumber String   @unique @map("invoice_number") @db.VarChar(50)
-  materialsCost Decimal  @default(0) @map("materials_cost") @db.Decimal(10, 2)
-  materialsProfit Decimal @default(0) @map("materials_profit") @db.Decimal(10, 2) // Profit from materials
-  labourCost    Decimal  @default(0) @map("labour_cost") @db.Decimal(10, 2)
-  totalAmount   Decimal  @map("total_amount") @db.Decimal(10, 2)
-  totalProfit   Decimal  @map("total_profit") @db.Decimal(10, 2) // Materials profit only (labour is 100% profit)
-  paymentMethod String   @default("cash") @map("payment_method") @db.VarChar(20)
-  paymentStatus String   @default("unpaid") @map("payment_status") @db.VarChar(20) // unpaid, paid
-  invoiceDate   DateTime @default(now()) @map("invoice_date")
-  paidDate      DateTime? @map("paid_date")
-  createdById   Int?     @map("created_by")
-  notes         String?  @db.Text
+  id             Int      @id @default(autoincrement())
+  jobId          Int      @unique @map("job_id")
+  invoiceNumber  String   @unique @map("invoice_number") @db.VarChar(50)
+  materialsCost  Decimal  @default(0) @map("materials_cost") @db.Decimal(10, 2)
+  labourCost     Decimal  @default(0) @map("labour_cost") @db.Decimal(10, 2)
+  totalAmount    Decimal  @map("total_amount") @db.Decimal(10, 2)
+  amountPaid     Decimal  @default(0) @map("amount_paid") @db.Decimal(10, 2) // Sum of all payments
+  amountDue      Decimal  @map("amount_due") @db.Decimal(10, 2) // totalAmount - amountPaid
+  paymentStatus  String   @default("unpaid") @map("payment_status") @db.VarChar(20) // unpaid, partial, paid
+  invoiceDate    DateTime @default(now()) @map("invoice_date")
+  fullyPaidDate  DateTime? @map("fully_paid_date")
+  notes          String?  @db.Text
 
   // Relations
-  job       Job   @relation(fields: [jobId], references: [id])
-  createdBy User? @relation(fields: [createdById], references: [id])
+  job      Job       @relation(fields: [jobId], references: [id])
+  payments Payment[]
 
   @@map("invoices")
 }
 
-model Booking {
-  id            Int           @id @default(autoincrement())
-  clientName    String        @map("client_name") @db.VarChar(100)
-  clientEmail   String?       @map("client_email") @db.VarChar(100)
-  clientPhone   String        @map("client_phone") @db.VarChar(20)
-  serviceType   String?       @map("service_type") @db.VarChar(100)
-  preferredDate DateTime?     @map("preferred_date") @db.Date
-  message       String?       @db.Text
-  status        BookingStatus @default(new)
-  createdAt     DateTime      @default(now()) @map("created_at")
+// ============================================
+// PAYMENTS (NEW - For Partial Payments)
+// ============================================
 
-  @@map("bookings")
-}
-
-model Expense {
-  id          Int      @id @default(autoincrement())
-  description String   @db.VarChar(200)
-  category    String   @db.VarChar(50) // rent, utilities, salaries, maintenance, supplies, other
-  amount      Decimal  @db.Decimal(10, 2)
-  expenseDate DateTime @default(now()) @map("expense_date")
-  recordedBy  Int?     @map("recorded_by")
-  notes       String?  @db.Text
-  createdAt   DateTime @default(now()) @map("created_at")
+model Payment {
+  id            Int      @id @default(autoincrement())
+  invoiceId     Int      @map("invoice_id")
+  amount        Decimal  @db.Decimal(10, 2)
+  paymentMethod String   @map("payment_method") @db.VarChar(20) // cash, momo, cheque
+  paymentDate   DateTime @default(now()) @map("payment_date")
+  receivedBy    Int      @map("received_by")
+  notes         String?  @db.Text
 
   // Relations
-  user User? @relation(fields: [recordedBy], references: [id])
+  invoice Invoice  @relation(fields: [invoiceId], references: [id])
+  user    User     @relation(fields: [receivedBy], references: [id])
+  receipt Receipt?
+
+  @@map("payments")
+}
+
+// ============================================
+// RECEIPTS (NEW - Auto-generated)
+// ============================================
+
+model Receipt {
+  id            Int      @id @default(autoincrement())
+  seqId         BigInt?  @unique @map("seq_id") @default(autoincrement())
+  receiptNumber String   @unique @map("receipt_number") @db.VarChar(50)
+  receiptType   String   @map("receipt_type") @db.VarChar(20) // 'sale' | 'payment'
+  
+  // Link to sale OR payment (one will be null)
+  saleId        Int?     @unique @map("sale_id")
+  paymentId     Int?     @unique @map("payment_id")
+  
+  amount        Decimal  @db.Decimal(10, 2)
+  paymentMethod String   @map("payment_method") @db.VarChar(20)
+  issuedBy      Int      @map("issued_by")
+  issuedDate    DateTime @default(now()) @map("issued_date")
+  
+  // Branding info (snapshot at time of receipt)
+  businessName  String   @map("business_name") @db.VarChar(100)
+  businessLogo  String?  @map("business_logo") @db.Text // Logo URL or base64
+  businessAddress String @map("business_address") @db.Text
+  businessContact String @map("business_contact") @db.VarChar(100)
+
+  // Relations
+  sale    Sale?    @relation(fields: [saleId], references: [id])
+  payment Payment? @relation(fields: [paymentId], references: [id])
+  user    User     @relation(fields: [issuedBy], references: [id])
+
+  @@map("receipts")
+}
+
+// ============================================
+// EXPENSES
+// ============================================
+
+model Expense {
+  id                  Int      @id @default(autoincrement())
+  type                String   @db.VarChar(20) // 'cog' (Cost of Goods) | 'operational'
+  category            String   @db.VarChar(50) // For operational: rent, utilities, salaries, etc. For COG: 'material_reorder'
+  description         String   @db.VarChar(200)
+  amount              Decimal  @db.Decimal(10, 2)
+  expenseDate         DateTime @default(now()) @map("expense_date")
+  source              String   @default("manual") @db.VarChar(20) // 'manual' | 'system'
+  isReadOnly          Boolean  @default(false) @map("is_read_only") // true for system-generated expenses
+  recordedBy          Int      @map("recorded_by")
+  notes               String?  @db.Text
+  createdAt           DateTime @default(now()) @map("created_at")
+
+  // Relations
+  user            User              @relation(fields: [recordedBy], references: [id])
+  materialReorder MaterialReorder?
 
   @@map("expenses")
 }
 
-enum BookingStatus {
-  new
-  contacted
-  scheduled
-  completed
-  cancelled
+// ============================================
+// BOOKINGS (From Public Website)
+// ============================================
+
+model Booking {
+  id            Int      @id @default(autoincrement())
+  bookingType   String   @map("booking_type") @db.VarChar(50) // 'booth' | 'service_inquiry'
+  clientName    String   @map("client_name") @db.VarChar(100)
+  clientEmail   String?  @map("client_email") @db.VarChar(100)
+  clientPhone   String   @map("client_phone") @db.VarChar(20)
+  serviceType   String?  @map("service_type") @db.VarChar(100) // For service inquiries
+  preferredDate DateTime? @map("preferred_date") @db.Date
+  preferredTime String?  @map("preferred_time") @db.VarChar(20)
+  message       String?  @db.Text
+  status        String   @default("new") @db.VarChar(20) // new, contacted, scheduled, completed, cancelled
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("bookings")
 }
+
+// ============================================
+// BUSINESS SETTINGS (NEW - For Branding)
+// ============================================
+
+model BusinessSettings {
+  id        Int      @id @default(autoincrement())
+  name      String   @db.VarChar(100)
+  logo      String?  @db.Text // Logo URL or base64
+  address   String   @db.Text
+  phone     String   @db.VarChar(50)
+  email     String   @db.VarChar(100)
+  website   String?  @db.VarChar(200)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@map("business_settings")
+}
+
+// ============================================
+// AUDIT LOG (For Tracking Changes)
+// ============================================
+
+model AuditLog {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  action      String   @db.VarChar(50) // CREATE, UPDATE, DELETE, LOGIN, etc.
+  entity      String   @db.VarChar(50) // Sale, Job, Material, etc.
+  entityId    Int?     @map("entity_id")
+  description String   @db.Text
+  ipAddress   String?  @map("ip_address") @db.VarChar(50)
+  userAgent   String?  @map("user_agent") @db.Text
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@map("audit_logs")
+}
+
+// ============================================
+// INDEXES FOR PERFORMANCE
+// ============================================
+
+// Users
+// @@index([username])
+// @@index([role])
+
+// Materials
+// @@index([isActive])
+// @@index([quantity]) // For low stock queries
+
+// Sales
+// @@index([saleDate])
+// @@index([soldBy])
+
+// Jobs
+// @@index([jobType])
+// @@index([assignedTo])
+// @@index([status])
+
+// Invoices
+// @@index([paymentStatus])
+// @@index([invoiceDate])
+
+// Payments
+// @@index([paymentDate])
+
+// Expenses
+// @@index([type])
+// @@index([expenseDate])
+
+// Bookings
+// @@index([status])
+// @@index([preferredDate])

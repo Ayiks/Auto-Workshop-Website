@@ -1,468 +1,912 @@
-import { prisma } from '../server.js';
-import { AppError } from '../middleware/errorHandler.js';
+import prisma from '../config/database.js';
+import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Create new job
 // @route   POST /api/jobs
-// @access  Private (Admin, Mechanic)
-export const createJob = async (req, res, next) => {
-  try {
-    const {
-      clientName,
-      clientPhone,
-      clientEmail,
-      carMake,
-      carModel,
-      carRegNumber,
-      problemDescription,
-      materials,
-    } = req.body;
+// @access  Private (requires 'jobs:create' permission)
+export const createJob = asyncHandler(async (req, res) => {
+  const {
+    jobType,
+    clientName,
+    clientPhone,
+    clientEmail,
+    vehicleMake,
+    vehicleModel,
+    vehicleRegNumber,
+    problemType,
+    problemDescription,
+    labourCost = 0,
+    materials = [],
+  } = req.body;
 
-    // Validate required fields
-    if (!clientName || !problemDescription) {
-      throw new AppError('Client name and problem description are required', 400, 'VALIDATION_ERROR');
-    }
-
-    // Process materials - can be from inventory or manual
-    const processedMaterials = [];
-    
-    if (materials && materials.length > 0) {
-      for (const mat of materials) {
-        if (mat.materialId) {
-          // Material from inventory
-          const inventoryMaterial = await prisma.material.findUnique({
-            where: { id: parseInt(mat.materialId) },
-          });
-
-          if (!inventoryMaterial) {
-            throw new AppError(`Material with ID ${mat.materialId} not found`, 404, 'RESOURCE_NOT_FOUND');
-          }
-
-          processedMaterials.push({
-            materialId: inventoryMaterial.id,
-            materialName: inventoryMaterial.name,
-            quantity: parseInt(mat.quantity),
-            unitPrice: parseFloat(inventoryMaterial.sellingPrice),
-            costPrice: parseFloat(inventoryMaterial.costPrice),
-            subtotal: parseFloat(inventoryMaterial.sellingPrice) * parseInt(mat.quantity),
-            isPurchased: false,
-          });
-        } else {
-          // Manual material entry
-          if (!mat.materialName || !mat.quantity || !mat.unitPrice) {
-            throw new AppError('Material name, quantity, and unit price are required for manual entries', 400, 'VALIDATION_ERROR');
-          }
-
-          processedMaterials.push({
-            materialId: null,
-            materialName: mat.materialName.trim(),
-            quantity: parseInt(mat.quantity),
-            unitPrice: parseFloat(mat.unitPrice),
-            costPrice: mat.costPrice ? parseFloat(mat.costPrice) : parseFloat(mat.unitPrice) * 0.7, // Estimate 30% profit if not provided
-            subtotal: parseFloat(mat.unitPrice) * parseInt(mat.quantity),
-            isPurchased: false,
-          });
-        }
-      }
-    }
-
-    // Create job with materials
-    const job = await prisma.job.create({
-      data: {
-        clientName: clientName.trim(),
-        clientPhone: clientPhone?.trim(),
-        clientEmail: clientEmail?.trim(),
-        carMake: carMake?.trim(),
-        carModel: carModel?.trim(),
-        carRegNumber: carRegNumber?.trim(),
-        problemDescription: problemDescription.trim(),
-        mechanicId: req.user.id,
-        status: 'pending',
-        materials: processedMaterials.length > 0 ? {
-          create: processedMaterials,
-        } : undefined,
-      },
-      include: {
-        materials: {
-          include: {
-            material: {
-              select: {
-                id: true,
-                name: true,
-                quantity: true,
-              },
-            },
-          },
-        },
-        mechanic: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
-          },
-        },
-      },
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Job created successfully',
-      job,
-    });
-  } catch (error) {
-    next(error);
+  // Validation
+  if (!jobType || !['mechanic', 'sprayer', 'bodyworks'].includes(jobType)) {
+    throw new AppError(
+      'Invalid job type. Must be mechanic, sprayer, or bodyworks',
+      400,
+      'VALIDATION_ERROR'
+    );
   }
-};
+
+  if (!clientName || !clientPhone) {
+    throw new AppError(
+      'Please provide client name and phone number',
+      400,
+      'VALIDATION_ERROR'
+    );
+  }
+
+  if (!problemType || !problemDescription) {
+    throw new AppError(
+      'Please provide problem type and description',
+      400,
+      'VALIDATION_ERROR'
+    );
+  }
+
+  // Check if user can create this job type
+  if (req.allowedJobType && req.allowedJobType !== jobType) {
+    throw new AppError(
+      `You can only create ${req.allowedJobType} jobs`,
+      403,
+      'PERMISSION_DENIED'
+    );
+  }
+
+  // Validate and calculate materials cost
+  let materialsCost = 0;
+  const validatedMaterials = [];
+
+  for (const material of materials) {
+    if (!material.materialName || !material.quantity || material.quantity <= 0) {
+      throw new AppError(
+        'Each material must have a name and valid quantity',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    if (!material.unitPrice || material.unitPrice <= 0) {
+      throw new AppError(
+        'Each material must have a valid unit price',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    const isExternal = material.isExternal === true;
+    let materialId = null;
+
+    // If not external, validate inventory material
+    if (!isExternal) {
+      if (!material.materialId) {
+        throw new AppError(
+          'Inventory materials must have materialId',
+          400,
+          'VALIDATION_ERROR'
+        );
+      }
+
+      const inventoryMaterial = await prisma.material.findUnique({
+        where: { id: parseInt(material.materialId) },
+      });
+
+      if (!inventoryMaterial) {
+        throw new AppError(
+          `Material with ID ${material.materialId} not found`,
+          404,
+          'NOT_FOUND'
+        );
+      }
+
+      if (!inventoryMaterial.isActive) {
+        throw new AppError(
+          `Material "${inventoryMaterial.name}" is inactive`,
+          400,
+          'INVALID_OPERATION'
+        );
+      }
+
+      if (inventoryMaterial.quantity < material.quantity) {
+        throw new AppError(
+          `Insufficient stock for "${inventoryMaterial.name}". Available: ${inventoryMaterial.quantity}`,
+          400,
+          'INSUFFICIENT_STOCK'
+        );
+      }
+
+      materialId = inventoryMaterial.id;
+    }
+
+    const subtotal = parseFloat(material.unitPrice) * parseInt(material.quantity);
+    validatedMaterials.push({
+      materialId,
+      materialName: material.materialName.trim(),
+      quantity: parseInt(material.quantity),
+      unitPrice: parseFloat(material.unitPrice),
+      subtotal,
+      isExternal,
+    });
+    materialsCost += subtotal;
+  }
+
+  const totalCost = materialsCost + parseFloat(labourCost);
+
+  // Create job with materials in transaction
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Create job
+    const job = await tx.job.create({
+      data: {
+        jobType,
+        clientName: clientName.trim(),
+        clientPhone: clientPhone.trim(),
+        clientEmail: clientEmail?.trim(),
+        vehicleMake: vehicleMake?.trim(),
+        vehicleModel: vehicleModel?.trim(),
+        vehicleRegNumber: vehicleRegNumber?.trim(),
+        problemType: problemType.trim(),
+        problemDescription: problemDescription.trim(),
+        labourCost: parseFloat(labourCost),
+        totalCost,
+        assignedTo: req.user.id,
+        status: 'pending',
+      },
+    });
+
+    // 2. Add materials to job
+    for (const material of validatedMaterials) {
+      await tx.jobMaterial.create({
+        data: {
+          jobId: job.id,
+          ...material,
+        },
+      });
+    }
+
+    // 3. Log audit
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'CREATE',
+        entity: 'Job',
+        entityId: job.id,
+        description: `Created ${jobType} job #${job.id} for ${clientName}. Total: GH₵${totalCost}`,
+      },
+    });
+
+    return job;
+  });
+
+  // Fetch complete job with materials
+  const completeJob = await prisma.job.findUnique({
+    where: { id: result.id },
+    include: {
+      materials: {
+        include: {
+          material: {
+            select: { name: true, sellingPrice: true },
+          },
+        },
+      },
+      user: {
+        select: {
+          fullName: true,
+          username: true,
+          role: true,
+        },
+      },
+    },
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Job created successfully',
+    data: completeJob,
+  });
+});
 
 // @desc    Get all jobs
 // @route   GET /api/jobs
-// @access  Private (Admin, Mechanic)
-export const getAllJobs = async (req, res, next) => {
-  try {
-    const { status, page = 1, limit = 20 } = req.query;
+// @access  Private (requires 'jobs:viewAll' or 'jobs:viewOwn' permission)
+export const getJobs = asyncHandler(async (req, res) => {
+  const { status, jobType, startDate, endDate, assignedTo } = req.query;
 
-    const where = {};
+  const where = {};
 
-    // Mechanics can only see their own jobs
-    if (req.user.role === 'mechanic') {
-      where.mechanicId = req.user.id;
+  // Filter by job type (if user is restricted to specific type)
+  if (req.allowedJobType) {
+    where.jobType = req.allowedJobType;
+  } else if (jobType) {
+    where.jobType = jobType;
+  }
+
+  // Filter by status
+  if (status) {
+    where.status = status;
+  }
+
+  // Date filtering
+  if (startDate || endDate) {
+    where.createdAt = {};
+    if (startDate) where.createdAt.gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      where.createdAt.lte = end;
     }
+  }
 
-    // Filter by status
-    if (status) {
-      where.status = status;
-    }
+  // Filter by assigned user
+  if (assignedTo) {
+    where.assignedTo = parseInt(assignedTo);
+  }
 
-    const [jobs, total] = await Promise.all([
-      prisma.job.findMany({
-        where,
-        skip: (parseInt(page) - 1) * parseInt(limit),
-        take: parseInt(limit),
-        orderBy: { createdAt: 'desc' },
+  // If user only has viewOwn permission, filter to their jobs
+  if (req.isOwnResource) {
+    where.assignedTo = req.user.id;
+  }
+
+  const jobs = await prisma.job.findMany({
+    where,
+    include: {
+      materials: {
         include: {
-          mechanic: {
-            select: {
-              id: true,
-              username: true,
-              fullName: true,
-            },
-          },
-          materials: true,
-          invoice: {
-            select: {
-              id: true,
-              invoiceNumber: true,
-              totalAmount: true,
-            },
+          material: {
+            select: { name: true },
           },
         },
-      }),
-      prisma.job.count({ where }),
-    ]);
+      },
+      user: {
+        select: {
+          fullName: true,
+          username: true,
+          role: true,
+        },
+      },
+      invoice: {
+        select: {
+          invoiceNumber: true,
+          paymentStatus: true,
+          amountPaid: true,
+          amountDue: true,
+        },
+      },
+    },
+    orderBy: { createdAt: 'desc' },
+  });
 
-    res.json({
-      success: true,
-      page: parseInt(page),
-      limit: parseInt(limit),
-      total,
-      totalPages: Math.ceil(total / parseInt(limit)),
-      jobs,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.status(200).json({
+    success: true,
+    count: jobs.length,
+    data: jobs,
+  });
+});
 
 // @desc    Get single job
 // @route   GET /api/jobs/:id
-// @access  Private (Admin, Mechanic - own jobs only)
-export const getJob = async (req, res, next) => {
-  try {
-    const { id } = req.params;
+// @access  Private (requires 'jobs:viewAll' or 'jobs:viewOwn' permission)
+export const getJob = asyncHandler(async (req, res) => {
+  const { id } = req.params;
 
-    const job = await prisma.job.findUnique({
-      where: { id: parseInt(id) },
-      include: {
-        mechanic: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
-          },
-        },
-        materials: true,
-        invoice: {
-          include: {
-            createdBy: {
-              select: {
-                id: true,
-                username: true,
-                fullName: true,
-              },
+  const job = await prisma.job.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      materials: {
+        include: {
+          material: {
+            select: {
+              id: true,
+              name: true,
+              sellingPrice: true,
+              quantity: true,
             },
           },
         },
       },
-    });
+      user: {
+        select: {
+          id: true,
+          fullName: true,
+          username: true,
+          role: true,
+          email: true,
+          phone: true,
+        },
+      },
+      invoice: {
+        include: {
+          payments: {
+            include: {
+              user: {
+                select: {
+                  fullName: true,
+                },
+              },
+              receipt: {
+                select: {
+                  receiptNumber: true,
+                },
+              },
+            },
+            orderBy: { paymentDate: 'desc' },
+          },
+        },
+      },
+    },
+  });
 
-    if (!job) {
-      throw new AppError('Job not found', 404, 'RESOURCE_NOT_FOUND');
-    }
-
-    // Mechanics can only view their own jobs
-    if (req.user.role === 'mechanic' && job.mechanicId !== req.user.id) {
-      throw new AppError('Access denied', 403, 'ACCESS_DENIED');
-    }
-
-    res.json({
-      success: true,
-      job,
-    });
-  } catch (error) {
-    next(error);
+  if (!job) {
+    throw new AppError('Job not found', 404, 'NOT_FOUND');
   }
-};
+
+  // Check ownership if user has only viewOwn permission
+  if (req.isOwnResource && job.assignedTo !== req.user.id) {
+    throw new AppError(
+      'Not authorized to view this job',
+      403,
+      'PERMISSION_DENIED'
+    );
+  }
+
+  // Check job type restriction
+  if (req.allowedJobType && job.jobType !== req.allowedJobType) {
+    throw new AppError(
+      `You can only view ${req.allowedJobType} jobs`,
+      403,
+      'PERMISSION_DENIED'
+    );
+  }
+
+  res.status(200).json({
+    success: true,
+    data: job,
+  });
+});
 
 // @desc    Update job
 // @route   PUT /api/jobs/:id
-// @access  Private (Admin, Mechanic - own jobs only)
-export const updateJob = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { status, problemDescription, carMake, carModel, carRegNumber } = req.body;
+// @access  Private (requires 'jobs:edit' or 'jobs:editOwn' permission)
+export const updateJob = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const {
+    clientName,
+    clientPhone,
+    clientEmail,
+    vehicleMake,
+    vehicleModel,
+    vehicleRegNumber,
+    problemType,
+    problemDescription,
+    labourCost,
+    status,
+  } = req.body;
 
-    // Check if job exists
-    const existingJob = await prisma.job.findUnique({
-      where: { id: parseInt(id) },
+  const job = await prisma.job.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      invoice: true,
+    },
+  });
+
+  if (!job) {
+    throw new AppError('Job not found', 404, 'NOT_FOUND');
+  }
+
+  // Check ownership if user has only editOwn permission
+  if (req.isOwnResource && job.assignedTo !== req.user.id) {
+    throw new AppError(
+      'Not authorized to edit this job',
+      403,
+      'PERMISSION_DENIED'
+    );
+  }
+
+  // Check job type restriction
+  if (req.allowedJobType && job.jobType !== req.allowedJobType) {
+    throw new AppError(
+      `You can only edit ${req.allowedJobType} jobs`,
+      403,
+      'PERMISSION_DENIED'
+    );
+  }
+
+  // Cannot edit job once invoiced
+  if (job.invoice) {
+    throw new AppError(
+      'Cannot edit job that has been invoiced',
+      400,
+      'INVALID_OPERATION'
+    );
+  }
+
+  // Validate status transition
+  const validStatuses = ['pending', 'in_progress', 'completed', 'invoiced'];
+  if (status && !validStatuses.includes(status)) {
+    throw new AppError(
+      'Invalid status. Must be pending, in_progress, completed, or invoiced',
+      400,
+      'VALIDATION_ERROR'
+    );
+  }
+
+  const updateData = {};
+  if (clientName) updateData.clientName = clientName.trim();
+  if (clientPhone) updateData.clientPhone = clientPhone.trim();
+  if (clientEmail !== undefined) updateData.clientEmail = clientEmail?.trim();
+  if (vehicleMake !== undefined) updateData.vehicleMake = vehicleMake?.trim();
+  if (vehicleModel !== undefined) updateData.vehicleModel = vehicleModel?.trim();
+  if (vehicleRegNumber !== undefined) updateData.vehicleRegNumber = vehicleRegNumber?.trim();
+  if (problemType) updateData.problemType = problemType.trim();
+  if (problemDescription) updateData.problemDescription = problemDescription.trim();
+  if (status) updateData.status = status;
+
+  // Recalculate total if labour cost changed
+  if (labourCost !== undefined) {
+    const materials = await prisma.jobMaterial.findMany({
+      where: { jobId: parseInt(id) },
     });
+    const materialsCost = materials.reduce((sum, m) => sum + parseFloat(m.subtotal), 0);
+    updateData.labourCost = parseFloat(labourCost);
+    updateData.totalCost = materialsCost + parseFloat(labourCost);
+  }
 
-    if (!existingJob) {
-      throw new AppError('Job not found', 404, 'RESOURCE_NOT_FOUND');
-    }
-
-    // Mechanics can only update their own jobs
-    if (req.user.role === 'mechanic' && existingJob.mechanicId !== req.user.id) {
-      throw new AppError('Access denied', 403, 'ACCESS_DENIED');
-    }
-
-    // Build update data
-    const updateData = {};
-    if (status) updateData.status = status;
-    if (problemDescription) updateData.problemDescription = problemDescription.trim();
-    if (carMake !== undefined) updateData.carMake = carMake?.trim();
-    if (carModel !== undefined) updateData.carModel = carModel?.trim();
-    if (carRegNumber !== undefined) updateData.carRegNumber = carRegNumber?.trim();
-
-    const job = await prisma.job.update({
-      where: { id: parseInt(id) },
-      data: updateData,
-      include: {
-        mechanic: {
-          select: {
-            id: true,
-            username: true,
-            fullName: true,
+  const updatedJob = await prisma.job.update({
+    where: { id: parseInt(id) },
+    data: updateData,
+    include: {
+      materials: {
+        include: {
+          material: {
+            select: { name: true },
           },
         },
-        materials: true,
       },
-    });
+      user: {
+        select: {
+          fullName: true,
+          username: true,
+        },
+      },
+    },
+  });
 
-    res.json({
-      success: true,
-      message: 'Job updated successfully',
-      job,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  // Log audit
+  await prisma.auditLog.create({
+    data: {
+      userId: req.user.id,
+      action: 'UPDATE',
+      entity: 'Job',
+      entityId: updatedJob.id,
+      description: `Updated job #${updatedJob.id}${status ? ` - Status changed to ${status}` : ''}`,
+    },
+  });
 
-// @desc    Add materials to job
+  res.status(200).json({
+    success: true,
+    message: 'Job updated successfully',
+    data: updatedJob,
+  });
+});
+
+// @desc    Add material to job
 // @route   POST /api/jobs/:id/materials
-// @access  Private (Admin, Mechanic - own jobs only)
-export const addJobMaterials = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-    const { materials } = req.body;
+// @access  Private (requires 'jobs:edit' or 'jobs:editOwn' permission)
+export const addJobMaterial = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { materialId, materialName, quantity, unitPrice, isExternal = false } = req.body;
 
-    if (!materials || !Array.isArray(materials) || materials.length === 0) {
-      throw new AppError('Materials array is required', 400, 'VALIDATION_ERROR');
+  // Validation
+  if (!materialName || !quantity || quantity <= 0 || !unitPrice || unitPrice <= 0) {
+    throw new AppError(
+      'Please provide material name, valid quantity, and unit price',
+      400,
+      'VALIDATION_ERROR'
+    );
+  }
+
+  const job = await prisma.job.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      invoice: true,
+      materials: true,
+    },
+  });
+
+  if (!job) {
+    throw new AppError('Job not found', 404, 'NOT_FOUND');
+  }
+
+  // Check ownership
+  if (req.isOwnResource && job.assignedTo !== req.user.id) {
+    throw new AppError(
+      'Not authorized to edit this job',
+      403,
+      'PERMISSION_DENIED'
+    );
+  }
+
+  // Cannot add materials once invoiced
+  if (job.invoice) {
+    throw new AppError(
+      'Cannot add materials to invoiced job',
+      400,
+      'INVALID_OPERATION'
+    );
+  }
+
+  let validatedMaterialId = null;
+
+  // If not external, validate inventory material
+  if (!isExternal) {
+    if (!materialId) {
+      throw new AppError(
+        'Inventory materials must have materialId',
+        400,
+        'VALIDATION_ERROR'
+      );
     }
 
-    // Check if job exists
-    const job = await prisma.job.findUnique({
-      where: { id: parseInt(id) },
+    const inventoryMaterial = await prisma.material.findUnique({
+      where: { id: parseInt(materialId) },
     });
 
-    if (!job) {
-      throw new AppError('Job not found', 404, 'RESOURCE_NOT_FOUND');
+    if (!inventoryMaterial) {
+      throw new AppError(
+        `Material with ID ${materialId} not found`,
+        404,
+        'NOT_FOUND'
+      );
     }
 
-    // Mechanics can only update their own jobs
-    if (req.user.role === 'mechanic' && job.mechanicId !== req.user.id) {
-      throw new AppError('Access denied', 403, 'ACCESS_DENIED');
+    if (!inventoryMaterial.isActive) {
+      throw new AppError(
+        `Material "${inventoryMaterial.name}" is inactive`,
+        400,
+        'INVALID_OPERATION'
+      );
     }
 
-    // Process materials
-    const processedMaterials = [];
-    
-    for (const mat of materials) {
-      if (mat.materialId) {
-        // Material from inventory
-        const inventoryMaterial = await prisma.material.findUnique({
-          where: { id: parseInt(mat.materialId) },
-        });
-
-        if (!inventoryMaterial) {
-          throw new AppError(`Material with ID ${mat.materialId} not found`, 404, 'RESOURCE_NOT_FOUND');
-        }
-
-        processedMaterials.push({
-          jobId: parseInt(id),
-          materialId: inventoryMaterial.id,
-          materialName: inventoryMaterial.name,
-          quantity: parseInt(mat.quantity),
-          unitPrice: parseFloat(inventoryMaterial.sellingPrice),
-          costPrice: parseFloat(inventoryMaterial.costPrice),
-          subtotal: parseFloat(inventoryMaterial.sellingPrice) * parseInt(mat.quantity),
-          isPurchased: mat.isPurchased || false,
-        });
-      } else {
-        // Manual material entry
-        if (!mat.materialName || !mat.quantity || !mat.unitPrice) {
-          throw new AppError('Material name, quantity, and unit price are required for manual entries', 400, 'VALIDATION_ERROR');
-        }
-
-        processedMaterials.push({
-          jobId: parseInt(id),
-          materialId: null,
-          materialName: mat.materialName.trim(),
-          quantity: parseInt(mat.quantity),
-          unitPrice: parseFloat(mat.unitPrice),
-          costPrice: mat.costPrice ? parseFloat(mat.costPrice) : parseFloat(mat.unitPrice) * 0.7,
-          subtotal: parseFloat(mat.unitPrice) * parseInt(mat.quantity),
-          isPurchased: mat.isPurchased || false,
-        });
-      }
+    if (inventoryMaterial.quantity < quantity) {
+      throw new AppError(
+        `Insufficient stock for "${inventoryMaterial.name}". Available: ${inventoryMaterial.quantity}`,
+        400,
+        'INSUFFICIENT_STOCK'
+      );
     }
 
-    // Add materials
-    await prisma.jobMaterial.createMany({
-      data: processedMaterials,
+    validatedMaterialId = inventoryMaterial.id;
+  }
+
+  const subtotal = parseFloat(unitPrice) * parseInt(quantity);
+
+  // Add material and update job total in transaction
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Add material
+    const jobMaterial = await tx.jobMaterial.create({
+      data: {
+        jobId: parseInt(id),
+        materialId: validatedMaterialId,
+        materialName: materialName.trim(),
+        quantity: parseInt(quantity),
+        unitPrice: parseFloat(unitPrice),
+        subtotal,
+        isExternal,
+      },
     });
 
-    // Get updated job
-    const updatedJob = await prisma.job.findUnique({
+    // 2. Update job total cost
+    const currentMaterialsCost = job.materials.reduce(
+      (sum, m) => sum + parseFloat(m.subtotal),
+      0
+    );
+    const newTotalCost = currentMaterialsCost + subtotal + parseFloat(job.labourCost);
+
+    await tx.job.update({
       where: { id: parseInt(id) },
-      include: {
-        materials: {
-          include: {
-            material: {
-              select: {
-                id: true,
-                name: true,
-                quantity: true,
-              },
-            },
-          },
+      data: { totalCost: newTotalCost },
+    });
+
+    // 3. Log audit
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'UPDATE',
+        entity: 'Job',
+        entityId: parseInt(id),
+        description: `Added material "${materialName}" to job #${id}`,
+      },
+    });
+
+    return jobMaterial;
+  });
+
+  res.status(201).json({
+    success: true,
+    message: 'Material added to job successfully',
+    data: result,
+  });
+});
+
+// @desc    Remove material from job
+// @route   DELETE /api/jobs/:id/materials/:materialId
+// @access  Private (requires 'jobs:edit' or 'jobs:editOwn' permission)
+export const removeJobMaterial = asyncHandler(async (req, res) => {
+  const { id, materialId } = req.params;
+
+  const job = await prisma.job.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      invoice: true,
+      materials: true,
+    },
+  });
+
+  if (!job) {
+    throw new AppError('Job not found', 404, 'NOT_FOUND');
+  }
+
+  // Check ownership
+  if (req.isOwnResource && job.assignedTo !== req.user.id) {
+    throw new AppError(
+      'Not authorized to edit this job',
+      403,
+      'PERMISSION_DENIED'
+    );
+  }
+
+  // Cannot remove materials once invoiced
+  if (job.invoice) {
+    throw new AppError(
+      'Cannot remove materials from invoiced job',
+      400,
+      'INVALID_OPERATION'
+    );
+  }
+
+  const jobMaterial = await prisma.jobMaterial.findUnique({
+    where: { id: parseInt(materialId) },
+  });
+
+  if (!jobMaterial || jobMaterial.jobId !== parseInt(id)) {
+    throw new AppError('Material not found in this job', 404, 'NOT_FOUND');
+  }
+
+  // Remove material and update job total in transaction
+  await prisma.$transaction(async (tx) => {
+    // 1. Delete material
+    await tx.jobMaterial.delete({
+      where: { id: parseInt(materialId) },
+    });
+
+    // 2. Recalculate job total cost
+    const remainingMaterials = job.materials.filter(
+      m => m.id !== parseInt(materialId)
+    );
+    const materialsCost = remainingMaterials.reduce(
+      (sum, m) => sum + parseFloat(m.subtotal),
+      0
+    );
+    const newTotalCost = materialsCost + parseFloat(job.labourCost);
+
+    await tx.job.update({
+      where: { id: parseInt(id) },
+      data: { totalCost: newTotalCost },
+    });
+
+    // 3. Log audit
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'UPDATE',
+        entity: 'Job',
+        entityId: parseInt(id),
+        description: `Removed material "${jobMaterial.materialName}" from job #${id}`,
+      },
+    });
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Material removed from job successfully',
+  });
+});
+
+// @desc    Complete job (mark as ready for invoicing)
+// @route   PUT /api/jobs/:id/complete
+// @access  Private (requires 'jobs:edit' or 'jobs:editOwn' permission)
+export const completeJob = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const job = await prisma.job.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      invoice: true,
+    },
+  });
+
+  if (!job) {
+    throw new AppError('Job not found', 404, 'NOT_FOUND');
+  }
+
+  // Check ownership
+  if (req.isOwnResource && job.assignedTo !== req.user.id) {
+    throw new AppError(
+      'Not authorized to complete this job',
+      403,
+      'PERMISSION_DENIED'
+    );
+  }
+
+  if (job.status === 'completed') {
+    throw new AppError('Job is already completed', 400, 'INVALID_OPERATION');
+  }
+
+  if (job.invoice) {
+    throw new AppError('Job is already invoiced', 400, 'INVALID_OPERATION');
+  }
+
+  const updatedJob = await prisma.job.update({
+    where: { id: parseInt(id) },
+    data: { status: 'completed' },
+    include: {
+      materials: true,
+      user: {
+        select: {
+          fullName: true,
+          username: true,
         },
       },
-    });
+    },
+  });
 
-    res.json({
-      success: true,
-      message: 'Materials added successfully',
-      job: updatedJob,
-    });
-  } catch (error) {
-    next(error);
+  // Log audit
+  await prisma.auditLog.create({
+    data: {
+      userId: req.user.id,
+      action: 'UPDATE',
+      entity: 'Job',
+      entityId: updatedJob.id,
+      description: `Completed job #${updatedJob.id}`,
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Job completed successfully. Ready for invoicing.',
+    data: updatedJob,
+  });
+});
+
+// @desc    Delete job
+// @route   DELETE /api/jobs/:id
+// @access  Private (requires 'jobs:delete' permission)
+export const deleteJob = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const job = await prisma.job.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      invoice: true,
+    },
+  });
+
+  if (!job) {
+    throw new AppError('Job not found', 404, 'NOT_FOUND');
   }
-};
 
-// @desc    Update job material
-// @route   PUT /api/jobs/:jobId/materials/:materialId
-// @access  Private (Admin, Mechanic - own jobs only)
-export const updateJobMaterial = async (req, res, next) => {
-  try {
-    const { jobId, materialId } = req.params;
-    const { isPurchased, estimatedCost } = req.body;
+  // Cannot delete job with invoice
+  if (job.invoice) {
+    throw new AppError(
+      'Cannot delete job that has been invoiced',
+      400,
+      'INVALID_OPERATION'
+    );
+  }
 
-    // Check if material exists and belongs to job
-    const material = await prisma.jobMaterial.findFirst({
-      where: {
-        id: parseInt(materialId),
-        jobId: parseInt(jobId),
+  await prisma.$transaction(async (tx) => {
+    // Delete job materials first (cascade should handle this, but explicit is safer)
+    await tx.jobMaterial.deleteMany({
+      where: { jobId: parseInt(id) },
+    });
+
+    // Delete job
+    await tx.job.delete({
+      where: { id: parseInt(id) },
+    });
+
+    // Log audit
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'DELETE',
+        entity: 'Job',
+        entityId: parseInt(id),
+        description: `Deleted ${job.jobType} job #${id}`,
       },
+    });
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Job deleted successfully',
+  });
+});
+
+// @desc    Get job statistics
+// @route   GET /api/jobs/stats
+// @access  Private (requires 'jobs:viewAll' or 'jobs:viewOwn' permission)
+export const getJobStats = asyncHandler(async (req, res) => {
+  const { startDate, endDate, jobType } = req.query;
+
+  const where = {};
+
+  // Job type filter
+  if (req.allowedJobType) {
+    where.jobType = req.allowedJobType;
+  } else if (jobType) {
+    where.jobType = jobType;
+  }
+
+  // Date filtering
+  if (startDate || endDate) {
+    where.createdAt = {};
+    if (startDate) where.createdAt.gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      where.createdAt.lte = end;
+    }
+  }
+
+  // If user only has viewOwn permission
+  if (req.isOwnResource) {
+    where.assignedTo = req.user.id;
+  }
+
+  const [totalJobs, jobsByType, jobsByStatus, recentJobs] = await Promise.all([
+    // Total jobs and revenue
+    prisma.job.aggregate({
+      where,
+      _sum: { totalCost: true },
+      _count: true,
+    }),
+
+    // Jobs by type
+    prisma.job.groupBy({
+      by: ['jobType'],
+      where,
+      _sum: { totalCost: true },
+      _count: true,
+    }),
+
+    // Jobs by status
+    prisma.job.groupBy({
+      by: ['status'],
+      where,
+      _count: true,
+    }),
+
+    // Recent jobs
+    prisma.job.findMany({
+      where,
       include: {
-        job: true,
+        user: {
+          select: { fullName: true },
+        },
       },
-    });
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    }),
+  ]);
 
-    if (!material) {
-      throw new AppError('Material not found', 404, 'RESOURCE_NOT_FOUND');
-    }
-
-    // Check access
-    if (req.user.role === 'mechanic' && material.job.mechanicId !== req.user.id) {
-      throw new AppError('Access denied', 403, 'ACCESS_DENIED');
-    }
-
-    // Update material
-    const updateData = {};
-    if (isPurchased !== undefined) updateData.isPurchased = isPurchased;
-    if (estimatedCost !== undefined) updateData.estimatedCost = parseFloat(estimatedCost);
-
-    const updatedMaterial = await prisma.jobMaterial.update({
-      where: { id: parseInt(materialId) },
-      data: updateData,
-    });
-
-    res.json({
-      success: true,
-      message: 'Material updated successfully',
-      material: updatedMaterial,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Delete job material
-// @route   DELETE /api/jobs/:jobId/materials/:materialId
-// @access  Private (Admin, Mechanic - own jobs only)
-export const deleteJobMaterial = async (req, res, next) => {
-  try {
-    const { jobId, materialId } = req.params;
-
-    // Check if material exists
-    const material = await prisma.jobMaterial.findFirst({
-      where: {
-        id: parseInt(materialId),
-        jobId: parseInt(jobId),
-      },
-      include: {
-        job: true,
-      },
-    });
-
-    if (!material) {
-      throw new AppError('Material not found', 404, 'RESOURCE_NOT_FOUND');
-    }
-
-    // Check access
-    if (req.user.role === 'mechanic' && material.job.mechanicId !== req.user.id) {
-      throw new AppError('Access denied', 403, 'ACCESS_DENIED');
-    }
-
-    await prisma.jobMaterial.delete({
-      where: { id: parseInt(materialId) },
-    });
-
-    res.json({
-      success: true,
-      message: 'Material deleted successfully',
-    });
-  } catch (error) {
-    next(error);
-  }
-};
+  res.status(200).json({
+    success: true,
+    data: {
+      totalJobs: totalJobs._count || 0,
+      totalRevenue: totalJobs._sum.totalCost || 0,
+      jobsByType,
+      jobsByStatus,
+      recentJobs,
+    },
+  });
+});

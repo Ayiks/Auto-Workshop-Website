@@ -1,35 +1,32 @@
-version: '3.8'
-
 services:
-  # Database Service
   db:
-    image: postgres:17-alpine  
+    image: postgres:17-alpine
     environment:
-      POSTGRES_USER: ${DB_USER}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
-      - postgres-data:/var/lib/postgresql/data
-    ports:
-      - "5432:5432"
+      - postgres_data:/var/lib/postgresql/data
 
-  # Backend Service (Node.js)
   backend:
     build: ./backend
-    environment:
-      DATABASE_URL: postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}
-    depends_on:
-      - db
     ports:
       - "5000:5000"
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      APP_URL: https://graymanager.com
+      FRONTEND_URL: https://graymanager.com
+    depends_on:
+      - db
 
-  # Frontend Service (React + Nginx)
   frontend:
     build: ./frontend
     ports:
-      - "80:80"
+      - "8080:80"
     depends_on:
       - backend
 
 volumes:
-  postgres-data:
+  postgres_data:

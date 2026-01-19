@@ -39,6 +39,14 @@ router.put(
   completeJob
 );
 
+// Update job status
+router.patch(
+  '/:id/status',
+  requireJobTypeAccess,
+  canAccessResource('jobs', 'edit'),
+  updateJob
+);
+
 // Job materials management
 router
   .route('/:id/materials')

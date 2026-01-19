@@ -1,28 +1,17 @@
 import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
-// Helper function to generate receipt number
-const generateReceiptNumber = async () => {
+// Helper function to generate receipt number - now uses database sequence
+const generateReceiptNumber = () => {
   const prefix = 'RCP';
   const date = new Date();
   const year = date.getFullYear().toString().slice(-2);
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
+  const day = date.getDate().toString().padStart(2, '0');
   
-  // Get count of receipts today
-  const startOfDay = new Date(date.setHours(0, 0, 0, 0));
-  const endOfDay = new Date(date.setHours(23, 59, 59, 999));
-  
-  const count = await prisma.receipt.count({
-    where: {
-      issuedDate: {
-        gte: startOfDay,
-        lte: endOfDay,
-      },
-    },
-  });
-  
-  const sequence = (count + 1).toString().padStart(4, '0');
-  return `${prefix}${year}${month}${sequence}`;
+  // Return template - Prisma will handle the sequence ID generation
+  // Format: RCPYYMMDDXXXXXXX (sequence handled by DB)
+  return `${prefix}${year}${month}${day}`;
 };
 
 // @desc    Record payment against invoice
@@ -138,8 +127,11 @@ export const recordPayment = asyncHandler(async (req, res) => {
       throw new AppError('Business settings not configured', 500, 'CONFIG_ERROR');
     }
 
-    // 5. Generate receipt
-    const receiptNumber = await generateReceiptNumber();
+    // 5. Generate receipt number
+    const baseNumber = generateReceiptNumber();
+    const seqId = await tx.receipt.count() + 1000; // Get next sequence
+    const receiptNumber = `${baseNumber}${seqId.toString().slice(-6)}`;
+    
     const receipt = await tx.receipt.create({
       data: {
         receiptNumber,

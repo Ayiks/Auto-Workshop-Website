@@ -103,18 +103,24 @@ export const getSalesReport = asyncHandler(async (req, res) => {
   });
 
   // Daily sales trend
-  const dailySales = await prisma.$queryRaw`
-    SELECT 
-      DATE(sale_date) as date,
-      COUNT(*) as count,
-      SUM(total_amount) as total
-    FROM sales
-    WHERE status = 'completed'
-      AND sale_date >= ${dateRange.gte}
-      AND sale_date <= ${dateRange.lte}
-    GROUP BY DATE(sale_date)
-    ORDER BY date ASC
-  `;
+  let dailySales = [];
+  try {
+    dailySales = await prisma.$queryRaw`
+      SELECT 
+        DATE(sale_date)::TEXT as date,
+        COUNT(*)::INTEGER as count,
+        SUM(total_amount)::DECIMAL as total
+      FROM sales
+      WHERE status = 'completed'
+        AND sale_date >= ${dateRange.gte}
+        AND sale_date <= ${dateRange.lte}
+      GROUP BY DATE(sale_date)
+      ORDER BY date ASC
+    `;
+  } catch (error) {
+    console.error('Daily sales query error:', error);
+    dailySales = [];
+  }
 
   res.status(200).json({
     success: true,
@@ -196,23 +202,29 @@ export const getJobReport = asyncHandler(async (req, res) => {
   let totalJobRevenue = 0;
   let totalPaid = 0;
   let totalOutstanding = 0;
+  let totalMaterialsCost = 0;
+  let totalLabourCost = 0;
 
   invoices.forEach(invoice => {
     const type = invoice.job.jobType;
     const revenue = parseFloat(invoice.totalAmount);
     const paid = parseFloat(invoice.amountPaid);
     const outstanding = parseFloat(invoice.amountDue);
+    const materialsCost = parseFloat(invoice.materialsCost || 0);
+    const labourCost = parseFloat(invoice.labourCost || 0);
 
     if (revenueByType[type]) {
       revenueByType[type].revenue += revenue;
       revenueByType[type].jobs += 1;
-      revenueByType[type].materialsCost += parseFloat(invoice.materialsCost);
-      revenueByType[type].labourCost += parseFloat(invoice.labourCost);
+      revenueByType[type].materialsCost += materialsCost;
+      revenueByType[type].labourCost += labourCost;
     }
 
     totalJobRevenue += revenue;
     totalPaid += paid;
     totalOutstanding += outstanding;
+    totalMaterialsCost += materialsCost;
+    totalLabourCost += labourCost;
   });
 
   // Materials usage in jobs
@@ -232,8 +244,8 @@ export const getJobReport = asyncHandler(async (req, res) => {
     });
   });
 
-  // Payment status breakdown
-  const paymentStatusBreakdown = await prisma.invoice.groupBy({
+  // Payment status breakdown with detailed counts
+  const paymentStatusRaw = await prisma.invoice.groupBy({
     by: ['paymentStatus'],
     where: invoiceWhere,
     _sum: {
@@ -242,6 +254,22 @@ export const getJobReport = asyncHandler(async (req, res) => {
       amountDue: true,
     },
     _count: true,
+  });
+
+  // Transform payment status breakdown for easier frontend consumption
+  const paymentStatusBreakdown = {
+    unpaid: { count: 0, amount: 0, amountDue: 0 },
+    partial: { count: 0, amount: 0, amountDue: 0 },
+    paid: { count: 0, amount: 0, amountDue: 0 },
+  };
+
+  paymentStatusRaw.forEach(status => {
+    const statusKey = status.paymentStatus?.toLowerCase() || 'unpaid';
+    if (paymentStatusBreakdown[statusKey]) {
+      paymentStatusBreakdown[statusKey].count = status._count;
+      paymentStatusBreakdown[statusKey].amount = parseFloat(status._sum.totalAmount || 0);
+      paymentStatusBreakdown[statusKey].amountDue = parseFloat(status._sum.amountDue || 0);
+    }
   });
 
   res.status(200).json({
@@ -255,6 +283,8 @@ export const getJobReport = asyncHandler(async (req, res) => {
         totalJobRevenue,
         totalPaid,
         totalOutstanding,
+        totalMaterialsCost,
+        totalLabourCost,
         totalJobs: invoices.length,
       },
       revenueByType,
@@ -263,6 +293,7 @@ export const getJobReport = asyncHandler(async (req, res) => {
         ...data,
       })),
       paymentStatusBreakdown,
+      paymentStatusRaw,
       recentJobs: invoices.slice(0, 10),
     },
   });
@@ -318,34 +349,68 @@ export const getExpenseReport = asyncHandler(async (req, res) => {
 
   const totalExpenses = cogTotal + operationalTotal;
 
-  // Expenses by category
-  const expensesByCategory = await prisma.expense.groupBy({
+  // Expenses by category - convert to array format
+  const expensesByCategoryRaw = await prisma.expense.groupBy({
     by: ['category'],
     where: expenseWhere,
     _sum: { amount: true },
     _count: true,
   });
 
-  // Expenses by type
-  const expensesByType = await prisma.expense.groupBy({
+  const byCategory = expensesByCategoryRaw.map(cat => ({
+    category: cat.category,
+    _sum: { amount: cat._sum.amount || 0 },
+    _count: cat._count,
+  }));
+
+  // Expenses by type - convert to array format
+  const expensesByTypeRaw = await prisma.expense.groupBy({
     by: ['type'],
     where: expenseWhere,
     _sum: { amount: true },
     _count: true,
   });
 
+  const byType = expensesByTypeRaw.map(t => ({
+    type: t.type,
+    _sum: { amount: t._sum.amount || 0 },
+    _count: t._count,
+  }));
+
   // Monthly trend
-  const monthlyExpenses = await prisma.$queryRaw`
-    SELECT 
-      DATE_TRUNC('month', expense_date) as month,
-      type,
-      SUM(amount) as total
-    FROM expenses
-    WHERE expense_date >= ${dateRange.gte}
-      AND expense_date <= ${dateRange.lte}
-    GROUP BY DATE_TRUNC('month', expense_date), type
-    ORDER BY month ASC
-  `;
+  let monthlyExpenses = [];
+  try {
+    monthlyExpenses = await prisma.$queryRaw`
+      SELECT 
+        DATE_TRUNC('month', expense_date)::TEXT as month,
+        type,
+        SUM(amount)::DECIMAL as total
+      FROM expenses
+      WHERE expense_date >= ${dateRange.gte}
+        AND expense_date <= ${dateRange.lte}
+      GROUP BY DATE_TRUNC('month', expense_date), type
+      ORDER BY month ASC
+    `;
+  } catch (error) {
+    console.error('Monthly expenses query error:', error);
+    monthlyExpenses = [];
+  }
+
+  // Count material reorders (for COG entries)
+  const materialReorderCount = await prisma.expense.count({
+    where: {
+      type: 'cog',
+      expenseDate: dateRange,
+    },
+  });
+
+  // Count operational entries
+  const operationalCount = await prisma.expense.count({
+    where: {
+      type: 'operational',
+      expenseDate: dateRange,
+    },
+  });
 
   res.status(200).json({
     success: true,
@@ -359,10 +424,12 @@ export const getExpenseReport = asyncHandler(async (req, res) => {
         cogTotal,
         operationalTotal,
         totalTransactions: expenses.length,
+        materialReorderCount,
+        operationalCount,
       },
       breakdown: {
-        byCategory: expensesByCategory,
-        byType: expensesByType,
+        byCategory,
+        byType,
       },
       monthlyTrend: monthlyExpenses,
       recentExpenses: expenses.slice(0, 10),
@@ -454,19 +521,6 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
   });
 
   // 7. Get job revenue breakdown by type
-  const jobsByType = await prisma.invoice.groupBy({
-    by: ['job'],
-    where: {
-      invoiceDate: dateRange,
-    },
-    _sum: {
-      totalAmount: true,
-      materialsCost: true,
-      labourCost: true,
-    },
-  });
-
-  // Get job types
   const invoicesWithJobs = await prisma.invoice.findMany({
     where: {
       invoiceDate: dateRange,
@@ -682,10 +736,12 @@ export const getMaterialUsageReport = asyncHandler(async (req, res) => {
         counterSalesUsage[item.materialName] = {
           quantity: 0,
           revenue: 0,
+          usedInSales: 0,
         };
       }
       counterSalesUsage[item.materialName].quantity += item.quantity;
       counterSalesUsage[item.materialName].revenue += parseFloat(item.subtotal);
+      counterSalesUsage[item.materialName].usedInSales += item.quantity;
     });
   });
 
@@ -712,10 +768,12 @@ export const getMaterialUsageReport = asyncHandler(async (req, res) => {
         jobMaterialUsage[material.materialName] = {
           quantity: 0,
           cost: 0,
+          usedInJobs: 0,
         };
       }
       jobMaterialUsage[material.materialName].quantity += material.quantity;
       jobMaterialUsage[material.materialName].cost += parseFloat(material.subtotal);
+      jobMaterialUsage[material.materialName].usedInJobs += material.quantity;
     });
   });
 
@@ -727,8 +785,10 @@ export const getMaterialUsageReport = asyncHandler(async (req, res) => {
 
   const materialUsage = Array.from(allMaterials).map(name => ({
     materialName: name,
-    counterSales: counterSalesUsage[name] || { quantity: 0, revenue: 0 },
-    jobs: jobMaterialUsage[name] || { quantity: 0, cost: 0 },
+    counterSales: counterSalesUsage[name] || { quantity: 0, revenue: 0, usedInSales: 0 },
+    jobs: jobMaterialUsage[name] || { quantity: 0, cost: 0, usedInJobs: 0 },
+    usedInSales: counterSalesUsage[name]?.usedInSales || 0,
+    usedInJobs: jobMaterialUsage[name]?.usedInJobs || 0,
     totalQuantity: 
       (counterSalesUsage[name]?.quantity || 0) + 
       (jobMaterialUsage[name]?.quantity || 0),

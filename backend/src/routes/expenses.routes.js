@@ -7,6 +7,7 @@ import {
   deleteExpense,
   getExpensesByCategory,
   getCOGSExpenses,
+  getExpenseStats
 } from '../controllers/expenses.controller.js';
 import { protect, requirePermission } from '../middleware/auth.js';
 
@@ -14,6 +15,13 @@ const router = express.Router();
 
 // All routes require authentication
 router.use(protect);
+
+//statistics
+router.get(
+  '/stats',
+  requirePermission('expenses', 'view'),
+  getExpenseStats
+);
 
 // Special routes (before /:id to avoid conflict)
 router.get(

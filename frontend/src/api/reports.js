@@ -36,4 +36,10 @@ export const reportsApi = {
     const response = await apiClient.get('/reports/revenue', { params });
     return response;
   },
+
+  // Get material usage report
+  getMaterialUsageReport: async (params) => {
+    const response = await apiClient.get('/reports/material-usage', { params });
+    return response;
+  },
 };

@@ -253,6 +253,7 @@ model Payment {
 
 model Receipt {
   id            Int      @id @default(autoincrement())
+  seqId         BigInt?  @unique @map("seq_id") @default(autoincrement())
   receiptNumber String   @unique @map("receipt_number") @db.VarChar(50)
   receiptType   String   @map("receipt_type") @db.VarChar(20) // 'sale' | 'payment'
   

@@ -424,3 +424,83 @@ export const getCOGSExpenses = asyncHandler(async (req, res) => {
     data: cogsExpenses,
   });
 });
+
+// Add this to your expenseController.js
+
+// @desc    Get expense statistics
+// @route   GET /api/expenses/stats
+// @access  Private (requires 'expenses:view' permission)
+export const getExpenseStats = asyncHandler(async (req, res) => {
+  const { startDate, endDate } = req.query;
+
+  const where = {};
+
+  // Date filtering
+  if (startDate || endDate) {
+    where.expenseDate = {};
+    if (startDate) where.expenseDate.gte = new Date(startDate);
+    if (endDate) {
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+      where.expenseDate.lte = end;
+    }
+  }
+
+  // Get all expenses
+  const allExpenses = await prisma.expense.findMany({
+    where,
+    select: {
+      type: true,
+      amount: true,
+      expenseDate: true,
+    },
+  });
+
+  // Calculate totals
+  let totalExpenses = 0;
+  let totalCOGS = 0;
+  let totalOperational = 0;
+
+  allExpenses.forEach(expense => {
+    const amount = parseFloat(expense.amount);
+    totalExpenses += amount;
+    
+    if (expense.type === 'cog') {
+      totalCOGS += amount;
+    } else if (expense.type === 'operational') {
+      totalOperational += amount;
+    }
+  });
+
+  // Get current month expenses
+  const now = new Date();
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
+
+  const thisMonthExpenses = await prisma.expense.findMany({
+    where: {
+      expenseDate: {
+        gte: firstDayOfMonth,
+        lte: lastDayOfMonth,
+      },
+    },
+    select: {
+      amount: true,
+    },
+  });
+
+  const thisMonth = thisMonthExpenses.reduce(
+    (sum, exp) => sum + parseFloat(exp.amount),
+    0
+  );
+
+  res.status(200).json({
+    success: true,
+    data: {
+      totalExpenses: totalExpenses.toFixed(2),
+      totalCOGS: totalCOGS.toFixed(2),
+      totalOperational: totalOperational.toFixed(2),
+      thisMonth: thisMonth.toFixed(2),
+    },
+  });
+});

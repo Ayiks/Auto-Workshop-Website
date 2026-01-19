@@ -159,7 +159,15 @@ import ProtectedRoute from '@components/common/ProtectedRoute';
 // Pages
 import Login from '@pages/Login';
 import Dashboard from '@pages/Dashboard';
+import Materials from '@pages/Materials';
+import Sales from '@pages/Sales';
+import Jobs from '@pages/Jobs';
+import Invoices from '@pages/Invoices';
+import Finance from '@/pages/Finance';
+import Expenses from '@pages/Expenses';
+import Users from '@pages/Users';
 import DashboardLayout from '@components/layout/DashboardLayout';
+
 
 // Create Query Client
 const queryClient = new QueryClient({
@@ -207,12 +215,14 @@ function App() {
           >
             <Route index element={<Navigate to="/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
+            <Route path="materials" element={<Materials />} />
+            <Route path="sales" element={<Sales />} />
+            <Route path="jobs" element={<Jobs />} />
+            <Route path='invoices' element={<Invoices />} />
+            <Route path='finance' element={<Finance />} />
+            <Route path="expenses" element={<Expenses />} />
+            <Route path="users" element={<Users />} />
             
-            {/* We'll add more routes here as we build features */}
-            {/* <Route path="materials" element={<Materials />} /> */}
-            {/* <Route path="sales" element={<Sales />} /> */}
-            {/* <Route path="jobs" element={<Jobs />} /> */}
-            {/* etc... */}
           </Route>
 
           {/* 404 Route */}

@@ -25,6 +25,9 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
         [name]: null,
       }));
     }
+
+        console.log("sending data:", finalValue);
+
   };
 
   const validate = () => {

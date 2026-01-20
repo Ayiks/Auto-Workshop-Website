@@ -10,11 +10,11 @@ import { protect, authorize } from '../middleware/auth.js';
 const router = express.Router();
 
 // Public routes (no authentication)
-router.get('/', getSettings);
+router.get('/business', getSettings);
 router.get('/booth-price', getBoothPrice);
 
 // Protected routes (admin only)
-router.put('/', protect, authorize('admin'), updateSettings);
+router.put('/business', protect, authorize('admin'), updateSettings);
 router.put('/logo', protect, authorize('admin'), updateLogo);
 
 export default router;

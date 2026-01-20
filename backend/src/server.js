@@ -21,6 +21,12 @@ const server = app.listen(PORT, async () => {
   }
 });
 
+// src/app.js or src/server.js
+BigInt.prototype.toJSON = function() {
+  return this.toString();
+};
+
+
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
   console.error('Unhandled Promise Rejection:', err);

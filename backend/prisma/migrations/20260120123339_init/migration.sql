@@ -22,7 +22,7 @@ CREATE TABLE "users" (
 CREATE TABLE "materials" (
     "id" SERIAL NOT NULL,
     "name" VARCHAR(100) NOT NULL,
-    "quantity" INTEGER NOT NULL DEFAULT 0,
+    "quantity" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "unit_cost" DECIMAL(10,2) NOT NULL,
     "selling_price" DECIMAL(10,2) NOT NULL,
     "low_stock_threshold" INTEGER NOT NULL DEFAULT 10,
@@ -38,7 +38,7 @@ CREATE TABLE "material_reorders" (
     "id" SERIAL NOT NULL,
     "material_id" INTEGER NOT NULL,
     "materialName" VARCHAR(100) NOT NULL,
-    "quantity_ordered" INTEGER NOT NULL,
+    "quantity_ordered" DECIMAL(10,2) NOT NULL,
     "unit_cost" DECIMAL(10,2) NOT NULL,
     "total_cost" DECIMAL(10,2) NOT NULL,
     "reordered_by" INTEGER NOT NULL,
@@ -80,7 +80,7 @@ CREATE TABLE "sale_items" (
     "item_type" VARCHAR(20) NOT NULL,
     "material_id" INTEGER,
     "materialName" VARCHAR(100),
-    "quantity" INTEGER,
+    "quantity" DECIMAL(10,2),
     "service_id" INTEGER,
     "unit_price" DECIMAL(10,2) NOT NULL,
     "subtotal" DECIMAL(10,2) NOT NULL,
@@ -116,7 +116,7 @@ CREATE TABLE "job_materials" (
     "job_id" INTEGER NOT NULL,
     "material_id" INTEGER,
     "material_name" VARCHAR(100) NOT NULL,
-    "quantity" INTEGER NOT NULL,
+    "quantity" DECIMAL(10,2) NOT NULL,
     "unit_price" DECIMAL(10,2) NOT NULL,
     "subtotal" DECIMAL(10,2) NOT NULL,
     "is_external" BOOLEAN NOT NULL DEFAULT false,
@@ -158,6 +158,7 @@ CREATE TABLE "payments" (
 -- CreateTable
 CREATE TABLE "receipts" (
     "id" SERIAL NOT NULL,
+    "seq_id" BIGSERIAL,
     "receipt_number" VARCHAR(50) NOT NULL,
     "receipt_type" VARCHAR(20) NOT NULL,
     "sale_id" INTEGER,
@@ -249,6 +250,9 @@ CREATE UNIQUE INDEX "invoices_job_id_key" ON "invoices"("job_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "invoices_invoice_number_key" ON "invoices"("invoice_number");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "receipts_seq_id_key" ON "receipts"("seq_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "receipts_receipt_number_key" ON "receipts"("receipt_number");

@@ -193,7 +193,7 @@ model JobMaterial {
   
   // Common fields (for both inventory and external)
   materialName String  @map("material_name") @db.VarChar(100)
-  quantity     Double
+  quantity     Decimal @db.Decimal(10, 2)
   unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
   subtotal     Decimal @db.Decimal(10, 2)
   isExternal   Boolean @default(false) @map("is_external") // true = external, false = from inventory

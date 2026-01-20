@@ -37,7 +37,7 @@ export const settingsApi = {
 
   // Update own profile
   updateProfile: async (data) => {
-    const response = await apiClient.put('/users/:id', data);
+    const response = await apiClient.put('/auth/me', data);
     return response;
   },
 

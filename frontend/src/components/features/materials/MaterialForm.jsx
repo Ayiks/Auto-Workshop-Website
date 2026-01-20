@@ -101,7 +101,6 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
               value={formData.quantity}
               onChange={handleChange}
               placeholder="0"
-              min="0"
               className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                 errors.quantity ? 'border-red-500' : 'border-gray-300'
               }`}

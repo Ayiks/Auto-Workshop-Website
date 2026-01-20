@@ -74,7 +74,7 @@ export const getMaterial = asyncHandler(async (req, res) => {
 export const createMaterial = asyncHandler(async (req, res) => {
   const {
     name,
-    quantity = 0,
+    quantity = 0.0,
     unitCost,
     sellingPrice,
     lowStockThreshold = 10,

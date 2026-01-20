@@ -71,12 +71,11 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
         <label className="block text-sm font-medium text-gray-900 mb-2">Quantity to Order</label>
         <input
           type="number"
-          step="0.1"
+          step="0.01"
           name="quantityOrdered"
           value={formData.quantityOrdered}
           onChange={handleChange}
           placeholder="Enter quantity"
-          min="1"
           className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
             errors.quantityOrdered ? 'border-red-500' : 'border-gray-300'
           }`}

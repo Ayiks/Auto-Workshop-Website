@@ -74,7 +74,7 @@ export const getMaterial = asyncHandler(async (req, res) => {
 export const createMaterial = asyncHandler(async (req, res) => {
   const {
     name,
-    quantity = 0,
+    quantity = 0.0,
     unitCost,
     sellingPrice,
     lowStockThreshold = 10,
@@ -122,10 +122,10 @@ export const createMaterial = asyncHandler(async (req, res) => {
   const material = await prisma.material.create({
     data: {
       name: name.trim(),
-      quantity: parseInt(quantity),
+      quantity: parseFloat(quantity),
       unitCost: parseFloat(unitCost),
       sellingPrice: parseFloat(sellingPrice),
-      lowStockThreshold: parseInt(lowStockThreshold),
+      lowStockThreshold: parseFloat(lowStockThreshold),
     },
   });
 
@@ -202,7 +202,7 @@ export const updateMaterial = asyncHandler(async (req, res) => {
   if (name) updateData.name = name.trim();
   if (unitCost !== undefined) updateData.unitCost = parseFloat(unitCost);
   if (sellingPrice !== undefined) updateData.sellingPrice = parseFloat(sellingPrice);
-  if (lowStockThreshold !== undefined) updateData.lowStockThreshold = parseInt(lowStockThreshold);
+  if (lowStockThreshold !== undefined) updateData.lowStockThreshold = parseFloat(lowStockThreshold);
   if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
   const updatedMaterial = await prisma.material.update({
@@ -350,7 +350,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
 
   // Use provided unit cost or material's current unit cost
   const reorderUnitCost = unitCost ? parseFloat(unitCost) : material.unitCost;
-  const totalCost = reorderUnitCost * parseInt(quantityOrdered);
+  const totalCost = reorderUnitCost * parseFloat(quantityOrdered);
 
   // Start transaction
   const result = await prisma.$transaction(async (tx) => {
@@ -359,7 +359,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
       data: {
         materialId: material.id,
         materialName: material.name,
-        quantityOrdered: parseInt(quantityOrdered),
+        quantityOrdered: parseFloat(quantityOrdered),
         unitCost: reorderUnitCost,
         totalCost,
         reorderedBy: req.user.id,
@@ -371,7 +371,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
     const updatedMaterial = await tx.material.update({
       where: { id: material.id },
       data: {
-        quantity: material.quantity + parseInt(quantityOrdered),
+        quantity: material.quantity + parseFloat(quantityOrdered),
         unitCost: reorderUnitCost, // Update to new cost
       },
     });

@@ -157,6 +157,7 @@ import { useAuthStore } from '@stores/authStore';
 import ProtectedRoute from '@components/common/ProtectedRoute';
 
 // Pages
+import LandingPage from '@pages/LandingPage';
 import Login from '@pages/Login';
 import Dashboard from '@pages/Dashboard';
 import Materials from '@pages/Materials';
@@ -166,6 +167,7 @@ import Invoices from '@pages/Invoices';
 import Finance from '@/pages/Finance';
 import Expenses from '@pages/Expenses';
 import Users from '@pages/Users';
+import Settings from '@pages/Settings';
 import DashboardLayout from '@components/layout/DashboardLayout';
 
 
@@ -202,18 +204,20 @@ function App() {
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
+          <Route path="/" element={<LandingPage />} />
+
           <Route path="/login" element={<Login />} />
 
           {/* Protected Routes */}
           <Route
-            path="/"
+            path="/app"
             element={
               <ProtectedRoute>
                 <DashboardLayout />
               </ProtectedRoute>
             }
           >
-            <Route index element={<Navigate to="/dashboard" replace />} />
+            <Route index element={<Navigate to="/app/dashboard" replace />} />
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="materials" element={<Materials />} />
             <Route path="sales" element={<Sales />} />
@@ -222,6 +226,7 @@ function App() {
             <Route path='finance' element={<Finance />} />
             <Route path="expenses" element={<Expenses />} />
             <Route path="users" element={<Users />} />
+            <Route path="settings" element={<Settings />} />
             
           </Route>
 

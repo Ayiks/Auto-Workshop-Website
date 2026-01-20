@@ -28,7 +28,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
         id: Date.now(),
         itemType: 'material',
         materialId: '',
-        quantity: 1,
+        quantity: 0,
         unitPrice: 0,
         subtotal: 0,
       },
@@ -58,7 +58,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
 
           // Recalculate subtotal when quantity changes
           if (field === 'quantity') {
-            updated.subtotal = updated.unitPrice * parseInt(value || 0);
+            updated.subtotal = updated.unitPrice * parseFloat(value || 0);
           }
 
           return updated;
@@ -105,7 +105,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
       ...items.map((item) => ({
         itemType: 'material',
         materialId: parseInt(item.materialId),
-        quantity: parseInt(item.quantity),
+        quantity: parseFloat(item.quantity),
       })),
     ];
 
@@ -173,7 +173,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                       onChange={(e) => updateItem(item.id, 'materialId', e.target.value)}
                       options={activeMaterials.map((m) => ({
                         value: m.id,
-                        label: `${m.name} (${m.quantity} available)`,
+                        label: `${m.name}`,
                       }))}
                       placeholder="Select material"
                       required
@@ -189,7 +189,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                         type="number"
                         value={item.quantity}
                         onChange={(e) => updateItem(item.id, 'quantity', e.target.value)}
-                        min="1"
+                        min="0"
                         max={item.maxQuantity}
                         required
                         disabled={isLoading}
@@ -206,7 +206,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                   {/* Unit Price */}
                   <div className="col-span-2">
                     <div className="relative">
-                      <span className="absolute left-3 top-2.5 text-gray-500">GH₵</span>
+                      <span className="absolute left-3 top-2.5 text-gray-500 mr-1.5">GH₵</span>
                       <Input
                         name={`price-${item.id}`}
                         type="number"
@@ -244,7 +244,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
       </div>
 
       {/* Booth Service */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
+      {/* <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="relative">
@@ -276,7 +276,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
           </div>
           <span className="text-lg font-semibold text-gray-900">GH₵{boothServicePrice.toFixed(2)}</span>
         </div>
-      </div>
+      </div> */}
 
       {/* Totals & Payment */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">

@@ -14,16 +14,17 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
 
   const handleChange = (e) => {
     const { name, value } = e.target;
-    setFormData({
-      ...formData,
+
+    setFormData(prev => ({
+      ...prev,
       [name]: value,
-    });
+    }));
     if (errors[name]) {
-      setErrors({
-        ...errors,
+      setErrors(prev => ({
+        ...prev,
         [name]: null,
-      });
-    }
+      }));
+    }    
   };
 
   const validate = () => {
@@ -60,8 +61,11 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validate()) {
+          
       onSubmit(formData);
     }
+    console.log();
+    
   };
 
   const profit = formData.sellingPrice - formData.unitCost;
@@ -96,7 +100,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
             <label className="block text-sm font-medium text-gray-900 mb-2">Initial Quantity</label>
             <input
               type="number"
-              step = "0.01"
+              step = "any"
               name="quantity"
               value={formData.quantity}
               onChange={handleChange}
@@ -117,6 +121,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
           <label className="block text-sm font-medium text-gray-900 mb-2">Low Stock Threshold</label>
           <input
             type="number"
+            step="any"
             name="lowStockThreshold"
             value={formData.lowStockThreshold}
             onChange={handleChange}

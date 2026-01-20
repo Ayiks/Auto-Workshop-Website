@@ -1,7 +1,11 @@
 import express from 'express';
 import {
   getBoothService,
-  updateBoothServicePrice,
+  getBoothServices,
+  createBoothService,
+  updateBoothService,
+  deleteBoothService,
+  toggleBoothService
 } from '../controllers/service.controller.js';
 import { protect, requirePermission } from '../middleware/auth.js';
 
@@ -14,6 +18,6 @@ router.use(protect);
 router
   .route('/booth')
   .get(requirePermission('booth', 'view'), getBoothService)
-  .put(requirePermission('booth', 'edit'), updateBoothServicePrice);
+  // .put(requirePermission('booth', 'edit'), );
 
 export default router;

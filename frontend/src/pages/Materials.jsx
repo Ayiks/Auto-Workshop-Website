@@ -33,7 +33,7 @@ export default function Materials() {
       }),
   });
 
-  const materials = data?.data || [];
+  const materials = data?.data || [];  
 
   // Filter by search term
   const filteredMaterials = materials.filter((material) =>

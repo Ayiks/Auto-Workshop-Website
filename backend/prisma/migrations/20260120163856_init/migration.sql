@@ -25,7 +25,7 @@ CREATE TABLE "materials" (
     "quantity" DECIMAL(10,2) NOT NULL DEFAULT 0,
     "unit_cost" DECIMAL(10,2) NOT NULL,
     "selling_price" DECIMAL(10,2) NOT NULL,
-    "low_stock_threshold" INTEGER NOT NULL DEFAULT 10,
+    "low_stock_threshold" DECIMAL(10,2) NOT NULL,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -53,8 +53,11 @@ CREATE TABLE "material_reorders" (
 CREATE TABLE "services" (
     "id" SERIAL NOT NULL,
     "type" VARCHAR(20) NOT NULL DEFAULT 'booth',
+    "name" VARCHAR(100) NOT NULL,
+    "category" VARCHAR(50) NOT NULL,
     "price" DECIMAL(10,2) NOT NULL,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
 
     CONSTRAINT "services_pkey" PRIMARY KEY ("id")

@@ -96,7 +96,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
             <label className="block text-sm font-medium text-gray-900 mb-2">Initial Quantity</label>
             <input
               type="number"
-              step = "0.1"
+              step = "0.01"
               name="quantity"
               value={formData.quantity}
               onChange={handleChange}
@@ -120,8 +120,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
             name="lowStockThreshold"
             value={formData.lowStockThreshold}
             onChange={handleChange}
-            placeholder="10"
-            min="0"
+            placeholder="3"
             className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
               errors.lowStockThreshold ? 'border-red-500' : 'border-gray-300'
             }`}

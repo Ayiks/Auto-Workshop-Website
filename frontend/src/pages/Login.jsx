@@ -20,7 +20,7 @@ export default function Login() {
     setError("");
     setIsLoading(true);
     const result = await login(formData);
-    if (result.success) navigate("/dashboard");
+    if (result.success) navigate("/app/dashboard");
     else setError(result.error || "Login failed. Please try again.");
     setIsLoading(false);
   };

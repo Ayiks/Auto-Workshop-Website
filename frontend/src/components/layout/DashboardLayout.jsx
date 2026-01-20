@@ -18,7 +18,7 @@ export default function DashboardLayout() {
   const navItems = [
     {
       name: "Dashboard",
-      path: "/dashboard",
+      path: "/app/dashboard",
       icon: (
         <svg
           className="w-5 h-5"
@@ -38,7 +38,7 @@ export default function DashboardLayout() {
     },
     {
       name: "Materials",
-      path: "/materials",
+      path: "/app/materials",
       icon: (
         <svg
           className="w-5 h-5"
@@ -58,7 +58,7 @@ export default function DashboardLayout() {
     },
     {
       name: "Sales",
-      path: "/sales",
+      path: "/app/sales",
       icon: (
         <svg
           className="w-5 h-5"
@@ -78,7 +78,7 @@ export default function DashboardLayout() {
     },
     {
       name: "Jobs",
-      path: "/jobs",
+      path: "/app/jobs",
       icon: (
         <svg
           className="w-5 h-5"
@@ -98,7 +98,7 @@ export default function DashboardLayout() {
     },
     {
       name: "Expenses",
-      path: "/expenses",
+      path: "/app/expenses",
       icon: (
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -124,7 +124,7 @@ export default function DashboardLayout() {
     },
     {
       name: "Finance",
-      path: "/finance",
+      path: "/app/finance",
       icon: (
         <svg
           className="w-5 h-5"
@@ -144,7 +144,7 @@ export default function DashboardLayout() {
     },
     {
       name: "Users",
-      path: "/users",
+      path: "/app/users",
       icon: (
         <svg
           className="w-5 h-5"
@@ -164,7 +164,7 @@ export default function DashboardLayout() {
     },
     {
       name: "Bookings",
-      path: "/bookings",
+      path: "/app/bookings",
       icon: (
         <svg
           className="w-5 h-5"
@@ -184,7 +184,7 @@ export default function DashboardLayout() {
     },
     {
       name: "Settings",
-      path: "/settings",
+      path: "/app/settings",
       icon: (
         <svg
           className="w-5 h-5"

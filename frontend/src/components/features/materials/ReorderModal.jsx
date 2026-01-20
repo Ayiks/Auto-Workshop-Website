@@ -71,6 +71,7 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
         <label className="block text-sm font-medium text-gray-900 mb-2">Quantity to Order</label>
         <input
           type="number"
+          step="0.1"
           name="quantityOrdered"
           value={formData.quantityOrdered}
           onChange={handleChange}

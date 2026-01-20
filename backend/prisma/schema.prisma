@@ -53,7 +53,7 @@ enum Role {
 model Material {
   id                Int      @id @default(autoincrement())
   name              String   @db.VarChar(100)
-  quantity          Int      @default(0)
+  quantity          Double  @default(0)
   unitCost          Decimal  @map("unit_cost") @db.Decimal(10, 2)
   sellingPrice      Decimal  @map("selling_price") @db.Decimal(10, 2)
   lowStockThreshold Int      @default(10) @map("low_stock_threshold")
@@ -73,7 +73,7 @@ model MaterialReorder {
   id              Int      @id @default(autoincrement())
   materialId      Int      @map("material_id")
   materialName    String   @db.VarChar(100)
-  quantityOrdered Int      @map("quantity_ordered")
+  quantityOrdered Double  @map("quantity_ordered")
   unitCost        Decimal  @map("unit_cost") @db.Decimal(10, 2)
   totalCost       Decimal  @map("total_cost") @db.Decimal(10, 2)
   reorderedBy     Int      @map("reordered_by")
@@ -137,7 +137,7 @@ model SaleItem {
   // Material fields (null if booth)
   materialId   Int?    @map("material_id")
   materialName String? @db.VarChar(100)
-  quantity     Int?
+  quantity     Double?
   
   // Service fields (null if material)
   serviceId    Int?    @map("service_id")
@@ -193,7 +193,7 @@ model JobMaterial {
   
   // Common fields (for both inventory and external)
   materialName String  @map("material_name") @db.VarChar(100)
-  quantity     Int
+  quantity     Double
   unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
   subtotal     Decimal @db.Decimal(10, 2)
   isExternal   Boolean @default(false) @map("is_external") // true = external, false = from inventory

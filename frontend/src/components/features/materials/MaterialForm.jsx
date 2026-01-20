@@ -96,6 +96,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
             <label className="block text-sm font-medium text-gray-900 mb-2">Initial Quantity</label>
             <input
               type="number"
+              step = "0.1"
               name="quantity"
               value={formData.quantity}
               onChange={handleChange}

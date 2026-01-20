@@ -66,6 +66,8 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
     if (validate()) {
       onSubmit(formData);
     }
+
+    console.log("sent data:", formData)
   };
 
   const profit = formData.sellingPrice - formData.unitCost;

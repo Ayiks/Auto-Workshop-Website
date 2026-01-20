@@ -166,7 +166,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                   </div>
 
                   {/* Material Selection */}
-                  <div className="col-span-5">
+                  <div className="col-span-4">
                     <Select
                       name={`material-${item.id}`}
                       value={item.materialId}
@@ -182,7 +182,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                   </div>
 
                   {/* Quantity */}
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <div className="relative">
                       <Input
                         name={`quantity-${item.id}`}

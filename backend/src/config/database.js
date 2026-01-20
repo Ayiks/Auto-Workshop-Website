@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './prisma/prisma.config';
 
 const prisma = new PrismaClient({
   log: process.env.NODE_ENV === 'development' 

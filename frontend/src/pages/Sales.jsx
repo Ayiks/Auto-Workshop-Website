@@ -68,12 +68,10 @@ export default function Sales() {
   };
 
   const handleCloseReceiptModal = () => {
-    setShowReceiptModal(false);
     // Don't clear state immediately, wait for animation
-    setTimeout(() => {
-      setSelectedReceipt(null);
-      setSelectedSale(null);
-    }, 300);
+    setSelectedReceipt(null);
+    setSelectedSale(null);
+    setShowReceiptModal(false);
   };
 
   const handleCloseCreateModal = () => {
@@ -358,18 +356,22 @@ export default function Sales() {
       </Modal>
 
       {/* Receipt Modal - Only render when data is available */}
-      {selectedReceipt && selectedSale && (
-        <Modal
-          isOpen={showReceiptModal}
-          onClose={handleCloseReceiptModal}
-          title="Sale Receipt"
-          size="md"
-        >
-          <div className="p-1">
-            <Receipt receipt={selectedReceipt} sale={selectedSale} />
-          </div>
-        </Modal>
-      )}
+      <Modal
+  isOpen={showReceiptModal}
+  onClose={handleCloseReceiptModal}
+  title="Sale Receipt"
+  size="md"
+>
+  <div className="p-1">
+    {selectedReceipt && selectedSale ? (
+      <Receipt receipt={selectedReceipt} sale={selectedSale} />
+    ) : (
+      <div className="text-center py-8">
+        <LoadingSpinner text="Loading receipt..." />
+      </div>
+    )}
+  </div>
+</Modal>
     </div>
   );
 }

@@ -213,13 +213,13 @@ export const createSale = asyncHandler(async (req, res) => {
   });
 
   res.status(201).json({
-    success: true,
-    message: 'Sale completed successfully',
-    data: {
-      sale: completeSale,
-      receipt: result.receipt,
-    },
-  });
+  success: true,
+  message: 'Sale completed successfully',
+  data: JSON.parse(JSON.stringify(completeSale, (key, value) =>
+    typeof value === 'bigint' ? value.toString() : value
+  )),
+});
+
 });
 
 // @desc    Get all sales

@@ -104,7 +104,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
     const saleItems = [
       ...items.map((item) => ({
         itemType: 'material',
-        materialId: parseInt(item.materialId),
+        materialId: Number(item.materialId),
         quantity: parseFloat(item.quantity),
       })),
     ];
@@ -172,7 +172,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                       value={item.materialId}
                       onChange={(e) => updateItem(item.id, 'materialId', e.target.value)}
                       options={activeMaterials.map((m) => ({
-                        value: m.id,
+                        value: m.id.toString(),
                         label: `${m.name}`,
                       }))}
                       placeholder="Select material"

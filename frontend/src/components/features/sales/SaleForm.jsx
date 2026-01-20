@@ -187,6 +187,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                       <Input
                         name={`quantity-${item.id}`}
                         type="number"
+                        step="any"
                         value={item.quantity}
                         onChange={(e) => updateItem(item.id, 'quantity', e.target.value)}
                         min="0"

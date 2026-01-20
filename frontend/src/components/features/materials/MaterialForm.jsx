@@ -26,7 +26,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
       }));
     }
 
-        console.log("sending data:", finalValue);
+        console.log("sending data:", prev);
 
   };
 

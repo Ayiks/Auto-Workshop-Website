@@ -14,9 +14,11 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
 
   const handleChange = (e) => {
     const { name, value } = e.target;
+    const finalValue = type === 'number' ? (value === '' ? '' : parseFloat(value)) : value;
+
     setFormData({
       ...formData,
-      [name]: value,
+      [name]: finalValue,
     });
     if (errors[name]) {
       setErrors({

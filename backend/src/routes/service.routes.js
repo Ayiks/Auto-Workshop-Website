@@ -2,7 +2,7 @@ import express from 'express';
 import {
   getBoothService,
   updateBoothServicePrice,
-} from '../controllers/serviceController.js';
+} from '../controllers/service.controller.js';
 import { protect, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();

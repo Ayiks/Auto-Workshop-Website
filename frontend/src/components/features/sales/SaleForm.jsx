@@ -157,7 +157,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
           <div className="space-y-4">
             {items.map((item, index) => (
               <div key={item.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                <div className="grid grid-cols-12 gap-4 items-center">
+                <div className="grid grid-cols-12 gap-3 items-center">
                   {/* Item Number */}
                   <div className="col-span-1">
                     <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white border border-gray-300 text-sm font-medium text-gray-700">
@@ -166,7 +166,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                   </div>
 
                   {/* Material Selection */}
-                  <div className="col-span-5">
+                  <div className="col-span-4">
                     <Select
                       name={`material-${item.id}`}
                       value={item.materialId}
@@ -182,11 +182,12 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                   </div>
 
                   {/* Quantity */}
-                  <div className="col-span-2">
+                  <div className="col-span-3">
                     <div className="relative">
                       <Input
                         name={`quantity-${item.id}`}
                         type="number"
+                        step="any"
                         value={item.quantity}
                         onChange={(e) => updateItem(item.id, 'quantity', e.target.value)}
                         min="0"

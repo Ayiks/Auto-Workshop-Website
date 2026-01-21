@@ -2,14 +2,17 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { materialsApi } from '@api/materials';
-import { boothServicesApi } from '@api/boothService';
+import { servicesApi } from '@api/sales'; // Fixed import name
 import Modal from '@components/common/Modal';
 import Button from '@components/common/Button';
 import Select from '@components/common/Select';
+import Input from '@components/common/Input'; // Added Input component
 
 export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoading }) {
   const [items, setItems] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [saleDate, setSaleDate] = useState('');
+  const [saleTime, setSaleTime] = useState('');
   const [reverseInventory, setReverseInventory] = useState(true);
   const [errors, setErrors] = useState({});
 
@@ -39,14 +42,44 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
         itemType: item.itemType,
         materialId: item.materialId || '',
         serviceId: item.serviceId || '',
-        quantity: item.quantity || 1,
+        quantity: parseFloat(item.quantity) || 0,
         unitPrice: parseFloat(item.unitPrice),
         subtotal: parseFloat(item.subtotal),
       }));
+      
       setItems(formattedItems);
       setPaymentMethod(sale.paymentMethod);
       setReverseInventory(true);
       setErrors({});
+      
+      // Parse sale date and time
+      if (sale.saleDate) {
+        try {
+          const saleDateObj = new Date(sale.saleDate);
+          if (!isNaN(saleDateObj.getTime())) {
+            // Format date as YYYY-MM-DD
+            const dateStr = saleDateObj.toISOString().split('T')[0];
+            
+            // Format time as HH:mm
+            const hours = saleDateObj.getHours().toString().padStart(2, '0');
+            const minutes = saleDateObj.getMinutes().toString().padStart(2, '0');
+            const timeStr = `${hours}:${minutes}`;
+            
+            setSaleDate(dateStr);
+            setSaleTime(timeStr);
+          } else {
+            // Fallback to current date/time
+            const now = new Date();
+            setSaleDate(now.toISOString().split('T')[0]);
+            setSaleTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
+          }
+        } catch (error) {
+          console.error('Error parsing sale date:', error);
+          const now = new Date();
+          setSaleDate(now.toISOString().split('T')[0]);
+          setSaleTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
+        }
+      }
     }
   }, [isOpen, sale]);
 
@@ -58,7 +91,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
         itemType: 'material',
         materialId: '',
         serviceId: '',
-        quantity: 1,
+        quantity: 0,
         unitPrice: 0,
         subtotal: 0,
       },
@@ -80,7 +113,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
             if (value === 'material') {
               updated.materialId = '';
               updated.serviceId = '';
-              updated.quantity = 1;
+              updated.quantity = 0;
               updated.unitPrice = 0;
               updated.subtotal = 0;
             } else if (value === 'booth') {
@@ -103,7 +136,9 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
 
           // Recalculate subtotal when quantity changes
           if (field === 'quantity') {
-            updated.subtotal = updated.unitPrice * parseInt(value || 0);
+            const qty = parseFloat(value || 0);
+            updated.quantity = qty;
+            updated.subtotal = updated.unitPrice * qty;
           }
 
           return updated;
@@ -122,6 +157,25 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
 
     if (items.length === 0) {
       newErrors.items = 'Please add at least one item';
+    }
+
+    // Validate sale date
+    if (!saleDate) {
+      newErrors.saleDate = 'Sale date is required';
+    } else {
+      const dateObj = new Date(saleDate);
+      if (isNaN(dateObj.getTime())) {
+        newErrors.saleDate = 'Invalid date format';
+      } else if (dateObj > new Date()) {
+        newErrors.saleDate = 'Sale date cannot be in the future';
+      }
+    }
+
+    // Validate sale time
+    if (!saleTime) {
+      newErrors.saleTime = 'Sale time is required';
+    } else if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(saleTime)) {
+      newErrors.saleTime = 'Invalid time format (HH:mm)';
     }
 
     for (const item of items) {
@@ -144,22 +198,32 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
 
     if (!validate()) return;
 
+    // Combine date and time
+    const combinedDateTime = new Date(`${saleDate}T${saleTime}`);
+    const formattedDateTime = combinedDateTime.toISOString();
+
     const formattedItems = items.map(item => ({
       itemType: item.itemType,
       materialId: item.itemType === 'material' ? parseInt(item.materialId) : undefined,
       serviceId: item.itemType === 'booth' ? item.serviceId : undefined,
-      quantity: item.itemType === 'material' ? parseInt(item.quantity) : undefined,
+      quantity: item.itemType === 'material' ? parseFloat(item.quantity) : undefined,
     }));
 
     onSubmit({
       items: formattedItems,
       paymentMethod,
+      saleDate: formattedDateTime, // Send the combined date and time
       reverseInventory,
     });
   };
 
   const totalAmount = calculateTotal();
   const hoursSinceSale = sale ? (new Date() - new Date(sale.saleDate)) / (1000 * 60 * 60) : 0;
+
+  // Get current date and time for max values
+  const now = new Date();
+  const currentDate = now.toISOString().split('T')[0];
+  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
 
   return (
     <Modal
@@ -186,6 +250,44 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
           </div>
         )}
 
+        {/* Date and Time Section */}
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <label htmlFor="saleDate" className="block text-sm font-medium text-gray-700 mb-1">
+              Sale Date *
+            </label>
+            <input
+              type="date"
+              id="saleDate"
+              value={saleDate}
+              onChange={(e) => setSaleDate(e.target.value)}
+              max={currentDate}
+              className={`w-full px-3 py-2 border ${errors.saleDate ? 'border-danger-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
+              disabled={isLoading}
+            />
+            {errors.saleDate && (
+              <p className="mt-1 text-sm text-danger-600">{errors.saleDate}</p>
+            )}
+          </div>
+
+          <div>
+            <label htmlFor="saleTime" className="block text-sm font-medium text-gray-700 mb-1">
+              Sale Time *
+            </label>
+            <input
+              type="time"
+              id="saleTime"
+              value={saleTime}
+              onChange={(e) => setSaleTime(e.target.value)}
+              className={`w-full px-3 py-2 border ${errors.saleTime ? 'border-danger-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
+              disabled={isLoading}
+            />
+            {errors.saleTime && (
+              <p className="mt-1 text-sm text-danger-600">{errors.saleTime}</p>
+            )}
+          </div>
+        </div>
+
         {/* Inventory Reversal Option */}
         <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
           <label className="flex items-start gap-3 cursor-pointer">
@@ -194,6 +296,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
               checked={reverseInventory}
               onChange={(e) => setReverseInventory(e.target.checked)}
               className="mt-0.5 rounded text-primary-600 focus:ring-primary-500"
+              disabled={isLoading}
             />
             <div>
               <p className="text-sm font-medium text-primary-900">Reverse Inventory Changes</p>
@@ -281,7 +384,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
                           type="number"
                           value={item.quantity}
                           onChange={(e) => updateItem(item.id, 'quantity', e.target.value)}
-                          min="1"
+                          step="any"
                           required
                           disabled={isLoading}
                           placeholder="Qty"

@@ -389,6 +389,7 @@ export const getItemCategories = asyncHandler(async (req, res) => {
       isActive: true,
     },
     select: {
+      id: true,
       category: true,  // Item Category (e.g. 4x4, Saloon, Fridge)
       price: true,
     },
@@ -396,6 +397,7 @@ export const getItemCategories = asyncHandler(async (req, res) => {
 
   // Format response to match what the frontend expects
   const formattedServices = services.map(service => ({
+    id: service.id,
     itemCategory: service.category,  // Frontend expects itemCategory
     price: service.price
   }));

@@ -984,7 +984,7 @@ function JobsTab({ jobs, dateRange }) {
   );
 }
 
-// Expenses Tab Component - Modernized
+// Expenses Tab Component
 function ExpensesTab({ expenses, dateRange }) {
   const handleExport = () => exportExpensesReport(expenses, dateRange);
 

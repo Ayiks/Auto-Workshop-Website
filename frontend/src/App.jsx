@@ -168,6 +168,7 @@ import Finance from '@/pages/Finance';
 import Expenses from '@pages/Expenses';
 import Users from '@pages/Users';
 import Settings from '@pages/Settings';
+import BoothServices from '@pages/BoothServices';
 import DashboardLayout from '@components/layout/DashboardLayout';
 
 
@@ -227,6 +228,7 @@ function App() {
             <Route path="expenses" element={<Expenses />} />
             <Route path="users" element={<Users />} />
             <Route path="settings" element={<Settings />} />
+            <Route path="booth" element={<BoothServices />} />
             
           </Route>
 

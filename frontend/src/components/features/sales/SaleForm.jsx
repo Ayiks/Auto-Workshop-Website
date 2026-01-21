@@ -1,13 +1,16 @@
+// src/components/features/sales/SaleForm.jsx
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { materialsApi } from '@api/materials';
 import Button from '@components/common/Button';
 import Select from '@components/common/Select';
 import Input from '@components/common/Input';
+import { format } from 'date-fns';
 
 export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   const [items, setItems] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
+  const [saleDate, setSaleDate] = useState(format(new Date(), 'yyyy-MM-dd'));
 
   // Fetch materials for selection
   const { data: materialsData } = useQuery({
@@ -73,8 +76,22 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   const boothServicePrice = 150;
   const grandTotal = itemsTotal + (includeBoothService ? boothServicePrice : 0);
 
+  // Check if date is in the future
+  const isFutureDate = new Date(saleDate) > new Date();
+  
+  // Check if date is more than 30 days in the past
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const isOldDate = new Date(saleDate) < thirtyDaysAgo;
+
   const handleSubmit = (e) => {
     e.preventDefault();
+
+    // Validate date
+    if (isFutureDate) {
+      alert('Cannot create a sale with a future date');
+      return;
+    }
 
     // Validate
     if (items.length === 0 && !includeBoothService) {
@@ -118,11 +135,55 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
     onSubmit({
       items: saleItems,
       paymentMethod,
+      saleDate: new Date(saleDate).toISOString(), // Send as ISO string
     });
   };
 
   return (
     <form onSubmit={handleSubmit} className="space-y-8">
+      {/* Sale Date Section */}
+      <div className="bg-white rounded-xl border border-gray-200 p-6">
+        <div className="flex items-start justify-between">
+          <div className="flex-1 max-w-md">
+            <label htmlFor="saleDate" className="block text-sm font-medium text-gray-900 mb-2">
+              Sale Date
+            </label>
+            <Input
+              id="saleDate"
+              type="date"
+              value={saleDate}
+              onChange={(e) => setSaleDate(e.target.value)}
+              max={format(new Date(), 'yyyy-MM-dd')}
+              required
+              disabled={isLoading}
+            />
+            <p className="text-xs text-gray-500 mt-2">
+              {saleDate === format(new Date(), 'yyyy-MM-dd') 
+                ? 'Recording sale for today'
+                : 'Backdating sale record'
+              }
+            </p>
+          </div>
+
+          {/* Date Warning */}
+          {isOldDate && (
+            <div className="ml-4 bg-warning-50 border border-warning-200 rounded-lg p-3 max-w-xs">
+              <div className="flex items-start gap-2">
+                <svg className="w-5 h-5 text-warning-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <div>
+                  <p className="text-sm font-medium text-warning-900">Old Date</p>
+                  <p className="text-xs text-warning-700 mt-1">
+                    This sale is more than 30 days old. Make sure this is intentional.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
       {/* Sale Items Section */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between mb-6">
@@ -244,7 +305,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
         )}
       </div>
 
-      {/* Booth Service */}
+      {/* Booth Service - Commented out as per original */}
       {/* <div className="bg-white rounded-xl border border-gray-200 p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
@@ -341,6 +402,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
             type="submit"
             variant="primary"
             loading={isLoading}
+            disabled={isFutureDate}
             className="px-8 shadow-sm"
           >
             Complete Sale • GH₵{grandTotal.toFixed(2)}

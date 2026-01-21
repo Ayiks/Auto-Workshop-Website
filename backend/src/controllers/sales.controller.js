@@ -16,8 +16,206 @@ const generateReceiptNumber = () => {
 // @desc    Create counter sale
 // @route   POST /api/sales
 // @access  Private (requires 'sales:create' permission)
+// export const createSale = asyncHandler(async (req, res) => {
+//   const { items, paymentMethod = 'cash' } = req.body;
+
+//   // Validation
+//   if (!items || !Array.isArray(items) || items.length === 0) {
+//     throw new AppError('Please provide sale items', 400, 'VALIDATION_ERROR');
+//   }
+
+//   if (!['cash', 'momo', 'cheque'].includes(paymentMethod)) {
+//     throw new AppError(
+//       'Invalid payment method. Must be cash, momo, or cheque',
+//       400,
+//       'VALIDATION_ERROR'
+//     );
+//   }
+
+//   // Validate and calculate total
+//   let totalAmount = 0;
+//   const validatedItems = [];
+
+//   for (const item of items) {
+//     if (!item.itemType || !['material', 'booth'].includes(item.itemType)) {
+//       throw new AppError(
+//         'Invalid item type. Must be material or booth',
+//         400,
+//         'VALIDATION_ERROR'
+//       );
+//     }
+
+//     if (item.itemType === 'material') {
+//       if (!item.materialId || !item.quantity || item.quantity <= 0) {
+//         throw new AppError(
+//           'Material items require valid materialId and quantity',
+//           400,
+//           'VALIDATION_ERROR'
+//         );
+//       }
+
+//       // Fetch material
+//       const material = await prisma.material.findUnique({
+//         where: { id: parseInt(item.materialId) },
+//       });
+
+//       if (!material) {
+//         throw new AppError(
+//           `Material with ID ${item.materialId} not found`,
+//           404,
+//           'NOT_FOUND'
+//         );
+//       }
+
+//       if (!material.isActive) {
+//         throw new AppError(
+//           `Material "${material.name}" is inactive`,
+//           400,
+//           'INVALID_OPERATION'
+//         );
+//       }
+
+//       if (material.quantity < item.quantity) {
+//         throw new AppError(
+//           `Insufficient stock for "${material.name}". Available: ${material.quantity}`,
+//           400,
+//           'INSUFFICIENT_STOCK'
+//         );
+//       }
+
+//       const subtotal = material.sellingPrice * item.quantity;
+//       validatedItems.push({
+//         itemType: 'material',
+//         materialId: material.id,
+//         materialName: material.name,
+//         quantity: item.quantity,
+//         unitPrice: material.sellingPrice,
+//         subtotal,
+//       });
+//       totalAmount += subtotal;
+
+//     } else if (item.itemType === 'booth') {
+//       // Fetch booth service
+//       const service = await prisma.service.findFirst({
+//         where: { type: 'booth', isActive: true },
+//       });
+
+//       if (!service) {
+//         throw new AppError('Booth service not configured', 404, 'NOT_FOUND');
+//       }
+
+//       validatedItems.push({
+//         itemType: 'booth',
+//         serviceId: service.id,
+//         unitPrice: service.price,
+//         subtotal: service.price,
+//       });
+//       totalAmount += service.price;
+//     }
+//   }
+
+//   // Start transaction
+//   const result = await prisma.$transaction(async (tx) => {
+//     // 1. Create sale
+//     const sale = await tx.sale.create({
+//       data: {
+//         totalAmount,
+//         paymentMethod,
+//         soldBy: req.user.id,
+//         status: 'completed',
+//       },
+//     });
+
+//     // 2. Create sale items and update inventory
+//     for (const item of validatedItems) {
+//       await tx.saleItem.create({
+//         data: {
+//           saleId: sale.id,
+//           ...item,
+//         },
+//       });
+
+//       // Deduct material stock
+//       if (item.itemType === 'material') {
+//         await tx.material.update({
+//           where: { id: item.materialId },
+//           data: {
+//             quantity: {
+//               decrement: item.quantity,
+//             },
+//           },
+//         });
+//       }
+//     }
+
+//     // 3. Get business settings for receipt
+//     const businessSettings = await tx.businessSettings.findFirst();
+//     if (!businessSettings) {
+//       throw new AppError('Business settings not configured', 500, 'CONFIG_ERROR');
+//     }
+
+//     // 4. Generate receipt
+//     const receiptNumber = await generateReceiptNumber();
+//     const receipt = await tx.receipt.create({
+//       data: {
+//         receiptNumber,
+//         receiptType: 'sale',
+//         saleId: sale.id,
+//         amount: totalAmount,
+//         paymentMethod,
+//         issuedBy: req.user.id,
+//         businessName: businessSettings.name,
+//         businessLogo: businessSettings.logo,
+//         businessAddress: businessSettings.address,
+//         businessContact: businessSettings.phone,
+//       },
+//     });
+
+//     // 5. Log audit
+//     await tx.auditLog.create({
+//       data: {
+//         userId: req.user.id,
+//         action: 'CREATE',
+//         entity: 'Sale',
+//         entityId: sale.id,
+//         description: `Created sale #${sale.id}. Total: GH₵${totalAmount}. Payment: ${paymentMethod}`,
+//       },
+//     });
+
+//     return { sale, receipt };
+//   });
+
+//   // Fetch complete sale with items
+//   const completeSale = await prisma.sale.findUnique({
+//     where: { id: result.sale.id },
+//     include: {
+//       items: true,
+//       receipt: true,
+//       user: {
+//         select: {
+//           fullName: true,
+//           username: true,
+//         },
+//       },
+//     },
+//   });
+
+//   res.status(201).json({
+//     success: true,
+//     message: 'Sale completed successfully',
+//     data: {
+//       sale: completeSale,
+//       receipt: result.receipt,
+//     },
+//   });
+// });
+// backend/src/controllers/saleController.js - Updated createSale function
+
+// @desc    Create counter sale
+// @route   POST /api/sales
+// @access  Private (requires 'sales:create' permission)
 export const createSale = asyncHandler(async (req, res) => {
-  const { items, paymentMethod = 'cash' } = req.body;
+  const { items, paymentMethod = 'cash', saleDate } = req.body;
 
   // Validation
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -30,6 +228,33 @@ export const createSale = asyncHandler(async (req, res) => {
       400,
       'VALIDATION_ERROR'
     );
+  }
+
+  // Validate and parse sale date
+  let parsedSaleDate = new Date();
+  if (saleDate) {
+    parsedSaleDate = new Date(saleDate);
+    
+    // Validate date is not in the future
+    if (parsedSaleDate > new Date()) {
+      throw new AppError(
+        'Sale date cannot be in the future',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    // Optional: Limit how far back they can backdate (e.g., 90 days)
+    const ninetyDaysAgo = new Date();
+    ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+    
+    if (parsedSaleDate < ninetyDaysAgo) {
+      throw new AppError(
+        'Sale date cannot be more than 90 days in the past',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
   }
 
   // Validate and calculate total
@@ -116,13 +341,14 @@ export const createSale = asyncHandler(async (req, res) => {
 
   // Start transaction
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Create sale
+    // 1. Create sale with custom date
     const sale = await tx.sale.create({
       data: {
         totalAmount,
         paymentMethod,
         soldBy: req.user.id,
         status: 'completed',
+        saleDate: parsedSaleDate, // Use the parsed date
       },
     });
 
@@ -154,7 +380,7 @@ export const createSale = asyncHandler(async (req, res) => {
       throw new AppError('Business settings not configured', 500, 'CONFIG_ERROR');
     }
 
-    // 4. Generate receipt
+    // 4. Generate receipt (use sale date for receipt date)
     const receiptNumber = await generateReceiptNumber();
     const receipt = await tx.receipt.create({
       data: {
@@ -164,6 +390,7 @@ export const createSale = asyncHandler(async (req, res) => {
         amount: totalAmount,
         paymentMethod,
         issuedBy: req.user.id,
+        issuedDate: parsedSaleDate, // Use the same date as sale
         businessName: businessSettings.name,
         businessLogo: businessSettings.logo,
         businessAddress: businessSettings.address,
@@ -178,7 +405,7 @@ export const createSale = asyncHandler(async (req, res) => {
         action: 'CREATE',
         entity: 'Sale',
         entityId: sale.id,
-        description: `Created sale #${sale.id}. Total: GH₵${totalAmount}. Payment: ${paymentMethod}`,
+        description: `Created sale #${sale.id}. Total: GH₵${totalAmount}. Payment: ${paymentMethod}. Date: ${parsedSaleDate.toISOString().split('T')[0]}`,
       },
     });
 
@@ -209,7 +436,6 @@ export const createSale = asyncHandler(async (req, res) => {
     },
   });
 });
-
 // @desc    Get all sales
 // @route   GET /api/sales
 // @access  Private (requires 'sales:view' or 'sales:viewOwn' permission)

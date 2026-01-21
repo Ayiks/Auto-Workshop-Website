@@ -19,6 +19,12 @@ const generateReceiptNumber = () => {
 export const createSale = asyncHandler(async (req, res) => {
   const { items, paymentMethod = 'cash' } = req.body;
 
+
+  console.log('=== Create Sale Request ===');
+  console.log('Items received:', JSON.stringify(items, null, 2));
+  console.log('==========================');
+
+
   // Validation
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new AppError('Please provide sale items', 400, 'VALIDATION_ERROR');
@@ -96,8 +102,8 @@ export const createSale = asyncHandler(async (req, res) => {
 
     } else if (item.itemType === 'booth') {
       // Fetch booth service
-      const service = await prisma.service.findFirst({
-        where: { type: 'booth', isActive: true },
+      const service = await prisma.service.findUnique({
+        where: { type: 'booth', isActive: true, id: parseInt(item.serviceId) },
       });
 
       if (!service) {
@@ -315,6 +321,97 @@ export const getSale = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     data: sale,
+  });
+});
+
+// @desc    Delete sale
+// @route   DELETE /api/sales/:id
+// @access  Private (requires 'sales:delete' permission)
+export const deleteSale = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { reverseInventory = true, reason } = req.body;
+
+  const sale = await prisma.sale.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      items: {
+        include: {
+          material: {
+            select: { name: true },
+          },
+        },
+      },
+      receipt: true,
+    },
+  });
+
+  if (!sale) {
+    throw new AppError('Sale not found', 404, 'NOT_FOUND');
+  }
+
+  // Check ownership if user has only deleteOwn permission
+  if (req.isOwnResource && sale.soldBy !== req.user.id) {
+    throw new AppError(
+      'Not authorized to delete this sale',
+      403,
+      'PERMISSION_DENIED'
+    );
+  }
+
+  // Start transaction to delete sale and optionally restore inventory
+  await prisma.$transaction(async (tx) => {
+    // Restore inventory if requested
+    if (reverseInventory) {
+      for (const item of sale.items) {
+        if (item.itemType === 'material' && item.materialId) {
+          await tx.material.update({
+            where: { id: item.materialId },
+            data: {
+              quantity: {
+                increment: item.quantity,
+              },
+            },
+          });
+        }
+      }
+    }
+
+    // Mark receipt as deleted (for audit trail)
+    if (sale.receipt) {
+      await tx.receipt.update({
+        where: { id: sale.receipt.id },
+        data: {
+          // Add a deletedAt field or status if you have one
+          // Otherwise, you might want to keep the receipt for audit purposes
+        },
+      });
+    }
+
+    // Delete sale items first (foreign key constraint)
+    await tx.saleItem.deleteMany({
+      where: { saleId: parseInt(id) },
+    });
+
+    // Delete the sale
+    await tx.sale.delete({
+      where: { id: parseInt(id) },
+    });
+
+    // Log audit
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'DELETE',
+        entity: 'Sale',
+        entityId: parseInt(id),
+        description: `Deleted sale #${id}. ${reverseInventory ? 'Inventory restored.' : 'Inventory not affected.'} ${reason ? `Reason: ${reason}` : ''}`,
+      },
+    });
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Sale deleted successfully',
   });
 });
 

@@ -4,6 +4,7 @@ import {
   getSales,
   getSale,
   getSalesStats,
+  deleteSale,
 } from '../controllers/sales.controller.js';
 import { protect, canAccessResource } from '../middleware/auth.js';
 
@@ -24,5 +25,9 @@ router
 router
   .route('/:id')
   .get(canAccessResource('sales', 'view'), getSale);
+
+router
+  .route('/:id')
+  .delete(canAccessResource('sales', 'delete'), deleteSale);
 
 export default router;

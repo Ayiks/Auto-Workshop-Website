@@ -56,18 +56,32 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   }, [saleType]);
 
   // Auto-fill price when both categories are selected
-  useEffect(() => {
-    if (serviceCategory && itemCategory) {
-      const selected = itemCategories.find(i => i.itemCategory === itemCategory);
-      if (selected) {
-        setBoothPrice(parseFloat(selected.price));
-        setSelectedService(selected);
-      }
+// Update the Auto-fill price effect with better debugging
+useEffect(() => {
+  console.log('=== Service Selection Effect ===');
+  console.log('Service Category:', serviceCategory);
+  console.log('Item Category:', itemCategory);
+  console.log('Available Item Categories:', itemCategories);
+  
+  if (serviceCategory && itemCategory) {
+    const selected = itemCategories.find(i => i.itemCategory === itemCategory);
+    console.log('Found selected service:', selected);
+    
+    if (selected) {
+      setBoothPrice(parseFloat(selected.price));
+      setSelectedService(selected);
+      console.log('Set selected service with ID:', selected.id);
     } else {
+      console.log('No matching service found!');
       setBoothPrice(0);
       setSelectedService(null);
     }
-  }, [serviceCategory, itemCategory, itemCategories]);
+  } else {
+    setBoothPrice(0);
+    setSelectedService(null);
+  }
+  console.log('=================================');
+}, [serviceCategory, itemCategory, itemCategories]);
 
   // Counter Sale Functions
   const addItem = () => {
@@ -177,24 +191,39 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
       });
     } else {
       // Validate booth sale
-      if (!serviceCategory || !itemCategory) {
-        alert("Please select both service and item category");
-        return;
-      }
+  if (!serviceCategory || !itemCategory) {
+    alert("Please select both service and item category");
+    return;
+  }
+console.log('=== Booth Sale Submission ===');
+  console.log('Selected Service Category:', serviceCategory);
+  console.log('Selected Item Category:', itemCategory);
+  console.log('Selected Service Object:', selectedService);
+  console.log('Service ID to submit:', selectedService?.id);
+  console.log('============================');
 
-      // Submit booth sale - single booth item
-      onSubmit({
-        items: [
-          {
-            itemType: "booth",
-            serviceCategory,
-            itemCategory,
-          }
-        ],
-        paymentMethod,
-        saleDate: new Date(saleDate).toISOString(),
-      });
-    }
+  if (!selectedService?.id) {
+    alert("Service ID not found. Please reselect the service.");
+    console.error('ERROR: Selected service has no ID:', selectedService);
+    return;
+  }
+
+     
+  // Submit booth sale - single booth item
+  const submitData = {
+    items: [
+      {
+        itemType: "booth",
+        serviceId: selectedService.id
+      }
+    ],
+    paymentMethod,
+    saleDate: new Date(saleDate).toISOString(),
+  };
+  
+  console.log('Final submit data:', JSON.stringify(submitData, null, 2));
+  onSubmit(submitData);
+}
   };
 
   return (

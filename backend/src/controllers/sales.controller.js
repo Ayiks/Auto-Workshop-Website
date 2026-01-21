@@ -95,6 +95,7 @@ export const createSale = asyncHandler(async (req, res) => {
         materialId: material.id,
         materialName: material.name,
         quantity: item.quantity,
+        unitCost: material.unitCost,
         unitPrice: material.sellingPrice,
         subtotal,
       });
@@ -114,6 +115,7 @@ export const createSale = asyncHandler(async (req, res) => {
         itemType: 'booth',
         serviceId: service.id,
         unitPrice: service.price,
+        unitCost: 0,
         subtotal: service.price,
       });
       totalAmount += service.price;
@@ -213,6 +215,254 @@ export const createSale = asyncHandler(async (req, res) => {
       sale: completeSale,
       receipt: result.receipt,
     },
+  });
+});
+
+// @desc    Update sale
+// @route   PUT /api/sales/:id
+// @access  Private (requires 'sales:update' permission)
+export const updateSale = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { items, paymentMethod, saleDate, reverseInventory = true } = req.body;
+
+  // Validate sale exists
+  const existingSale = await prisma.sale.findUnique({
+    where: { id: parseInt(id) },
+    include: { 
+      items: true,
+      receipt: true,
+    },
+  });
+
+  if (!existingSale) {
+    throw new AppError('Sale not found', 404, 'NOT_FOUND');
+  }
+
+  // Check if sale can be edited (within 24 hours or based on permission)
+  const saleDateTime = new Date(existingSale.saleDate);
+  const hoursSinceSale = (new Date() - saleDateTime) / (1000 * 60 * 60);
+  
+
+
+  // Validate request
+  if (!items || !Array.isArray(items) || items.length === 0) {
+    throw new AppError('Please provide sale items', 400, 'VALIDATION_ERROR');
+  }
+
+  if (paymentMethod && !['cash', 'momo', 'cheque'].includes(paymentMethod)) {
+    throw new AppError(
+      'Invalid payment method. Must be cash, momo, or cheque',
+      400,
+      'VALIDATION_ERROR'
+    );
+  }
+
+  // Validate and calculate new total
+  let totalAmount = 0;
+  const validatedItems = [];
+
+  for (const item of items) {
+    if (!item.itemType || !['material', 'booth'].includes(item.itemType)) {
+      throw new AppError(
+        'Invalid item type. Must be material or booth',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    if (item.itemType === 'material') {
+      if (!item.materialId || !item.quantity || item.quantity <= 0) {
+        throw new AppError(
+          'Material items require valid materialId and quantity',
+          400,
+          'VALIDATION_ERROR'
+        );
+      }
+
+      // Fetch material
+      const material = await prisma.material.findUnique({
+        where: { id: parseInt(item.materialId) },
+      });
+
+      if (!material) {
+        throw new AppError(
+          `Material with ID ${item.materialId} not found`,
+          404,
+          'NOT_FOUND'
+        );
+      }
+
+      if (!material.isActive) {
+        throw new AppError(
+          `Material "${material.name}" is inactive`,
+          400,
+          'INVALID_OPERATION'
+        );
+      }
+
+      // Check stock availability considering the current sale items
+      let availableQuantity = material.quantity;
+      
+      // If we're reversing inventory, add back the current sale quantity
+      if (reverseInventory) {
+        const currentMaterialItem = existingSale.items.find(
+          i => i.itemType === 'material' && i.materialId === material.id
+        );
+        if (currentMaterialItem) {
+          availableQuantity += currentMaterialItem.quantity;
+        }
+      }
+
+      if (availableQuantity < item.quantity) {
+        throw new AppError(
+          `Insufficient stock for "${material.name}". Available: ${availableQuantity}`,
+          400,
+          'INSUFFICIENT_STOCK'
+        );
+      }
+
+      const subtotal = material.sellingPrice * item.quantity;
+      validatedItems.push({
+        itemType: 'material',
+        materialId: material.id,
+        materialName: material.name,
+        quantity: item.quantity,
+        unitPrice: material.sellingPrice,
+        unitCost: material.unitCost,
+        subtotal,
+      });
+      totalAmount += subtotal;
+
+    } else if (item.itemType === 'booth') {
+      // Fetch booth service
+      const service = await prisma.service.findUnique({
+        where: { type: 'booth', isActive: true },
+      });
+
+      if (!service) {
+        throw new AppError('Booth service not configured', 404, 'NOT_FOUND');
+      }
+
+      validatedItems.push({
+        itemType: 'booth',
+        serviceId: service.id,
+        unitPrice: service.price,
+        unitCost: 0,
+        subtotal: service.price,
+      });
+      totalAmount += service.price;
+    }
+  }
+
+  // Start transaction for update
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Reverse inventory if needed
+    if (reverseInventory) {
+      for (const item of existingSale.items) {
+        if (item.itemType === 'material') {
+          await tx.material.update({
+            where: { id: item.materialId },
+            data: {
+              quantity: {
+                increment: item.quantity,
+              },
+            },
+          });
+        }
+      }
+    }
+
+    // 2. Delete existing sale items
+    await tx.saleItem.deleteMany({
+      where: { saleId: parseInt(id) },
+    });
+
+    // 3. Update sale with new data
+    const saleUpdateData = {
+      totalAmount,
+      paymentMethod: paymentMethod || existingSale.paymentMethod,
+    };
+
+    // Only update saleDate if provided and valid
+    if (saleDate) {
+      const parsedDate = new Date(saleDate);
+      if (!isNaN(parsedDate.getTime())) {
+        saleUpdateData.saleDate = parsedDate;
+      }
+    }
+
+    const updatedSale = await tx.sale.update({
+      where: { id: parseInt(id) },
+      data: saleUpdateData,
+    });
+
+    // 4. Create new sale items and update inventory
+    for (const item of validatedItems) {
+      await tx.saleItem.create({
+        data: {
+          saleId: updatedSale.id,
+          ...item,
+        },
+      });
+
+      // Deduct material stock
+      if (item.itemType === 'material') {
+        await tx.material.update({
+          where: { id: item.materialId },
+          data: {
+            quantity: {
+              decrement: item.quantity,
+            },
+          },
+        });
+      }
+    }
+
+    // 5. Update receipt if exists
+    if (existingSale.receipt) {
+      await tx.receipt.update({
+        where: { id: existingSale.receipt.id },
+        data: {
+          amount: totalAmount,
+          paymentMethod: paymentMethod || existingSale.paymentMethod,
+          issuedDate: saleDate ? new Date(saleDate) : existingSale.saleDate,
+        },
+      });
+    }
+
+    // 6. Log audit
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'UPDATE',
+        entity: 'Sale',
+        entityId: parseInt(id),
+        description: `Updated sale #${id}. New total: GH₵${totalAmount}. Payment: ${paymentMethod || existingSale.paymentMethod}`,
+      },
+    });
+
+    return updatedSale;
+  });
+
+  // Fetch complete updated sale with items
+  const completeSale = await prisma.sale.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      items: true,
+      receipt: true,
+      user: {
+        select: {
+          fullName: true,
+          username: true,
+        },
+      },
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Sale updated successfully',
+    data: completeSale,
   });
 });
 

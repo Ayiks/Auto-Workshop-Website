@@ -147,6 +147,7 @@ model SaleItem {
   serviceId    Int?    @map("service_id")
   
   // Common fields
+  unitCost   Decimal @default(0) @map("unit_cost") @db.Decimal(10, 2)
   unitPrice  Decimal @map("unit_price") @db.Decimal(10, 2)
   subtotal   Decimal @db.Decimal(10, 2)
 

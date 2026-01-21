@@ -1,7 +1,7 @@
 // src/pages/BoothServices.jsx
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { boothServicesApi } from '@api/boothServices';
+import { boothServicesApi } from '@api/boothService';
 import { useAuthStore } from '@stores/authStore';
 import Button from '@components/common/Button';
 import Card, { StatCard } from '@components/common/Card';

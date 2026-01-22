@@ -504,6 +504,242 @@ export default function Finance() {
 //   );
 // }
 
+// function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
+//   // Safely extract values
+//   const grossRevenue = Number(pl.grossRevenue || 0);
+//   const grossProfit = Number(pl.grossProfit || 0);
+//   const netProfit = Number(pl.netProfit || 0);
+//   const totalCOGS = Number(pl.cogs || 0);
+//   const operationalExpenses = Number(pl.operationalExpenses || 0);
+//   const totalCosts = totalCOGS + operationalExpenses;
+
+//   // Revenue breakdown for chart
+//   const materialSalesRevenue = Number(pl.materialsSales || revenue.materialsSales || 0);
+//   const boothSalesRevenue = Number(pl.boothSales || revenue.boothSales || 0);
+//   const jobsRevenue = Number(pl.jobsRevenue || revenue.jobsRevenue || 0);
+
+//   const revenueChartData = [
+//     { 
+//       name: 'Materials', 
+//       value: materialSalesRevenue, 
+//       percentage: grossRevenue > 0 ? ((materialSalesRevenue / grossRevenue) * 100).toFixed(1) : 0 
+//     },
+//     { 
+//       name: 'Booth', 
+//       value: boothSalesRevenue, 
+//       percentage: grossRevenue > 0 ? ((boothSalesRevenue / grossRevenue) * 100).toFixed(1) : 0 
+//     },
+//     { 
+//       name: 'Jobs', 
+//       value: jobsRevenue, 
+//       percentage: grossRevenue > 0 ? ((jobsRevenue / grossRevenue) * 100).toFixed(1) : 0 
+//     },
+//   ];
+
+//   return (
+//     <div className="space-y-6">
+//       {/* Key Metrics Grid */}
+//       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-indigo-200 transition-colors">
+//           <div className="flex items-center justify-between mb-3">
+//             <span className="text-sm font-medium text-gray-600">Gross Revenue</span>
+//             <div className="p-2 bg-indigo-50 rounded-lg">
+//               <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+//               </svg>
+//             </div>
+//           </div>
+//           <div className="text-2xl font-bold text-gray-900">GH₵{grossRevenue.toLocaleString()}</div>
+//           <div className="text-xs text-gray-500 mt-1">Total revenue</div>
+//         </div>
+
+//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-200 transition-colors">
+//           <div className="flex items-center justify-between mb-3">
+//             <span className="text-sm font-medium text-gray-600">Gross Profit</span>
+//             <div className="p-2 bg-green-50 rounded-lg">
+//               <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+//               </svg>
+//             </div>
+//           </div>
+//           <div className="text-2xl font-bold text-gray-900">GH₵{grossProfit.toLocaleString()}</div>
+//           <div className="text-sm text-green-600 font-medium">{pl.grossProfitMargin}% margin</div>
+//         </div>
+
+//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-200 transition-colors">
+//           <div className="flex items-center justify-between mb-3">
+//             <span className="text-sm font-medium text-gray-600">Net Profit</span>
+//             <div className={`p-2 rounded-lg ${netProfit >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
+//               <svg className={`w-4 h-4 ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+//               </svg>
+//             </div>
+//           </div>
+//           <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
+//             GH₵{netProfit.toLocaleString()}
+//           </div>
+//           <div className={`text-sm font-medium ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+//             {pl.netProfitMargin}% margin
+//           </div>
+//         </div>
+
+//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-200 transition-colors">
+//           <div className="flex items-center justify-between mb-3">
+//             <span className="text-sm font-medium text-gray-600">Total Expenses</span>
+//             <div className="p-2 bg-gray-100 rounded-lg">
+//               <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+//               </svg>
+//             </div>
+//           </div>
+//           <div className="text-2xl font-bold text-gray-900">GH₵{totalCosts.toLocaleString()}</div>
+//           <div className="text-xs text-gray-500 mt-1">COGS + Operational</div>
+//         </div>
+//       </div>
+
+//       {/* Charts Section */}
+//       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+//         {/* Revenue Distribution PIE CHART */}
+//         <div className="bg-white rounded-xl p-6 border border-gray-200">
+//           <div className="flex items-center justify-between mb-6">
+//             <div>
+//               <h3 className="text-lg font-semibold text-gray-900">Revenue Distribution</h3>
+//               <p className="text-sm text-gray-500">By revenue source</p>
+//             </div>
+//           </div>
+//           <div className="h-64">
+//             <ResponsiveContainer width="100%" height="100%">
+//               <PieChart>
+//                 <Pie
+//                   data={revenueChartData}
+//                   cx="50%"
+//                   cy="50%"
+//                   innerRadius={60}
+//                   outerRadius={80}
+//                   paddingAngle={2}
+//                   dataKey="value"
+//                   label={({ name, percentage }) => `${name}: ${percentage}%`}
+//                   labelLine={false}
+//                 >
+//                   {revenueChartData.map((entry, index) => (
+//                     <Cell key={`cell-${index}`} fill={COLORS[index]} />
+//                   ))}
+//                 </Pie>
+//                 <Tooltip 
+//                   formatter={(value) => `GH₵${Number(value).toLocaleString()}`}
+//                   contentStyle={{ 
+//                     borderRadius: '8px',
+//                     border: '1px solid #E2E8F0',
+//                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
+//                   }}
+//                 />
+//               </PieChart>
+//             </ResponsiveContainer>
+//           </div>
+//         </div>
+
+//         {/* Revenue Breakdown LIST */}
+//         <div className="bg-white rounded-xl p-6 border border-gray-200">
+//           <div className="mb-6">
+//             <h3 className="text-lg font-semibold text-gray-900">Revenue Breakdown</h3>
+//             <p className="text-sm text-gray-500">Detailed revenue sources</p>
+//           </div>
+//           <div className="space-y-4">
+//             {revenueChartData.map((item, index) => (
+//               <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
+//                 <div className="flex items-center gap-3">
+//                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index] }} />
+//                   <div>
+//                     <div className="font-medium text-gray-900">{item.name}</div>
+//                     <div className="text-sm text-gray-500">{item.percentage}% of total</div>
+//                   </div>
+//                 </div>
+//                 <div className="font-bold text-gray-900">GH₵{Number(item.value).toLocaleString()}</div>
+//               </div>
+//             ))}
+//           </div>
+//         </div>
+//       </div>
+
+//       {/* Summary Cards */}
+//       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+//         {/* Sales Summary */}
+//         <div className="bg-white rounded-xl p-6 border border-gray-200">
+//           <div className="flex items-center justify-between mb-4">
+//             <h3 className="font-semibold text-gray-900">Sales Summary</h3>
+//             <div className="p-2 bg-blue-50 rounded-lg">
+//               <span className="text-sm font-medium text-blue-600">💰</span>
+//             </div>
+//           </div>
+//           <div className="space-y-3">
+//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
+//               <span className="text-gray-600">Total Sales</span>
+//               <span className="font-semibold">{sales.totalSales || 0}</span>
+//             </div>
+//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
+//               <span className="text-gray-600">Total Revenue</span>
+//               <span className="font-semibold">GH₵{Number(sales.totalRevenue || 0).toLocaleString()}</span>
+//             </div>
+//             <div className="flex justify-between items-center py-2">
+//               <span className="text-gray-600">Average Sale</span>
+//               <span className="font-semibold">GH₵{Number(sales.averageSale || 0).toFixed(2)}</span>
+//             </div>
+//           </div>
+//         </div>
+
+//         {/* Jobs Summary */}
+//         <div className="bg-white rounded-xl p-6 border border-gray-200">
+//           <div className="flex items-center justify-between mb-4">
+//             <h3 className="font-semibold text-gray-900">Jobs Summary</h3>
+//             <div className="p-2 bg-green-50 rounded-lg">
+//               <span className="text-sm font-medium text-green-600">🔧</span>
+//             </div>
+//           </div>
+//           <div className="space-y-3">
+//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
+//               <span className="text-gray-600">Total Jobs</span>
+//               <span className="font-semibold">{jobs.totalJobs || 0}</span>
+//             </div>
+//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
+//               <span className="text-gray-600">Total Revenue</span>
+//               <span className="font-semibold">GH₵{Number(jobs.totalRevenue || 0).toLocaleString()}</span>
+//             </div>
+//             <div className="flex justify-between items-center py-2">
+//               <span className="text-gray-600">Average Job</span>
+//               <span className="font-semibold">GH₵{Number(jobs.averageJob || 0).toFixed(2)}</span>
+//             </div>
+//           </div>
+//         </div>
+
+//         {/* Expenses Summary */}
+//         {/* Expenses Summary - UPDATED to show ONLY operational expenses */}
+// <div className="bg-white rounded-xl p-6 border border-gray-200">
+//   <div className="flex items-center justify-between mb-4">
+//     <h3 className="font-semibold text-gray-900">Expenses Overview</h3>
+//     <div className="p-2 bg-red-50 rounded-lg">
+//       <span className="text-sm font-medium text-red-600">📉</span>
+//     </div>
+//   </div>
+//   <div className="space-y-3">
+//     <div className="flex justify-between items-center py-2 border-b border-gray-100">
+//       <span className="text-gray-600">Operational Expenses</span>
+//       <span className="font-semibold">GH₵{Number(operationalExpenses).toLocaleString()}</span>
+//     </div>
+//     <div className="flex justify-between items-center py-2 border-b border-gray-100">
+//       <span className="text-gray-600">Total Transactions</span>
+//       <span className="font-semibold">{expenses.operationalCount || 0}</span>
+//     </div>
+//     <div className="flex justify-between items-center py-2">
+//       <span className="text-gray-600">This Period</span>
+//       <span className="font-semibold">GH₵{Number(expenses.operationalTotal || 0).toLocaleString()}</span>
+//     </div>
+//   </div>
+ 
+// </div>
+//       </div>
+//     </div>
+//   );
+// }
 function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
   // Safely extract values
   const grossRevenue = Number(pl.grossRevenue || 0);
@@ -511,7 +747,6 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
   const netProfit = Number(pl.netProfit || 0);
   const totalCOGS = Number(pl.cogs || 0);
   const operationalExpenses = Number(pl.operationalExpenses || 0);
-  const totalCosts = totalCOGS + operationalExpenses;
 
   // Revenue breakdown for chart
   const materialSalesRevenue = Number(pl.materialsSales || revenue.materialsSales || 0);
@@ -540,6 +775,7 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
     <div className="space-y-6">
       {/* Key Metrics Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* 1. Gross Revenue */}
         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-indigo-200 transition-colors">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-gray-600">Gross Revenue</span>
@@ -553,6 +789,7 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
           <div className="text-xs text-gray-500 mt-1">Total revenue</div>
         </div>
 
+        {/* 2. Gross Profit */}
         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-200 transition-colors">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-gray-600">Gross Profit</span>
@@ -566,6 +803,7 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
           <div className="text-sm text-green-600 font-medium">{pl.grossProfitMargin}% margin</div>
         </div>
 
+        {/* 3. Net Profit */}
         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-200 transition-colors">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-gray-600">Net Profit</span>
@@ -583,21 +821,22 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
           </div>
         </div>
 
-        <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-200 transition-colors">
+        {/* 4. Operating Expenses - FIXED: Shows ONLY operational, not COGS */}
+        <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-red-200 transition-colors">
           <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-gray-600">Total Expenses</span>
-            <div className="p-2 bg-gray-100 rounded-lg">
-              <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <span className="text-sm font-medium text-gray-600">Operating Expenses</span>
+            <div className="p-2 bg-red-50 rounded-lg">
+              <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
             </div>
           </div>
-          <div className="text-2xl font-bold text-gray-900">GH₵{totalCosts.toLocaleString()}</div>
-          <div className="text-xs text-gray-500 mt-1">COGS + Operational</div>
+          <div className="text-2xl font-bold text-gray-900">GH₵{operationalExpenses.toLocaleString()}</div>
+          <div className="text-xs text-gray-500 mt-1">Rent, utilities, salaries, etc.</div>
         </div>
       </div>
 
-      {/* Charts Section */}
+      {/* Charts Section - Keep as is */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Distribution PIE CHART */}
         <div className="bg-white rounded-xl p-6 border border-gray-200">
@@ -711,36 +950,38 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
           </div>
         </div>
 
-        {/* Expenses Summary */}
-        {/* Expenses Summary - UPDATED to show ONLY operational expenses */}
-<div className="bg-white rounded-xl p-6 border border-gray-200">
-  <div className="flex items-center justify-between mb-4">
-    <h3 className="font-semibold text-gray-900">Expenses Overview</h3>
-    <div className="p-2 bg-red-50 rounded-lg">
-      <span className="text-sm font-medium text-red-600">📉</span>
-    </div>
-  </div>
-  <div className="space-y-3">
-    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-      <span className="text-gray-600">Operational Expenses</span>
-      <span className="font-semibold">GH₵{Number(operationalExpenses).toLocaleString()}</span>
-    </div>
-    <div className="flex justify-between items-center py-2 border-b border-gray-100">
-      <span className="text-gray-600">Total Transactions</span>
-      <span className="font-semibold">{expenses.operationalCount || 0}</span>
-    </div>
-    <div className="flex justify-between items-center py-2">
-      <span className="text-gray-600">This Period</span>
-      <span className="font-semibold">GH₵{Number(expenses.operationalTotal || 0).toLocaleString()}</span>
-    </div>
-  </div>
- 
-</div>
+        {/* Expenses Summary - UPDATED: Shows ONLY operational */}
+        <div className="bg-white rounded-xl p-6 border border-gray-200">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-semibold text-gray-900">Expenses Overview</h3>
+            <div className="p-2 bg-red-50 rounded-lg">
+              <span className="text-sm font-medium text-red-600">📉</span>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Operating Expenses</span>
+              <span className="font-semibold">GH₵{Number(operationalExpenses).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-gray-100">
+              <span className="text-gray-600">Transactions</span>
+              <span className="font-semibold">{expenses.operationalCount || 0}</span>
+            </div>
+            <div className="flex justify-between items-center py-2">
+              <span className="text-gray-600">This Period</span>
+              <span className="font-semibold">GH₵{Number(expenses.operationalTotal || 0).toLocaleString()}</span>
+            </div>
+          </div>
+          <div className="mt-3 pt-3 border-t border-gray-100">
+            <p className="text-xs text-gray-500">
+              💡 COGS tracked in P&L, not expenses
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-
 // P&L Tab Component
 function PLTab({ pl, dateRange }) {
   const handleExport = () => {

@@ -136,6 +136,17 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   const handleSubmit = (e) => {
     e.preventDefault();
 
+   const now = new Date();
+    const currentTimeString = format(now, "HH:mm:ss");
+    
+    // 2. Combine the selected date with the current time
+    // This creates a string like "2023-10-25T14:30:15"
+    const dateTimeString = `${saleDate}T${currentTimeString}`;
+    
+    // 3. Create the Date object
+    const saleDateTime = new Date(dateTimeString);
+    const formattedDateTime = saleDateTime.toISOString();
+    
     if (isFutureDate) {
       alert("Cannot create a sale with a future date");
       return;
@@ -175,7 +186,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
       onSubmit({
         items: saleItems,
         paymentMethod,
-        saleDate: new Date(saleDate).toISOString(),
+        saleDate: formattedDateTime,
       });
     } else {
       if (!serviceCategory || !itemCategory) {

@@ -99,7 +99,7 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
             placeholder="0.00"
             step="0.01"
             min="0"
-            className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+            className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
               errors.unitCost ? 'border-red-500' : 'border-gray-300'
             }`}
             disabled={isLoading}

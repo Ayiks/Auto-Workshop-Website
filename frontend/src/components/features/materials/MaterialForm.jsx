@@ -4,10 +4,10 @@ import Button from '@components/common/Button';
 export default function MaterialForm({ material, onSubmit, onCancel, isLoading }) {
   const [formData, setFormData] = useState({
     name: material?.name || '',
-    quantity: material?.quantity || 0,
+    quantity: material?.quantity,
     unitCost: material?.unitCost || '',
     sellingPrice: material?.sellingPrice || '',
-    lowStockThreshold: material?.lowStockThreshold || 10,
+    lowStockThreshold: material?.lowStockThreshold || 3,
   });
 
   const [errors, setErrors] = useState({});
@@ -61,11 +61,8 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
   const handleSubmit = (e) => {
     e.preventDefault();
     if (validate()) {
-          
       onSubmit(formData);
     }
-    console.log();
-    
   };
 
   const profit = formData.sellingPrice - formData.unitCost;
@@ -100,7 +97,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
             <label className="block text-sm font-medium text-gray-900 mb-2">Initial Quantity</label>
             <input
               type="number"
-              step = "any"
+              step="any"
               name="quantity"
               value={formData.quantity}
               onChange={handleChange}
@@ -143,7 +140,9 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
         <div>
           <label className="block text-sm font-medium text-gray-900 mb-2">Unit Cost (GH₵)</label>
           <div className="relative">
-            <span className="absolute left-3 top-3 text-gray-500">GH₵</span>
+            <span className="absolute left-3 top-3 text-gray-500 pointer-events-none">
+              GH₵&nbsp;
+            </span>
             <input
               type="number"
               name="unitCost"
@@ -152,7 +151,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
               placeholder="0.00"
               step="0.01"
               min="0"
-              className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                 errors.unitCost ? 'border-red-500' : 'border-gray-300'
               }`}
               disabled={isLoading}
@@ -167,7 +166,9 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
         <div>
           <label className="block text-sm font-medium text-gray-900 mb-2">Selling Price (GH₵)</label>
           <div className="relative">
-            <span className="absolute left-3 top-3 text-gray-500">GH₵</span>
+            <span className="absolute left-3 top-3 text-gray-500 pointer-events-none">
+              GH₵&nbsp;
+            </span>
             <input
               type="number"
               name="sellingPrice"
@@ -176,7 +177,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
               placeholder="0.00"
               step="0.01"
               min="0"
-              className={`w-full pl-10 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
+              className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                 errors.sellingPrice ? 'border-red-500' : 'border-gray-300'
               }`}
               disabled={isLoading}
@@ -208,7 +209,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
             </div>
             <div className="text-right">
               <p className="text-sm text-gray-600">Profit per unit</p>
-              <p className="text-sm font-bold text-gray-900">GH₵{profit.toFixed(2)}</p>
+              <p className="text-sm font-bold text-gray-900">GH₵ {profit.toFixed(2)}</p>
             </div>
           </div>
         </div>

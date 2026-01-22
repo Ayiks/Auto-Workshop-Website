@@ -332,6 +332,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
     );
   }
 
+  const qtyToAdd = parseFloat(quantityOrdered);
   const material = await prisma.material.findUnique({
     where: { id: parseInt(id) },
   });
@@ -349,8 +350,8 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
   }
 
   // Use provided unit cost or material's current unit cost
-  const reorderUnitCost = unitCost ? parseFloat(unitCost) : material.unitCost;
-  const totalCost = reorderUnitCost * parseFloat(quantityOrdered);
+  const reorderUnitCost = unitCost ? parseFloat(unitCost) : Number(material.unitCost);
+  const totalCost = reorderUnitCost * qtyToAdd;
 
   // Start transaction
   const result = await prisma.$transaction(async (tx) => {
@@ -371,7 +372,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
     const updatedMaterial = await tx.material.update({
       where: { id: material.id },
       data: {
-        quantity: material.quantity + parseFloat(quantityOrdered),
+        quantity: { increment: qtyToAdd },
         unitCost: reorderUnitCost, // Update to new cost
       },
     });
@@ -381,7 +382,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
       data: {
         type: 'cog',
         category: 'material_reorder',
-        description: `Material reorder: ${material.name} (${quantityOrdered} units)`,
+        description: `Material reorder: ${material.name} (${qtyToAdd} units)`,
         amount: totalCost,
         source: 'system',
         isReadOnly: true,

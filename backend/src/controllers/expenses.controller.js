@@ -504,3 +504,162 @@ export const getExpenseStats = asyncHandler(async (req, res) => {
     },
   });
 });
+
+// @desc    Revert (Delete) a Material Reorder
+// @route   DELETE /api/expenses/:id/revert-reorder
+// @access  Private (Admin/Manager)
+export const revertReorder = asyncHandler(async (req, res) => {
+  const { id } = req.params; // This is the Expense ID
+
+  await prisma.$transaction(async (tx) => {
+    // 1. Find the Reorder linked to this Expense
+    const reorder = await tx.materialReorder.findFirst({
+      where: { expenseId: parseInt(id) },
+      include: { material: true }
+    });
+
+    if (!reorder) {
+      throw new AppError('Linked material reorder record not found', 404);
+    }
+
+    // 2. Safety Check: Do we have enough stock to revert?
+    // If you bought 10, but now have 2 in stock (because you sold 8),
+    // you cannot return/delete the purchase of 10 (stock would become -8).
+    const currentMaterial = await tx.material.findUnique({
+      where: { id: reorder.materialId }
+    });
+
+    if (!currentMaterial) {
+      throw new AppError('Material no longer exists', 404);
+    }
+
+    if (currentMaterial.quantity < reorder.quantityOrdered) {
+      throw new AppError(
+        `Cannot revert: Stock too low. You bought ${reorder.quantityOrdered} but only have ${currentMaterial.quantity} left.`,
+        400
+      );
+    }
+
+    // 3. Subtract from Inventory
+    await tx.material.update({
+      where: { id: reorder.materialId },
+      data: {
+        quantity: { decrement: reorder.quantityOrdered }
+      }
+    });
+
+    // 4. Delete the Reorder Log
+    await tx.materialReorder.delete({
+      where: { id: reorder.id }
+    });
+
+    // 5. Delete the Expense
+    // Note: We delete expense LAST to avoid foreign key constraints if set up that way
+    await tx.expense.delete({
+      where: { id: parseInt(id) }
+    });
+
+    // 6. Audit Log
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'REVERT_REORDER',
+        entity: 'Material',
+        entityId: reorder.materialId,
+        description: `Reversed purchase of ${reorder.quantityOrdered} ${reorder.materialName}. Stock reduced.`,
+      },
+    });
+  });
+
+  res.status(200).json({ success: true, message: 'Reorder reverted and inventory adjusted' });
+});
+
+// @desc    Correct (Edit) a Material Reorder
+// @route   PUT /api/expenses/:id/correct-reorder
+// @access  Private (Admin/Manager)
+export const correctReorder = asyncHandler(async (req, res) => {
+  const { id } = req.params; // Expense ID
+  const { newQuantity, newUnitCost } = req.body;
+
+  if (!newQuantity || newQuantity <= 0) {
+    throw new AppError('Quantity must be greater than 0', 400);
+  }
+
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Find existing records
+    const reorder = await tx.materialReorder.findFirst({
+      where: { expenseId: parseInt(id) },
+    });
+
+    if (!reorder) {
+      throw new AppError('Reorder record not found', 404);
+    }
+
+    // 2. Calculate Diffs
+    const oldQty = Number(reorder.quantityOrdered);
+    const targetQty = parseFloat(newQuantity);
+    const targetCost = parseFloat(newUnitCost);
+    
+    // Difference: If New (12) - Old (10) = +2 (Add 2 to stock)
+    // Difference: If New (8) - Old (10) = -2 (Remove 2 from stock)
+    const qtyDifference = targetQty - oldQty;
+    const newTotalCost = targetQty * targetCost;
+
+    // 3. Safety Check if reducing stock
+    if (qtyDifference < 0) {
+      const currentMaterial = await tx.material.findUnique({
+        where: { id: reorder.materialId }
+      });
+      
+      // If we are removing 2 items (qtyDifference is -2), check if we have at least 2 items
+      if (currentMaterial.quantity + qtyDifference < 0) {
+        throw new AppError(`Cannot reduce quantity: Insufficient stock to remove ${Math.abs(qtyDifference)} items.`, 400);
+      }
+    }
+
+    // 4. Update Material (Inventory & Unit Cost)
+    await tx.material.update({
+      where: { id: reorder.materialId },
+      data: {
+        quantity: { increment: qtyDifference }, // Works for positive and negative numbers
+        unitCost: targetCost // Update the material's current cost to the corrected value
+      }
+    });
+
+    // 5. Update Reorder Log
+    await tx.materialReorder.update({
+      where: { id: reorder.id },
+      data: {
+        quantityOrdered: targetQty,
+        unitCost: targetCost,
+        totalCost: newTotalCost
+      }
+    });
+
+    // 6. Update Expense
+    const updatedExpense = await tx.expense.update({
+      where: { id: parseInt(id) },
+      data: {
+        amount: newTotalCost,
+        // Update description to reflect new Qty
+        description: `Material reorder: ${reorder.materialName} (${targetQty} units)`, 
+        notes: `Correction: Modified by ${req.user.firstName}. Prev Qty: ${oldQty}`
+      }
+    });
+
+    // 7. Audit Log
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'CORRECT_REORDER',
+        entity: 'Material',
+        entityId: reorder.materialId,
+        description: `Corrected reorder #${reorder.id}. Qty: ${oldQty} -> ${targetQty}. Cost: ${targetCost}`,
+      },
+    });
+
+    return updatedExpense;
+  });
+
+  res.status(200).json({ success: true, data: result });
+});

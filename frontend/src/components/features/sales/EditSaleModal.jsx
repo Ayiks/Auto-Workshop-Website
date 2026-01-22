@@ -1,14 +1,15 @@
 // src/components/features/sales/EditSaleModal.jsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { materialsApi } from '@api/materials';
-import { servicesApi } from '@api/sales'; // Fixed import name
+import { servicesApi } from '@api/sales'; 
 import Modal from '@components/common/Modal';
 import Button from '@components/common/Button';
 import Select from '@components/common/Select';
-import Input from '@components/common/Input'; // Added Input component
+import Input from '@components/common/Input'; 
 
 export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoading }) {
+  // --- State ---
   const [items, setItems] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [saleDate, setSaleDate] = useState('');
@@ -16,65 +17,62 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
   const [reverseInventory, setReverseInventory] = useState(true);
   const [errors, setErrors] = useState({});
 
-  // Fetch materials
+  // --- Data Fetching ---
+  
+  // 1. Fetch Materials
   const { data: materialsData } = useQuery({
     queryKey: ['materials', { status: 'active' }],
     queryFn: () => materialsApi.getMaterials({ status: 'active' }),
     enabled: isOpen,
   });
 
-  // Fetch booth service
-  const { data: serviceData } = useQuery({
-    queryKey: ['services', 'booth'],
-    queryFn: () => servicesApi.getBoothService(),
+  // 2. Fetch Services (Booths)
+  // Assuming getServices returns a list of active services including booths
+  const { data: servicesData } = useQuery({
+    queryKey: ['services'],
+    queryFn: () => servicesApi.getServices(), 
     enabled: isOpen,
   });
 
   const materials = materialsData?.data || [];
-  const boothService = serviceData?.data;
+  const services = servicesData?.data || [];
 
-  // Initialize form when modal opens
+  // --- Initialization ---
   useEffect(() => {
     if (isOpen && sale) {
-      // Map existing sale items to form format
+      // Map existing items
       const formattedItems = sale.items.map(item => ({
-        id: Date.now() + Math.random(),
-        itemType: item.itemType,
-        materialId: item.materialId || '',
-        serviceId: item.serviceId || '',
-        quantity: parseFloat(item.quantity) || 0,
-        unitPrice: parseFloat(item.unitPrice),
-        subtotal: parseFloat(item.subtotal),
+        id: Date.now() + Math.random(), // Frontend temporary ID
+        itemType: item.itemType, // 'material' or 'booth'
+        
+        // Material Fields
+        materialId: item.materialId ? item.materialId.toString() : '',
+        
+        // Booth Fields
+        serviceId: item.serviceId ? item.serviceId.toString() : '',
+        
+        // Common Fields
+        quantity: parseFloat(item.quantity) || 1,
+        unitPrice: parseFloat(item.unitPrice || 0),
+        subtotal: parseFloat(item.subtotal || 0),
       }));
       
       setItems(formattedItems);
-      setPaymentMethod(sale.paymentMethod);
+      setPaymentMethod(sale.paymentMethod || 'cash');
       setReverseInventory(true);
       setErrors({});
       
-      // Parse sale date and time
+      // Parse Date/Time
       if (sale.saleDate) {
         try {
           const saleDateObj = new Date(sale.saleDate);
           if (!isNaN(saleDateObj.getTime())) {
-            // Format date as YYYY-MM-DD
-            const dateStr = saleDateObj.toISOString().split('T')[0];
-            
-            // Format time as HH:mm
+            setSaleDate(saleDateObj.toISOString().split('T')[0]);
             const hours = saleDateObj.getHours().toString().padStart(2, '0');
             const minutes = saleDateObj.getMinutes().toString().padStart(2, '0');
-            const timeStr = `${hours}:${minutes}`;
-            
-            setSaleDate(dateStr);
-            setSaleTime(timeStr);
-          } else {
-            // Fallback to current date/time
-            const now = new Date();
-            setSaleDate(now.toISOString().split('T')[0]);
-            setSaleTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
+            setSaleTime(`${hours}:${minutes}`);
           }
-        } catch (error) {
-          console.error('Error parsing sale date:', error);
+        } catch (e) {
           const now = new Date();
           setSaleDate(now.toISOString().split('T')[0]);
           setSaleTime(`${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`);
@@ -83,15 +81,17 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
     }
   }, [isOpen, sale]);
 
+  // --- Handlers ---
+
   const addItem = () => {
     setItems([
       ...items,
       {
         id: Date.now(),
-        itemType: 'material',
+        itemType: 'material', // Default to material
         materialId: '',
         serviceId: '',
-        quantity: 0,
+        quantity: 1,
         unitPrice: 0,
         subtotal: 0,
       },
@@ -103,91 +103,74 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
   };
 
   const updateItem = (id, field, value) => {
-    setItems(
-      items.map(item => {
-        if (item.id === id) {
-          const updated = { ...item, [field]: value };
+    setItems(prevItems => prevItems.map(item => {
+      if (item.id !== id) return item;
 
-          // When item type changes
-          if (field === 'itemType') {
-            if (value === 'material') {
-              updated.materialId = '';
-              updated.serviceId = '';
-              updated.quantity = 0;
-              updated.unitPrice = 0;
-              updated.subtotal = 0;
-            } else if (value === 'booth') {
-              updated.materialId = '';
-              updated.serviceId = boothService?.id || '';
-              updated.quantity = 1;
-              updated.unitPrice = boothService?.price || 0;
-              updated.subtotal = boothService?.price || 0;
-            }
-          }
+      const updated = { ...item, [field]: value };
 
-          // When material is selected
-          if (field === 'materialId' && value) {
-            const material = materials.find(m => m.id === parseInt(value));
-            if (material) {
-              updated.unitPrice = material.sellingPrice;
-              updated.subtotal = material.sellingPrice * updated.quantity;
-            }
-          }
+      // 1. Handle Type Change (Material <-> Booth)
+      if (field === 'itemType') {
+        updated.materialId = '';
+        updated.serviceId = '';
+        updated.quantity = 1; 
+        updated.unitPrice = 0;
+        updated.subtotal = 0;
+      }
 
-          // Recalculate subtotal when quantity changes
-          if (field === 'quantity') {
-            const qty = parseFloat(value || 0);
-            updated.quantity = qty;
-            updated.subtotal = updated.unitPrice * qty;
-          }
-
-          return updated;
+      // 2. Handle Material Selection
+      if (field === 'materialId') {
+        const material = materials.find(m => m.id.toString() === value.toString());
+        if (material) {
+          updated.unitPrice = material.sellingPrice;
+          updated.subtotal = material.sellingPrice * updated.quantity;
         }
-        return item;
-      })
-    );
+      }
+
+      // 3. Handle Service (Booth) Selection
+      if (field === 'serviceId') {
+        const service = services.find(s => s.id.toString() === value.toString());
+        if (service) {
+          updated.unitPrice = service.price;
+          updated.quantity = 1; // Usually booths are single quantity per line, but can be changed if needed
+          updated.subtotal = service.price * 1;
+        }
+      }
+
+      // 4. Handle Quantity Change
+      if (field === 'quantity') {
+        const qty = parseFloat(value) || 0;
+        updated.quantity = qty;
+        updated.subtotal = updated.unitPrice * qty;
+      }
+
+      return updated;
+    }));
   };
 
-  const calculateTotal = () => {
-    return items.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
-  };
+  const calculateTotal = useMemo(() => {
+    return items.reduce((sum, item) => sum + (parseFloat(item.subtotal) || 0), 0);
+  }, [items]);
 
+  // --- Validation ---
   const validate = () => {
     const newErrors = {};
 
-    if (items.length === 0) {
-      newErrors.items = 'Please add at least one item';
-    }
+    if (items.length === 0) newErrors.items = 'Please add at least one item';
+    if (!saleDate) newErrors.saleDate = 'Sale date is required';
+    if (!saleTime) newErrors.saleTime = 'Sale time is required';
 
-    // Validate sale date
-    if (!saleDate) {
-      newErrors.saleDate = 'Sale date is required';
-    } else {
-      const dateObj = new Date(saleDate);
-      if (isNaN(dateObj.getTime())) {
-        newErrors.saleDate = 'Invalid date format';
-      } else if (dateObj > new Date()) {
-        newErrors.saleDate = 'Sale date cannot be in the future';
+    // Item Validation
+    let hasItemErrors = false;
+    items.forEach((item, index) => {
+      if (item.itemType === 'material') {
+        if (!item.materialId) hasItemErrors = true;
+        if (item.quantity <= 0) hasItemErrors = true;
+      } else if (item.itemType === 'booth') {
+        if (!item.serviceId) hasItemErrors = true;
       }
-    }
+    });
 
-    // Validate sale time
-    if (!saleTime) {
-      newErrors.saleTime = 'Sale time is required';
-    } else if (!/^([01]\d|2[0-3]):([0-5]\d)$/.test(saleTime)) {
-      newErrors.saleTime = 'Invalid time format (HH:mm)';
-    }
-
-    for (const item of items) {
-      if (item.itemType === 'material' && !item.materialId) {
-        newErrors.items = 'Please select a material for all items';
-        break;
-      }
-      if (item.quantity <= 0) {
-        newErrors.items = 'Quantity must be greater than 0';
-        break;
-      }
-    }
+    if (hasItemErrors) newErrors.items = 'Please complete all item fields (Select Material/Service and Quantity)';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -195,265 +178,289 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
     if (!validate()) return;
 
-    // Combine date and time
+    // Combine Date & Time
     const combinedDateTime = new Date(`${saleDate}T${saleTime}`);
-    const formattedDateTime = combinedDateTime.toISOString();
 
+    // Format items for Backend
     const formattedItems = items.map(item => ({
       itemType: item.itemType,
+      // Send correct ID based on type
       materialId: item.itemType === 'material' ? parseInt(item.materialId) : undefined,
-      serviceId: item.itemType === 'booth' ? item.serviceId : undefined,
-      quantity: item.itemType === 'material' ? parseFloat(item.quantity) : undefined,
+      serviceId: item.itemType === 'booth' ? parseInt(item.serviceId) : undefined,
+      quantity: parseFloat(item.quantity)
     }));
 
     onSubmit({
       items: formattedItems,
       paymentMethod,
-      saleDate: formattedDateTime, // Send the combined date and time
+      saleDate: combinedDateTime.toISOString(),
       reverseInventory,
     });
   };
 
-  const totalAmount = calculateTotal();
+  // Calculations for Warnings
   const hoursSinceSale = sale ? (new Date() - new Date(sale.saleDate)) / (1000 * 60 * 60) : 0;
-
-  // Get current date and time for max values
-  const now = new Date();
-  const currentDate = now.toISOString().split('T')[0];
-  const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+  const currentDate = new Date().toISOString().split('T')[0];
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Sale"
-      size="large"
+      size="xl" // Made slightly wider for better table layout
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Warning if sale is old */}
-        {hoursSinceSale > 12 && (
-          <div className="bg-warning-50 border border-warning-200 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <svg className="w-5 h-5 text-warning-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <form onSubmit={handleSubmit} className="flex flex-col h-[calc(100vh-200px)]">
+        
+        {/* Scrollable Content Area */}
+        <div className="flex-1 overflow-y-auto pr-2 space-y-6">
+          
+          {/* Warning Section */}
+          {hoursSinceSale > 12 && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3">
+              <svg className="w-5 h-5 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
               <div>
-                <p className="text-sm font-medium text-warning-900">Old Sale Warning</p>
-                <p className="text-sm text-warning-700 mt-1">
-                  This sale is {Math.floor(hoursSinceSale)} hours old. Consider creating a reversal instead of editing.
+                <p className="text-sm font-medium text-amber-900">Older Record</p>
+                <p className="text-sm text-amber-700">
+                  This sale is {Math.floor(hoursSinceSale)} hours old. Editing will reverse inventory for old items and deduct for new ones.
                 </p>
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Date and Time Section */}
-        <div className="grid grid-cols-2 gap-4">
-          <div>
-            <label htmlFor="saleDate" className="block text-sm font-medium text-gray-700 mb-1">
-              Sale Date *
-            </label>
-            <input
+          {/* Date & Time Settings */}
+          <div className="grid grid-cols-2 gap-4">
+            <Input
               type="date"
-              id="saleDate"
+              label="Sale Date"
               value={saleDate}
               onChange={(e) => setSaleDate(e.target.value)}
               max={currentDate}
-              className={`w-full px-3 py-2 border ${errors.saleDate ? 'border-danger-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
+              error={errors.saleDate}
               disabled={isLoading}
+              required
             />
-            {errors.saleDate && (
-              <p className="mt-1 text-sm text-danger-600">{errors.saleDate}</p>
-            )}
-          </div>
-
-          <div>
-            <label htmlFor="saleTime" className="block text-sm font-medium text-gray-700 mb-1">
-              Sale Time *
-            </label>
-            <input
+            <Input
               type="time"
-              id="saleTime"
+              label="Sale Time"
               value={saleTime}
               onChange={(e) => setSaleTime(e.target.value)}
-              className={`w-full px-3 py-2 border ${errors.saleTime ? 'border-danger-300' : 'border-gray-300'} rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent`}
-              disabled={isLoading}
+              error={errors.saleTime}
+              disabled
+              required
             />
-            {errors.saleTime && (
-              <p className="mt-1 text-sm text-danger-600">{errors.saleTime}</p>
+          </div>
+
+          {/* Items Section */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-700">Sale Items</h3>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={addItem}
+                disabled={isLoading}
+                icon={
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                  </svg>
+                }
+              >
+                Add Item
+              </Button>
+            </div>
+
+            {/* Global Item Error */}
+            {errors.items && (
+              <div className="mb-3 p-2 bg-red-50 border border-red-100 text-red-600 text-sm rounded">
+                {errors.items}
+              </div>
             )}
-          </div>
-        </div>
 
-        {/* Inventory Reversal Option */}
-        <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
-          <label className="flex items-start gap-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={reverseInventory}
-              onChange={(e) => setReverseInventory(e.target.checked)}
-              className="mt-0.5 rounded text-primary-600 focus:ring-primary-500"
-              disabled={isLoading}
-            />
-            <div>
-              <p className="text-sm font-medium text-primary-900">Reverse Inventory Changes</p>
-              <p className="text-sm text-primary-700 mt-1">
-                When enabled, the system will restore the old items to inventory before applying the new changes. Uncheck only if you've manually adjusted inventory.
-              </p>
-            </div>
-          </label>
-        </div>
-
-        {/* Items Section */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-semibold text-gray-900">Sale Items</h3>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={addItem}
-              disabled={isLoading}
-            >
-              Add Item
-            </Button>
-          </div>
-
-          {errors.items && (
-            <div className="mb-4 p-3 bg-danger-50 border border-danger-200 rounded-lg">
-              <p className="text-sm text-danger-700">{errors.items}</p>
-            </div>
-          )}
-
-          {items.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed">
-              <p className="text-gray-500">No items added. Click "Add Item" to start.</p>
-            </div>
-          ) : (
             <div className="space-y-3">
               {items.map((item, index) => (
-                <div key={item.id} className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="text-sm font-medium text-gray-600">Item #{index + 1}</span>
-                    <button
-                      type="button"
-                      onClick={() => removeItem(item.id)}
-                      className="text-danger-600 hover:text-danger-800"
-                      disabled={isLoading}
-                    >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
+                <div 
+                  key={item.id} 
+                  className={`p-3 rounded-lg border transition-colors ${
+                    item.itemType === 'material' ? 'bg-white border-gray-200' : 'bg-indigo-50/50 border-indigo-100'
+                  }`}
+                >
+                  <div className="flex gap-3 items-start">
+                    
+                    {/* 1. Type Selector */}
+                    <div className="w-32">
+                      <Select
+                        label={index === 0 ? "Type" : ""}
+                        value={item.itemType}
+                        onChange={(e) => updateItem(item.id, 'itemType', e.target.value)}
+                        options={[
+                          { value: 'material', label: 'Material' },
+                          { value: 'booth', label: 'Booth' },
+                        ]}
+                        disabled={isLoading}
+                      />
+                    </div>
 
-                  <div className="grid grid-cols-4 gap-3">
-                    {/* Item Type */}
-                    <Select
-                      name={`itemType-${item.id}`}
-                      value={item.itemType}
-                      onChange={(e) => updateItem(item.id, 'itemType', e.target.value)}
-                      options={[
-                        { value: 'material', label: 'Material' },
-                        { value: 'booth', label: 'Booth Service' },
-                      ]}
-                      disabled={isLoading}
-                      className="col-span-1"
-                    />
+                    {/* 2. DYNAMIC FIELDS BASED ON TYPE */}
+                    <div className="flex-1">
+                      {item.itemType === 'material' ? (
+                        // --- MATERIAL FIELDS ---
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <Select
+                              label={index === 0 ? "Select Material" : ""}
+                              value={item.materialId}
+                              onChange={(e) => updateItem(item.id, 'materialId', e.target.value)}
+                              options={materials.map(m => ({
+                                value: m.id,
+                                label: `${m.name} (Stock: ${m.quantity})`
+                              }))}
+                              placeholder="Choose material..."
+                              disabled={isLoading}
+                            />
+                          </div>
+                          <div className="w-24">
+                            <Input
+                              type="number"
+                              label={index === 0 ? "Qty" : ""}
+                              value={item.quantity}
+                              onChange={(e) => updateItem(item.id, 'quantity', e.target.value)}
+                              min="0.1"
+                              step="any"
+                              disabled={isLoading}
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        // --- BOOTH FIELDS ---
+                        <div className="flex gap-3">
+                          <div className="flex-1">
+                            <Select
+                              label={index === 0 ? "Select Service" : ""}
+                              value={item.serviceId}
+                              onChange={(e) => updateItem(item.id, 'serviceId', e.target.value)}
+                              options={services.map(s => ({
+                                value: s.id,
+                                label: s.name
+                              }))}
+                              placeholder="Choose service..."
+                              disabled={isLoading}
+                            />
+                          </div>
+                          {/* Hidden Quantity for Booth (visual only or locked to 1) */}
+                          <div className="w-24 opacity-50">
+                            <Input
+                              label={index === 0 ? "Qty" : ""}
+                              value="1"
+                              disabled={true}
+                              className="bg-gray-100"
+                            />
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
-                    {/* Material or Service */}
-                    {item.itemType === 'material' ? (
-                      <>
-                        <Select
-                          name={`material-${item.id}`}
-                          value={item.materialId}
-                          onChange={(e) => updateItem(item.id, 'materialId', e.target.value)}
-                          options={materials.map(m => ({
-                            value: m.id,
-                            label: `${m.name}`,
-                          }))}
-                          placeholder="Select material"
-                          required
-                          disabled={isLoading}
-                          className="col-span-2"
-                        />
-                        <input
-                          type="number"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(item.id, 'quantity', e.target.value)}
-                          step="any"
-                          required
-                          disabled={isLoading}
-                          placeholder="Qty"
-                          className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
-                        />
-                      </>
-                    ) : (
-                      <div className="col-span-3 flex items-center px-3 py-2 bg-success-50 border border-success-200 rounded-lg">
-                        <span className="text-sm text-success-800">
-                          Booth Service - GH₵{boothService?.price || 0}
-                        </span>
+                    {/* 3. Price & Delete (Common) */}
+                    <div className="w-24 pt-1">
+                      <label className={`block text-xs font-medium text-gray-700 mb-1 ${index === 0 ? 'visible' : 'invisible'}`}>
+                        Total
+                      </label>
+                      <div className="h-[38px] flex items-center justify-end px-2 font-medium text-gray-900 bg-gray-50 rounded border border-gray-200">
+                        {parseFloat(item.subtotal || 0).toFixed(2)}
                       </div>
-                    )}
-                  </div>
+                    </div>
 
-                  <div className="mt-2 text-right">
-                    <span className="text-sm text-gray-600">Subtotal: </span>
-                    <span className="text-sm font-semibold text-gray-900">
-                      GH₵{parseFloat(item.subtotal || 0).toFixed(2)}
-                    </span>
+                    <div className={`pt-1 ${index === 0 ? 'mt-6' : 'mt-0'}`}>
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Remove item"
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    </div>
                   </div>
+                  
+                  {/* Validation message per item */}
+                  {((item.itemType === 'material' && !item.materialId) || (item.itemType === 'booth' && !item.serviceId)) && (
+                     <p className="text-xs text-red-500 mt-1 ml-1">* Selection required</p>
+                  )}
                 </div>
               ))}
             </div>
-          )}
-        </div>
 
-        {/* Payment Method */}
-        <Select
-          label="Payment Method"
-          name="paymentMethod"
-          value={paymentMethod}
-          onChange={(e) => setPaymentMethod(e.target.value)}
-          options={[
-            { value: 'cash', label: 'Cash' },
-            { value: 'momo', label: 'Mobile Money (Momo)' },
-            { value: 'cheque', label: 'Cheque' },
-          ]}
-          required
-          disabled={isLoading}
-        />
-
-        {/* Total */}
-        <div className="bg-primary-50 border border-primary-200 rounded-lg p-4">
-          <div className="flex justify-between items-center">
-            <span className="text-lg font-semibold text-gray-900">Total Amount:</span>
-            <span className="text-2xl font-bold text-primary-700">
-              GH₵{totalAmount.toFixed(2)}
-            </span>
+            {items.length === 0 && (
+              <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+                <p className="text-gray-500 text-sm">No items added to this sale yet.</p>
+              </div>
+            )}
           </div>
+
         </div>
 
-        {/* Actions */}
-        <div className="flex justify-end gap-3 border-t pt-4">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onClose}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            loading={isLoading}
-          >
-            Update Sale
-          </Button>
+        {/* Footer Area (Fixed at bottom) */}
+        <div className="border-t border-gray-200 pt-4 mt-4 bg-white">
+          <div className="grid grid-cols-2 gap-6 mb-4">
+            <div>
+              <Select
+                label="Payment Method"
+                value={paymentMethod}
+                onChange={(e) => setPaymentMethod(e.target.value)}
+                options={[
+                  { value: 'cash', label: 'Cash' },
+                  { value: 'momo', label: 'Mobile Money' },
+                  { value: 'cheque', label: 'Cheque' },
+                ]}
+              />
+            </div>
+            
+            {/* Inventory Reversal Toggle */}
+            <div className="flex items-center pt-6">
+              <label className="flex items-center gap-2 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={reverseInventory}
+                  onChange={(e) => setReverseInventory(e.target.checked)}
+                  className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 h-4 w-4"
+                  disabled={isLoading}
+                />
+                <span className="text-sm text-gray-700">Auto-reverse inventory</span>
+                
+              </label>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+            <div className="text-right flex-1">
+              <span className="text-sm text-gray-500 mr-2">Total Amount:</span>
+              <span className="text-2xl font-bold text-gray-900">GH₵{calculateTotal.toFixed(2)}</span>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-3 mt-4">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={onClose}
+              disabled={isLoading}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              loading={isLoading}
+            >
+              Save Changes
+            </Button>
+          </div>
         </div>
       </form>
     </Modal>

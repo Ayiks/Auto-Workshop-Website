@@ -46,6 +46,27 @@ export const expensesApi = {
     const response = await apiClient.get('/expenses/by-category', { params });
     return response;
   },
+
+
+  // ----------------------------------------------------------------
+  // NEW: INVENTORY CORRECTION METHODS (Cost of Goods)
+  // ----------------------------------------------------------------
+
+  // Revert a reorder (Delete expense + Reverse Inventory Stock)
+  // Route: DELETE /api/expenses/:id/revert-reorder
+  revertReorder: async (id) => {
+    const response = await apiClient.delete(`/expenses/${id}/revert-reorder`);
+    return response;
+  },
+
+  // Correct a reorder (Update expense + Adjust Inventory Stock & Unit Cost)
+  // Route: PUT /api/expenses/:id/correct-reorder
+  correctReorder: async (id, data) => {
+    const response = await apiClient.put(`/expenses/${id}/correct-reorder`, data);
+    return response;
+  },
+
+  
 };
 
 export default expensesApi;

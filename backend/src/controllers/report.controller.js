@@ -302,6 +302,150 @@ export const getJobReport = asyncHandler(async (req, res) => {
 // @desc    Get Expense Report
 // @route   GET /api/reports/expenses
 // @access  Private (requires 'reports:view' permission)
+// export const getExpenseReport = asyncHandler(async (req, res) => {
+//   const { startDate, endDate, type, category } = req.query;
+//   const dateRange = getDateRange(startDate, endDate);
+
+//   const expenseWhere = {
+//     expenseDate: dateRange,
+//   };
+
+//   if (type) {
+//     expenseWhere.type = type;
+//   }
+
+//   if (category) {
+//     expenseWhere.category = category;
+//   }
+
+//   const expenses = await prisma.expense.findMany({
+//     where: expenseWhere,
+//     include: {
+//       user: {
+//         select: { fullName: true, username: true },
+//       },
+//       materialReorder: {
+//         select: {
+//           materialName: true,
+//           quantityOrdered: true,
+//         },
+//       },
+//     },
+//     orderBy: { expenseDate: 'desc' },
+//   });
+
+//   // Calculate totals by type (ONLY operational expenses, no COG)
+//   let operationalTotal = 0;
+
+//   expenses.forEach(expense => {
+//     const amount = parseFloat(expense.amount);
+//     if (expense.type === 'operational') {
+//       operationalTotal += amount;
+//     }
+//   });
+
+//   const totalExpenses = operationalTotal; // Only operational expenses
+
+//   // Expenses by category - ONLY operational
+//   const expensesByCategoryRaw = await prisma.expense.groupBy({
+//     by: ['category'],
+//     where: {
+//       ...expenseWhere,
+//       type: 'operational', // ONLY operational expenses
+//     },
+//     _sum: { amount: true },
+//     _count: true,
+//   });
+
+//   const byCategory = expensesByCategoryRaw.map(cat => ({
+//     category: cat.category,
+//     amount: parseFloat(cat._sum.amount || 0),
+//     count: cat._count,
+//     percentage: totalExpenses > 0 
+//       ? ((parseFloat(cat._sum.amount || 0) / totalExpenses) * 100).toFixed(1) 
+//       : '0.0',
+//   }));
+
+//   // Expenses by type
+//   const expensesByTypeRaw = await prisma.expense.groupBy({
+//     by: ['type'],
+//     where: expenseWhere,
+//     _sum: { amount: true },
+//     _count: true,
+//   });
+
+//   const byType = expensesByTypeRaw.map(t => ({
+//     type: t.type,
+//     amount: parseFloat(t._sum.amount || 0),
+//     count: t._count,
+//   }));
+
+//   // Monthly trend - ONLY operational
+//   let monthlyExpenses = [];
+//   try {
+//     monthlyExpenses = await prisma.$queryRaw`
+//       SELECT 
+//         DATE_TRUNC('month', expense_date)::TEXT as month,
+//         SUM(amount)::DECIMAL as total
+//       FROM expenses
+//       WHERE expense_date >= ${dateRange.gte}
+//         AND expense_date <= ${dateRange.lte}
+//         AND type = 'operational'
+//       GROUP BY DATE_TRUNC('month', expense_date)
+//       ORDER BY month ASC
+//     `;
+//   } catch (error) {
+//     console.error('Monthly expenses query error:', error);
+//     monthlyExpenses = [];
+//   }
+
+//   // Count operational entries only
+//   const operationalCount = await prisma.expense.count({
+//     where: {
+//       type: 'operational',
+//       expenseDate: dateRange,
+//     },
+//   });
+
+//   res.status(200).json({
+//     success: true,
+//     period: {
+//       startDate: dateRange.gte,
+//       endDate: dateRange.lte,
+//     },
+//     data: {
+//       summary: {
+//         totalExpenses,
+//         operationalTotal,
+//         totalTransactions: operationalCount,
+//         operationalCount,
+//       },
+//       breakdown: {
+//         byCategory,
+//         byType,
+//       },
+//       monthlyTrend: monthlyExpenses,
+//       recentExpenses: expenses.filter(e => e.type === 'operational').slice(0, 10),
+//       allExpenses: expenses.filter(e => e.type === 'operational'),
+//     },
+//   });
+// });
+
+// @desc    Get Profit & Loss Statement
+// @route   GET /api/reports/profit-loss
+// @access  Private (requires 'reports:viewAdvanced' permission)
+
+
+
+
+// Helper to get date range (keep your existing implementation if different)
+
+
+// @desc    Get Expense Report (Aggregated for Finance Dashboard)
+// @route   GET /api/reports/expenses
+// @access  Private
+// ... imports
+
 export const getExpenseReport = asyncHandler(async (req, res) => {
   const { startDate, endDate, type, category } = req.query;
   const dateRange = getDateRange(startDate, endDate);
@@ -310,48 +454,51 @@ export const getExpenseReport = asyncHandler(async (req, res) => {
     expenseDate: dateRange,
   };
 
-  if (type) {
-    expenseWhere.type = type;
-  }
-
-  if (category) {
-    expenseWhere.category = category;
-  }
-
+  // 1. Fetch ALL expenses
   const expenses = await prisma.expense.findMany({
     where: expenseWhere,
     include: {
-      user: {
-        select: { fullName: true, username: true },
-      },
-      materialReorder: {
-        select: {
-          materialName: true,
-          quantityOrdered: true,
-        },
-      },
+      materialReorder: { select: { materialName: true, quantityOrdered: true } },
     },
     orderBy: { expenseDate: 'desc' },
   });
 
-  // Calculate totals by type (ONLY operational expenses, no COG)
+  // --- DEBUG LOG START ---
+  console.log(`[Report Debug] Found ${expenses.length} total expenses for range.`);
+  // --- DEBUG LOG END ---
+
+  // 2. Calculate Totals
   let operationalTotal = 0;
+  let cogTotal = 0;
+  let materialReorderCount = 0;
+  let operationalCount = 0;
 
   expenses.forEach(expense => {
-    const amount = parseFloat(expense.amount);
-    if (expense.type === 'operational') {
-      operationalTotal += amount;
+    const amount = parseFloat(expense.amount || 0);
+    const type = expense.type?.toLowerCase(); // Handle case sensitivity
+
+    // Check for both 'cog' and 'cost_of_goods' just to be safe
+    if (type === 'cog' || type === 'cost_of_goods') {
+        cogTotal += amount;
+        materialReorderCount++;
+    } else if (type === 'operational') {
+        operationalTotal += amount;
+        operationalCount++;
     }
   });
 
-  const totalExpenses = operationalTotal; // Only operational expenses
+  const totalExpenses = operationalTotal + cogTotal;
+  
+  // --- DEBUG LOG START ---
+  console.log(`[Report Debug] COG Total: ${cogTotal}, Op Total: ${operationalTotal}`);
+  // --- DEBUG LOG END ---
 
-  // Expenses by category - ONLY operational
+  // 3. Breakdown by Category (Operational Only)
   const expensesByCategoryRaw = await prisma.expense.groupBy({
     by: ['category'],
     where: {
       ...expenseWhere,
-      type: 'operational', // ONLY operational expenses
+      type: 'operational', 
     },
     _sum: { amount: true },
     _count: true,
@@ -366,31 +513,31 @@ export const getExpenseReport = asyncHandler(async (req, res) => {
       : '0.0',
   }));
 
-  // Expenses by type
-  const expensesByTypeRaw = await prisma.expense.groupBy({
-    by: ['type'],
-    where: expenseWhere,
-    _sum: { amount: true },
-    _count: true,
-  });
+  // 4. CRITICAL FIX: Manually add "Material Purchases" to the list
+  if (cogTotal > 0) {
+    byCategory.push({
+      category: 'Material Purchases', // This name will appear in your table
+      amount: cogTotal,
+      count: materialReorderCount,
+      percentage: totalExpenses > 0 
+        ? ((cogTotal / totalExpenses) * 100).toFixed(1) 
+        : '0.0',
+    });
+  }
 
-  const byType = expensesByTypeRaw.map(t => ({
-    type: t.type,
-    amount: parseFloat(t._sum.amount || 0),
-    count: t._count,
-  }));
+  // Sort: Highest amount first
+  byCategory.sort((a, b) => b.amount - a.amount);
 
-  // Monthly trend - ONLY operational
+  // 5. Monthly Trend (FIXED TABLE NAME)
   let monthlyExpenses = [];
   try {
     monthlyExpenses = await prisma.$queryRaw`
       SELECT 
         DATE_TRUNC('month', expense_date)::TEXT as month,
         SUM(amount)::DECIMAL as total
-      FROM expenses
+      FROM "expenses" -- <--- CHANGED "Expense" TO "expenses" (lowercase)
       WHERE expense_date >= ${dateRange.gte}
         AND expense_date <= ${dateRange.lte}
-        AND type = 'operational'
       GROUP BY DATE_TRUNC('month', expense_date)
       ORDER BY month ASC
     `;
@@ -399,41 +546,32 @@ export const getExpenseReport = asyncHandler(async (req, res) => {
     monthlyExpenses = [];
   }
 
-  // Count operational entries only
-  const operationalCount = await prisma.expense.count({
-    where: {
-      type: 'operational',
-      expenseDate: dateRange,
-    },
-  });
-
   res.status(200).json({
     success: true,
-    period: {
-      startDate: dateRange.gte,
-      endDate: dateRange.lte,
-    },
+    period: { startDate: dateRange.gte, endDate: dateRange.lte },
     data: {
       summary: {
         totalExpenses,
         operationalTotal,
-        totalTransactions: operationalCount,
+        cogTotal,
+        totalTransactions: expenses.length,
         operationalCount,
+        materialReorderCount,
       },
       breakdown: {
-        byCategory,
-        byType,
+        byCategory, // This now includes Material Purchases
+        byType: [
+          { type: 'Operational', amount: operationalTotal },
+          { type: 'Cost of Goods', amount: cogTotal }
+        ]
       },
       monthlyTrend: monthlyExpenses,
-      recentExpenses: expenses.filter(e => e.type === 'operational').slice(0, 10),
-      allExpenses: expenses.filter(e => e.type === 'operational'),
+      recentExpenses: expenses.slice(0, 10),
+      allExpenses: expenses,
     },
   });
 });
 
-// @desc    Get Profit & Loss Statement
-// @route   GET /api/reports/profit-loss
-// @access  Private (requires 'reports:viewAdvanced' permission)
 export const getProfitLoss = asyncHandler(async (req, res) => {
   const { startDate, endDate } = req.query;
   const dateRange = getDateRange(startDate, endDate);

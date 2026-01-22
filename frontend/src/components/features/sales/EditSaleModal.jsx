@@ -373,7 +373,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
                           onChange={(e) => updateItem(item.id, 'materialId', e.target.value)}
                           options={materials.map(m => ({
                             value: m.id,
-                            label: `${m.name} (Stock: ${m.quantity})`,
+                            label: `${m.name}`,
                           }))}
                           placeholder="Select material"
                           required

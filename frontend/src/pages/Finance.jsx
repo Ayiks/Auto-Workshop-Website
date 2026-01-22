@@ -132,7 +132,17 @@ export default function Finance() {
     operationalTotal: expensesData?.data?.summary?.operationalTotal || 0,
     materialReorderCount: expensesData?.data?.summary?.materialReorderCount || 0,
     operationalCount: expensesData?.data?.summary?.operationalCount || 0,
+
+    // --- BREAKDOWN (This was missing) ---
+    // Log Path: expensesData.data.breakdown (One .data only!)
+    breakdown: expensesData?.data?.breakdown || { byCategory: [] }, 
+    
+    // --- OTHER ARRAYS ---
+    monthlyTrend: expensesData?.data?.monthlyTrend || [],
+    recentExpenses: expensesData?.data?.recentExpenses || [],
+    allExpenses: expensesData?.data?.allExpenses || [],
   };
+
 
   const pl = {
     // Summary values
@@ -181,11 +191,6 @@ export default function Finance() {
     },
   };
 
-  console.log("expenses", expenses);
-  console.log("pl", pl);
-  console.log("sales", sales);
-  console.log("jobs", jobs);
-  console.log("materials", materialUsage);
 
   const isLoading =
     loadingSales ||
@@ -286,10 +291,6 @@ export default function Finance() {
 }
 
 function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
-
-  console.log("FULL EXPENSES PROP:", expenses);
-  console.log("Is it nested inside data?", expenses?.data);
-  console.log("Direct breakdown?", expenses?.breakdown);
   // State to toggle between COGS (Sold/Used) and Purchases (Restock/Cash)
   const [showPurchases, setShowPurchases] = useState(false);
 
@@ -1376,16 +1377,13 @@ function JobsTab({ jobs, dateRange }) {
 
 function ExpensesTab({ expenses, dateRange }) {
 
-  console.log('expenses tab data:', expenses);
-  // const handleExport = () => exportExpensesReport(expenses, dateRange); // Uncomment if you have the export function
-
-  // --- FIX START: Define variables safely at the top ---
-  // 1. Get the total (Safety check: if expenses is null, default to 0)
   const totalExpenses = expenses?.totalExpenses || 0;
+  const operationalCount = expenses?.operationalCount || 0;
+  const operationalTotal = expenses?.operationalTotal || 0;
 
-  // 2. Get the breakdown array
+  // 2. Get Breakdown Array
+  // It is now passed as expenses.breakdown
   const byCategory = expenses?.breakdown?.byCategory || [];
-  // --- FIX END ---
 
   return (
     <div className="space-y-6">

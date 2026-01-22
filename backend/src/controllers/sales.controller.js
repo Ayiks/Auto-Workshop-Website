@@ -17,13 +17,21 @@ const generateReceiptNumber = () => {
 // @route   POST /api/sales
 // @access  Private (requires 'sales:create' permission)
 export const createSale = asyncHandler(async (req, res) => {
-  const { items, paymentMethod = 'cash', saleDate } = req.body;
+  const { items, paymentMethod, saleDate: userProvidedDate } = req.body;
 
+  let finalSaleDate = new Date();
+  if (userProvidedDate) {
+    const datePart = new Date(userProvidedDate);
 
-  console.log('=== Create Sale Request ===');
-  console.log('Items received:', JSON.stringify(items, null, 2));
-  console.log('==========================');
+    const timePart = new Date();
 
+    datePart.setHours(timePart.getHours());
+    datePart.setMinutes(timePart.getMinutes());
+    datePart.setSeconds(timePart.getSeconds());
+    datePart.setMilliseconds(timePart.getMilliseconds());
+
+    finalSaleDate = datePart;
+  }
 
   // Validation
   if (!items || !Array.isArray(items) || items.length === 0) {
@@ -131,7 +139,7 @@ export const createSale = asyncHandler(async (req, res) => {
         paymentMethod,
         soldBy: req.user.id,
         status: 'completed',
-        saleDate: saleDate ? new Date(saleDate) : undefined,
+        saleDate: finalSaleDate,
       },
     });
 
@@ -177,7 +185,7 @@ export const createSale = asyncHandler(async (req, res) => {
         businessLogo: businessSettings.logo,
         businessAddress: businessSettings.address,
         businessContact: businessSettings.phone,
-        issuedDate: saleDate ? new Date(saleDate) : undefined,
+        issuedDate: finalSaleDate,
       },
     });
 
@@ -501,7 +509,11 @@ export const updateSale = asyncHandler(async (req, res) => {
 // @route   GET /api/sales
 // @access  Private (requires 'sales:view' or 'sales:viewOwn' permission)
 export const getSales = asyncHandler(async (req, res) => {
-  const { startDate, endDate, paymentMethod, soldBy } = req.query;
+  const { startDate, endDate, paymentMethod, soldBy, page = 1, limit = 10 } = req.query;
+
+  const pageNumber = parseInt(page);
+  const limitNumber = parseInt(limit);
+  const skip = (pageNumber - 1) * limitNumber;
 
   const where = { status: 'completed' };
 
@@ -531,8 +543,11 @@ export const getSales = asyncHandler(async (req, res) => {
     where.soldBy = req.user.id;
   }
 
-  const sales = await prisma.sale.findMany({
+  const [sales, totalCount, revenueAgg, paymentStats] = await prisma.$transaction([
+    prisma.sale.findMany({
     where,
+    skip: skip,          // <--- Skip previous pages
+    take: limitNumber,
     include: {
       items: true,
       user: {
@@ -548,14 +563,41 @@ export const getSales = asyncHandler(async (req, res) => {
       },
     },
     orderBy: { saleDate: 'desc' },
+  }),
+    prisma.sale.count({ where }),
+    prisma.sale.aggregate({
+      _sum: { totalAmount: true },
+      where, // Important: Use same 'where' to respect date filters!
+    }),
+    prisma.sale.groupBy({
+      by: ['paymentMethod'],
+      _count: { paymentMethod: true },
+      where,
+    }),
+  ]);
+
+  const statsMap = {};
+  paymentStats.forEach((stat) => {
+    statsMap[stat.paymentMethod] = stat._count.paymentMethod;
   });
 
   res.status(200).json({
     success: true,
-    count: sales.length,
     data: sales,
+    // Pagination info
+    totalItems: totalCount,
+    totalPages: Math.ceil(totalCount / limitNumber),
+    currentPage: pageNumber,
+    // New Stats Object
+    stats: {
+      totalRevenue: revenueAgg._sum.totalAmount || 0,
+      totalSales: totalCount,
+      cashCount: statsMap['cash'] || 0,
+      momoCount: statsMap['momo'] || 0,
+    }
   });
 });
+
 
 // @desc    Get single sale
 // @route   GET /api/sales/:id

@@ -3,13 +3,15 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { expensesApi } from "@api/expenses";
 import { useAuthStore } from "@stores/authStore";
+import { toast } from "react-hot-toast"; // <--- Ensure this is imported
+
 import Button from "@components/common/Button";
-import Card from "@components/common/Card";
-import Table from "@components/common/Table";
 import Modal from "@components/common/Modal";
 import LoadingSpinner from "@components/common/LoadingSpinner";
 import EmptyState from "@components/common/EmptyState";
 import ExpenseForm from "@components/features/expenses/ExpenseForm";
+import ReorderCorrectionModal from "@components/features/expenses/ReorderCorrectionModal";
+import RevertReorderModal from "@components/features/expenses/RevertReorderModal";
 import { format } from "date-fns";
 
 const EXPENSE_TYPE_COLORS = {
@@ -29,9 +31,20 @@ export default function Expenses() {
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Modal States
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
+  
+  // Correction States
+  const [showCorrectionModal, setShowCorrectionModal] = useState(false);
+  const [selectedReorder, setSelectedReorder] = useState(null);
+  
+  // Revert States
+  const [isRevertModalOpen, setIsRevertModalOpen] = useState(false);
+  const [expenseToRevert, setExpenseToRevert] = useState(null);
+  const [isReverting, setIsReverting] = useState(false);
 
   // Fetch expenses
   const { data: expensesData, isLoading } = useQuery({
@@ -65,10 +78,9 @@ export default function Expenses() {
       queryClient.invalidateQueries(["expenses"]);
       queryClient.invalidateQueries(["expense-stats"]);
       setShowCreateModal(false);
+      toast.success("Expense added successfully");
     },
-    onError: (error) => {
-      // Show error toast
-    },
+    onError: (error) => toast.error("Failed to add expense"),
   });
 
   // Update expense mutation
@@ -79,23 +91,83 @@ export default function Expenses() {
       queryClient.invalidateQueries(["expense-stats"]);
       setShowEditModal(false);
       setSelectedExpense(null);
+      toast.success("Expense updated");
     },
-    onError: (error) => {
-      // Show error toast
-    },
+    onError: (error) => toast.error("Failed to update expense"),
   });
 
-  // Delete expense mutation
+  // Delete expense mutation (Standard)
   const deleteMutation = useMutation({
     mutationFn: expensesApi.deleteExpense,
     onSuccess: () => {
       queryClient.invalidateQueries(["expenses"]);
       queryClient.invalidateQueries(["expense-stats"]);
+      toast.success("Expense deleted");
     },
-    onError: (error) => {
-      // Show error toast
-    },
+    onError: (error) => toast.error("Failed to delete expense"),
   });
+
+  // Correction mutation
+  const correctionMutation = useMutation({
+    mutationFn: ({ id, ...data }) => expensesApi.correctReorder(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["expenses"]);
+      queryClient.invalidateQueries(["expense-stats"]);
+      setShowCorrectionModal(false);
+      setSelectedReorder(null);
+      toast.success("Stock and expense corrected");
+    },
+    onError: () => toast.error("Failed to correct reorder"),
+  });
+
+  // --- HANDLERS ---
+
+  // 1. Open Correction Modal
+  const handleCorrection = (expense) => {
+    setSelectedReorder(expense);
+    setShowCorrectionModal(true);
+  };
+
+  // 2. Open Revert Modal (Renamed to match button call)
+  const handleRevert = (expense) => {
+    setExpenseToRevert(expense);
+    setIsRevertModalOpen(true);
+  };
+
+  // 3. Confirm Revert Logic
+  const confirmRevert = async (id) => {
+    try {
+      setIsReverting(true);
+      await expensesApi.revertReorder(id);
+      
+      // Success: Refresh data
+      queryClient.invalidateQueries(["expenses"]);
+      queryClient.invalidateQueries(["expense-stats"]);
+      
+      toast.success('Reorder reverted and stock adjusted.');
+      setIsRevertModalOpen(false);
+      setExpenseToRevert(null);
+    } catch (error) {
+      console.error(error);
+      toast.error(error.response?.data?.message || 'Failed to revert reorder');
+    } finally {
+      setIsReverting(false);
+    }
+  };
+
+  // Standard Edit
+  const handleEdit = (expense) => {
+    setSelectedExpense(expense);
+    setShowEditModal(true);
+  };
+
+  // Standard Delete
+  const handleDelete = (id, isReadOnly) => {
+    if (isReadOnly) return;
+    if (window.confirm("Are you sure you want to delete this expense?")) {
+      deleteMutation.mutate(id);
+    }
+  };
 
   // Filter expenses by search term
   const filteredExpenses = expenses.filter((expense) => {
@@ -106,23 +178,10 @@ export default function Expenses() {
     );
   });
 
-  const handleEdit = (expense) => {
-    setSelectedExpense(expense);
-    setShowEditModal(true);
-  };
-
-  const handleDelete = (id, isReadOnly) => {
-    if (isReadOnly) {
-      return;
-    }
-    if (window.confirm("Are you sure you want to delete this expense?")) {
-      deleteMutation.mutate(id);
-    }
-  };
-
   // Get unique categories for filter
   const categories = [...new Set(expenses.map((e) => e.category))].sort();
 
+  // Column Definitions
   const columns = [
     {
       key: "expenseDate",
@@ -206,25 +265,41 @@ export default function Expenses() {
       width: "100px",
       render: (expense) => (
         <div className="flex gap-2">
-          {expense.type === "operational" && !expense.isReadOnly ? (
+          {
+            expense.category === 'material_reorder' ? (
+             <>
+              <button
+                onClick={() => handleCorrection(expense)}
+                className="p-1.5 text-blue-400 hover:text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                title="Correct Inventory Stock & Cost"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>
+              </button>
+              
+              <button
+                onClick={() => handleRevert(expense)} 
+                className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                title="Reverse Reorder (Remove Stock)"
+              >
+                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+                  </svg>
+              </button>
+             </>
+          ) : (
+            
+          /* CASE 2: Operational (Standard) */
+            expense.type === "operational" && !expense.isReadOnly ? (
             <>
               <button
                 onClick={() => handleEdit(expense)}
                 className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded transition-colors"
                 title="Edit"
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                  />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
               </button>
               <button
@@ -232,24 +307,16 @@ export default function Expenses() {
                 className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
                 title="Delete"
               >
-                <svg
-                  className="w-4 h-4"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                  />
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
                 </svg>
               </button>
             </>
           ) : (
-            <span className="text-xs text-gray-300 px-2">System</span>
-          )}
+             /* Case 3: Read Only System Logs */
+             <span className="text-xs text-gray-300 px-2">System</span>
+          ))
+          }
         </div>
       ),
     },
@@ -325,8 +392,6 @@ export default function Expenses() {
 
         {/* main content */}
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-
-        
 
         <div className="mb-8">
           {/* Stats Grid */}
@@ -567,6 +632,7 @@ export default function Expenses() {
                     </tbody>
                   </table>
                 </div>
+                {/* Pagination placeholder if needed */}
                 <div className="px-6 py-4 border-t border-gray-200 flex items-center justify-between text-sm text-gray-500">
                   <div>
                     Showing {filteredExpenses.length} of {expenses.length}{" "}
@@ -648,6 +714,27 @@ export default function Expenses() {
           isLoading={updateMutation.isPending}
         />
       </Modal>
+
+      {/* Correction Modal */}
+      <ReorderCorrectionModal
+        isOpen={showCorrectionModal}
+        onClose={() => {
+            setShowCorrectionModal(false);
+            setSelectedReorder(null);
+        }}
+        expense={selectedReorder}
+        onSubmit={(data) => correctionMutation.mutate(data)}
+        isLoading={correctionMutation.isPending}
+      />
+
+      {/* Revert Modal */}
+      <RevertReorderModal
+         isOpen={isRevertModalOpen}
+         onClose={() => setIsRevertModalOpen(false)}
+         expense={expenseToRevert}
+         onConfirm={confirmRevert}
+         isLoading={isReverting}
+       />
     </div>
   );
 }

@@ -174,7 +174,8 @@ export default function Materials() {
           checked={filteredMaterials.length > 0 && selectedIds.length === filteredMaterials.length}
           onChange={toggleSelectAll}
           disabled={filteredMaterials.length === 0}
-        />
+        />,
+        <span>Restock</span>
       ),
       accessor: "select",
       className: "w-10",
@@ -246,22 +247,7 @@ export default function Materials() {
       accessor: "sellingPrice",
       render: (row) => <span className="text-sm font-medium text-gray-900">GH₵{Number(row.sellingPrice || 0).toFixed(2)}</span>
     },
-    {
-      header: "Margin",
-      accessor: "margin",
-      render: (row) => {
-        const cost = Number(row.unitCost || 0);
-        const price = Number(row.sellingPrice || 0);
-        if (cost === 0) return <span className="text-xs text-gray-400">-</span>;
-        
-        const margin = ((price - cost) / cost) * 100;
-        return (
-          <span className={`text-sm font-medium ${margin > 20 ? 'text-green-600' : margin > 10 ? 'text-amber-600' : 'text-red-600'}`}>
-            {margin.toFixed(1)}%
-          </span>
-        );
-      },
-    },
+    
     {
       header: "Status",
       accessor: "isActive",

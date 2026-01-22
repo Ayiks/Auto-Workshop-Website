@@ -52,7 +52,7 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
   // We use Number() on both values to force math addition instead of string concatenation
   const currentStock = Number(material?.quantity || 0);
   const quantityToAdd = Number(formData.quantityOrdered || 0);
-  const newStockLevel = currentStock + quantityToAdd;
+  const newStockLevel = Number(currentStock + quantityToAdd);
   
   const totalCost = quantityToAdd * Number(formData.unitCost || 0);
   // --- FIX END ---

@@ -1,5 +1,5 @@
 // src/pages/Sales.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { salesApi, receiptsApi } from "@api/sales";
 import { useAuthStore } from "@stores/authStore";
@@ -31,7 +31,7 @@ export default function Sales() {
   const [limit] = useState(10);
 
   // Fetch sales
-  const { data, isLoading, error } = useQuery({
+  const { data: apiResponse, isLoading, error } = useQuery({
     queryKey: [
       "sales",
       {
@@ -43,6 +43,7 @@ export default function Sales() {
     ],
     queryFn: () =>
       salesApi.getSales({
+
         page,
         limit,
         startDate: dateFilter || undefined,
@@ -51,9 +52,16 @@ export default function Sales() {
     keepPreviousData: true,
   });
 
-  const sales = data?.data || [];
-  const totalItems = data?.totalItems || data?.data?.length || 0;
-  const totalPages = Math.ceil(totalItems / limit);
+  const sales = apiResponse?.data || [];
+  const totalItems = apiResponse?.totalItems || 0;
+const totalPages = apiResponse?.totalPages || 1;
+
+const stats = apiResponse?.stats || {
+  totalRevenue: 0,
+  totalSales: 0,
+  cashCount: 0,
+  momoCount: 0
+};
 
   const startItem = (page - 1) * limit + 1;
   const endItem = Math.min(startItem + limit - 1, totalItems);
@@ -79,9 +87,12 @@ export default function Sales() {
   // Update sale mutation
   const updateMutation = useMutation({
     mutationFn: ({ id, data }) => salesApi.updateSale(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(["sales"]);
-      queryClient.invalidateQueries(["dashboard"]);
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ 
+        queryKey: ["sales"],
+        refetchType: 'all' // Forces all sales-related queries (all pages) to be marked stale
+      });
+      queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setShowEditModal(false);
       setSelectedSale(null);
       alert("Sale updated successfully!");
@@ -180,7 +191,7 @@ export default function Sales() {
   }, [dateFilter, paymentMethodFilter]);
 
   // Table columns
-  const columns = [
+  const columns =  useMemo(() => [
     {
       header: "Date",
       accessor: "saleDate",
@@ -325,7 +336,7 @@ export default function Sales() {
         </div>
       ),
     },
-  ];
+  ], [hasPermission]) ;
 
   if (error) {
     return (
@@ -411,7 +422,7 @@ export default function Sales() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Total Sales</p>
                 <p className="text-2xl font-semibold text-gray-900 mt-0.5">
-                  {sales.length}
+                  {stats.totalSales}
                 </p>
               </div>
             </div>
@@ -440,12 +451,7 @@ export default function Sales() {
                 </p>
                 <p className="text-2xl font-semibold text-gray-900 mt-0.5">
                   GH₵
-                  {sales
-                    .reduce(
-                      (sum, sale) => sum + parseFloat(sale.totalAmount),
-                      0,
-                    )
-                    .toFixed(2)}
+                 {parseFloat(stats.totalRevenue).toFixed(2)}
                 </p>
               </div>
             </div>
@@ -471,7 +477,7 @@ export default function Sales() {
               <div>
                 <p className="text-sm font-medium text-gray-600">Cash Sales</p>
                 <p className="text-2xl font-semibold text-gray-900 mt-0.5">
-                  {sales.filter((s) => s.paymentMethod === "cash").length}
+                  {stats.cashCount}
                 </p>
               </div>
             </div>
@@ -499,7 +505,7 @@ export default function Sales() {
                   Mobile Money
                 </p>
                 <p className="text-2xl font-semibold text-gray-900 mt-0.5">
-                  {sales.filter((s) => s.paymentMethod === "momo").length}
+                  {stats.momoCount}
                 </p>
               </div>
             </div>

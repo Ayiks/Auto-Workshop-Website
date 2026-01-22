@@ -7,7 +7,9 @@ import {
   deleteExpense,
   getExpensesByCategory,
   getCOGSExpenses,
-  getExpenseStats
+  getExpenseStats,
+  revertReorder,
+  correctReorder
 } from '../controllers/expenses.controller.js';
 import { protect, requirePermission } from '../middleware/auth.js';
 
@@ -47,5 +49,20 @@ router
   .get(requirePermission('expenses', 'view'), getExpense)
   .put(requirePermission('expenses', 'edit'), updateExpense)
   .delete(requirePermission('expenses', 'delete'), deleteExpense);
+
+// 1. Route for Reverting (Deleting)
+router.delete(
+  '/:id/revert-reorder', 
+  requirePermission('expenses', 'delete'), 
+  revertReorder
+);
+
+// 2. Route for Correcting (Updating) - Note the URL change here
+router.put(
+  '/:id/correct-reorder', 
+  requirePermission('expenses', 'edit'), 
+  correctReorder
+);
+
 
 export default router;

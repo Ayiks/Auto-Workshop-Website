@@ -127,16 +127,11 @@ export default function Finance() {
   };
 
   const expenses = {
-    totalExpenses: expensesData?.data?.summary?.totalExpenses || 0,
+   totalExpenses: expensesData?.data?.summary?.totalExpenses || 0,
     cogTotal: expensesData?.data?.summary?.cogTotal || 0,
     operationalTotal: expensesData?.data?.summary?.operationalTotal || 0,
-    materialReorderCount:
-      expensesData?.data?.summary?.materialReorderCount || 0,
+    materialReorderCount: expensesData?.data?.summary?.materialReorderCount || 0,
     operationalCount: expensesData?.data?.summary?.operationalCount || 0,
-    breakdown: expensesData?.data?.data?.breakdown,
-    monthlyTrend: expensesData?.data?.data?.monthlyTrend,
-    recentExpenses: expensesData?.data?.data?.recentExpenses,
-    allExpenses: expensesData?.data?.data?.allExpenses,
   };
 
   const pl = {
@@ -290,463 +285,52 @@ export default function Finance() {
   );
 }
 
-// Overview Tab Component
-// function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
-//   const revenueChartData = [
-//     { name: 'Materials', value: Number(revenue.materialsSales || 0), percentage: revenue.materialsPercentage || 0 },
-//     { name: 'Booth', value: Number(revenue.boothSales || 0), percentage: revenue.boothPercentage || 0 },
-//     { name: 'Jobs', value: Number(revenue.jobsRevenue || 0), percentage: revenue.jobsPercentage || 0 },
-//   ];
-
-//   return (
-//     <div className="space-y-6">
-//       {/* Key Metrics Grid */}
-//       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-indigo-200 transition-colors">
-//           <div className="flex items-center justify-between mb-3">
-//             <span className="text-sm font-medium text-gray-600">Gross Revenue</span>
-//             <div className="p-2 bg-indigo-50 rounded-lg">
-//               <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-//               </svg>
-//             </div>
-//           </div>
-//           <div className="text-2xl font-bold text-gray-900">GH₵{Number(pl.grossRevenue || 0).toLocaleString()}</div>
-//           <div className="text-xs text-gray-500 mt-1">Previous period: +12.5%</div>
-//         </div>
-
-//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-200 transition-colors">
-//           <div className="flex items-center justify-between mb-3">
-//             <span className="text-sm font-medium text-gray-600">Gross Profit</span>
-//             <div className="p-2 bg-green-50 rounded-lg">
-//               <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-//               </svg>
-//             </div>
-//           </div>
-//           <div className="text-2xl font-bold text-gray-900">GH₵{Number(pl.grossProfit || 0).toLocaleString()}</div>
-//           <div className="text-sm text-green-600 font-medium">{pl.grossProfitMargin || 0}% margin</div>
-//         </div>
-
-//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-200 transition-colors">
-//           <div className="flex items-center justify-between mb-3">
-//             <span className="text-sm font-medium text-gray-600">Net Profit</span>
-//             <div className={`p-2 rounded-lg ${Number(pl.netProfit || 0) >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-//               <svg className={`w-4 h-4 ${Number(pl.netProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-//               </svg>
-//             </div>
-//           </div>
-//           <div className={`text-2xl font-bold ${Number(pl.netProfit || 0) >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
-//             GH₵{Number(pl.netProfit || 0).toLocaleString()}
-//           </div>
-//           <div className={`text-sm font-medium ${Number(pl.netProfit || 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-//             {pl.netProfitMargin || 0}% margin
-//           </div>
-//         </div>
-
-//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-200 transition-colors">
-//           <div className="flex items-center justify-between mb-3">
-//             <span className="text-sm font-medium text-gray-600">Total Expenses</span>
-//             <div className="p-2 bg-gray-100 rounded-lg">
-//               <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-//               </svg>
-//             </div>
-//           </div>
-//           <div className="text-2xl font-bold text-gray-900">GH₵{Number((pl.costs?.totalCosts || pl.cogs + pl.operationalExpenses) || 0).toLocaleString()}</div>
-//           <div className="text-xs text-gray-500 mt-1">COGS + Operational</div>
-//         </div>
-//       </div>
-
-//       {/* Charts Section */}
-//       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-//         {/* Revenue Distribution */}
-//         <div className="bg-white rounded-xl p-6 border border-gray-200">
-//           <div className="flex items-center justify-between mb-6">
-//             <div>
-//               <h3 className="text-lg font-semibold text-gray-900">Revenue Distribution</h3>
-//               <p className="text-sm text-gray-500">By revenue source</p>
-//             </div>
-//             {/* <button className="text-sm font-medium text-indigo-600 hover:text-indigo-700">
-//               View details →
-//             </button> */}
-//           </div>
-//           <div className="h-64">
-//             <ResponsiveContainer width="100%" height="100%">
-//               <PieChart>
-//                 <Pie
-//                   data={revenueChartData}
-//                   cx="50%"
-//                   cy="50%"
-//                   innerRadius={60}
-//                   outerRadius={80}
-//                   paddingAngle={2}
-//                   dataKey="value"
-//                   label={({ name, percentage }) => `${name}: ${percentage}%`}
-//                   labelLine={false}
-//                 >
-//                   {revenueChartData.map((entry, index) => (
-//                     <Cell key={`cell-${index}`} fill={COLORS[index]} />
-//                   ))}
-//                 </Pie>
-//                 <Tooltip
-//                   formatter={(value) => `GH₵${Number(value).toLocaleString()}`}
-//                   contentStyle={{
-//                     borderRadius: '8px',
-//                     border: '1px solid #E2E8F0',
-//                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-//                   }}
-//                 />
-//               </PieChart>
-//             </ResponsiveContainer>
-//           </div>
-//         </div>
-
-//         {/* Revenue Breakdown */}
-//         <div className="bg-white rounded-xl p-6 border border-gray-200">
-//           <div className="mb-6">
-//             <h3 className="text-lg font-semibold text-gray-900">Revenue Breakdown</h3>
-//             <p className="text-sm text-gray-500">Detailed revenue sources</p>
-//           </div>
-//           <div className="space-y-4">
-//             {revenueChartData.map((item, index) => (
-//               <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
-//                 <div className="flex items-center gap-3">
-//                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index] }} />
-//                   <div>
-//                     <div className="font-medium text-gray-900">{item.name}</div>
-//                     <div className="text-sm text-gray-500">{item.percentage}% of total</div>
-//                   </div>
-//                 </div>
-//                 <div className="font-bold text-gray-900">GH₵{Number(item.value).toLocaleString()}</div>
-//               </div>
-//             ))}
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* Summary Cards */}
-//       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-//         {/* Sales Summary */}
-//         <div className="bg-white rounded-xl p-6 border border-gray-200">
-//           <div className="flex items-center justify-between mb-4">
-//             <h3 className="font-semibold text-gray-900">Sales Summary</h3>
-//             <div className="p-2 bg-blue-50 rounded-lg">
-//               <span className="text-sm font-medium text-blue-600">💰</span>
-//             </div>
-//           </div>
-//           <div className="space-y-3">
-//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//               <span className="text-gray-600">Total Sales</span>
-//               <span className="font-semibold">{sales.totalSales || 0}</span>
-//             </div>
-//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//               <span className="text-gray-600">Total Revenue</span>
-//               <span className="font-semibold">GH₵{Number(sales.totalRevenue || 0).toLocaleString()}</span>
-//             </div>
-//             <div className="flex justify-between items-center py-2">
-//               <span className="text-gray-600">Average Sale</span>
-//               <span className="font-semibold">GH₵{Number(sales.averageSale || 0).toFixed(2)}</span>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Jobs Summary */}
-//         <div className="bg-white rounded-xl p-6 border border-gray-200">
-//           <div className="flex items-center justify-between mb-4">
-//             <h3 className="font-semibold text-gray-900">Jobs Summary</h3>
-//             <div className="p-2 bg-green-50 rounded-lg">
-//               <span className="text-sm font-medium text-green-600">🔧</span>
-//             </div>
-//           </div>
-//           <div className="space-y-3">
-//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//               <span className="text-gray-600">Total Jobs</span>
-//               <span className="font-semibold">{jobs.totalJobs || 0}</span>
-//             </div>
-//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//               <span className="text-gray-600">Total Revenue</span>
-//               <span className="font-semibold">GH₵{Number(jobs.totalRevenue || 0).toLocaleString()}</span>
-//             </div>
-//             <div className="flex justify-between items-center py-2">
-//               <span className="text-gray-600">Average Job</span>
-//               <span className="font-semibold">GH₵{Number(jobs.averageJob || 0).toFixed(2)}</span>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Expenses Summary */}
-//         <div className="bg-white rounded-xl p-6 border border-gray-200">
-//           <div className="flex items-center justify-between mb-4">
-//             <h3 className="font-semibold text-gray-900">Expenses Overview</h3>
-//             <div className="p-2 bg-red-50 rounded-lg">
-//               <span className="text-sm font-medium text-red-600">📉</span>
-//             </div>
-//           </div>
-//           <div className="space-y-3">
-//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//               <span className="text-gray-600">COGS</span>
-//               <span className="font-semibold">GH₵{Number(expenses.cogTotal || 0).toLocaleString()}</span>
-//             </div>
-//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//               <span className="text-gray-600">Operational</span>
-//               <span className="font-semibold">GH₵{Number(expenses.operationalTotal || 0).toLocaleString()}</span>
-//             </div>
-//             <div className="flex justify-between items-center py-2">
-//               <span className="text-gray-600">Total Expenses</span>
-//               <span className="font-semibold">GH₵{Number(expenses.totalExpenses || 0).toLocaleString()}</span>
-//             </div>
-//           </div>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }
-
-// function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
-//   // Safely extract values
-//   const grossRevenue = Number(pl.grossRevenue || 0);
-//   const grossProfit = Number(pl.grossProfit || 0);
-//   const netProfit = Number(pl.netProfit || 0);
-//   const totalCOGS = Number(pl.cogs || 0);
-//   const operationalExpenses = Number(pl.operationalExpenses || 0);
-//   const totalCosts = totalCOGS + operationalExpenses;
-
-//   // Revenue breakdown for chart
-//   const materialSalesRevenue = Number(pl.materialsSales || revenue.materialsSales || 0);
-//   const boothSalesRevenue = Number(pl.boothSales || revenue.boothSales || 0);
-//   const jobsRevenue = Number(pl.jobsRevenue || revenue.jobsRevenue || 0);
-
-//   const revenueChartData = [
-//     { 
-//       name: 'Materials', 
-//       value: materialSalesRevenue, 
-//       percentage: grossRevenue > 0 ? ((materialSalesRevenue / grossRevenue) * 100).toFixed(1) : 0 
-//     },
-//     { 
-//       name: 'Booth', 
-//       value: boothSalesRevenue, 
-//       percentage: grossRevenue > 0 ? ((boothSalesRevenue / grossRevenue) * 100).toFixed(1) : 0 
-//     },
-//     { 
-//       name: 'Jobs', 
-//       value: jobsRevenue, 
-//       percentage: grossRevenue > 0 ? ((jobsRevenue / grossRevenue) * 100).toFixed(1) : 0 
-//     },
-//   ];
-
-//   return (
-//     <div className="space-y-6">
-//       {/* Key Metrics Grid */}
-//       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-indigo-200 transition-colors">
-//           <div className="flex items-center justify-between mb-3">
-//             <span className="text-sm font-medium text-gray-600">Gross Revenue</span>
-//             <div className="p-2 bg-indigo-50 rounded-lg">
-//               <svg className="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-//               </svg>
-//             </div>
-//           </div>
-//           <div className="text-2xl font-bold text-gray-900">GH₵{grossRevenue.toLocaleString()}</div>
-//           <div className="text-xs text-gray-500 mt-1">Total revenue</div>
-//         </div>
-
-//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-200 transition-colors">
-//           <div className="flex items-center justify-between mb-3">
-//             <span className="text-sm font-medium text-gray-600">Gross Profit</span>
-//             <div className="p-2 bg-green-50 rounded-lg">
-//               <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-//               </svg>
-//             </div>
-//           </div>
-//           <div className="text-2xl font-bold text-gray-900">GH₵{grossProfit.toLocaleString()}</div>
-//           <div className="text-sm text-green-600 font-medium">{pl.grossProfitMargin}% margin</div>
-//         </div>
-
-//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-200 transition-colors">
-//           <div className="flex items-center justify-between mb-3">
-//             <span className="text-sm font-medium text-gray-600">Net Profit</span>
-//             <div className={`p-2 rounded-lg ${netProfit >= 0 ? 'bg-green-50' : 'bg-red-50'}`}>
-//               <svg className={`w-4 h-4 ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-//               </svg>
-//             </div>
-//           </div>
-//           <div className={`text-2xl font-bold ${netProfit >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
-//             GH₵{netProfit.toLocaleString()}
-//           </div>
-//           <div className={`text-sm font-medium ${netProfit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-//             {pl.netProfitMargin}% margin
-//           </div>
-//         </div>
-
-//         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-200 transition-colors">
-//           <div className="flex items-center justify-between mb-3">
-//             <span className="text-sm font-medium text-gray-600">Total Expenses</span>
-//             <div className="p-2 bg-gray-100 rounded-lg">
-//               <svg className="w-4 h-4 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-//                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-//               </svg>
-//             </div>
-//           </div>
-//           <div className="text-2xl font-bold text-gray-900">GH₵{totalCosts.toLocaleString()}</div>
-//           <div className="text-xs text-gray-500 mt-1">COGS + Operational</div>
-//         </div>
-//       </div>
-
-//       {/* Charts Section */}
-//       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-//         {/* Revenue Distribution PIE CHART */}
-//         <div className="bg-white rounded-xl p-6 border border-gray-200">
-//           <div className="flex items-center justify-between mb-6">
-//             <div>
-//               <h3 className="text-lg font-semibold text-gray-900">Revenue Distribution</h3>
-//               <p className="text-sm text-gray-500">By revenue source</p>
-//             </div>
-//           </div>
-//           <div className="h-64">
-//             <ResponsiveContainer width="100%" height="100%">
-//               <PieChart>
-//                 <Pie
-//                   data={revenueChartData}
-//                   cx="50%"
-//                   cy="50%"
-//                   innerRadius={60}
-//                   outerRadius={80}
-//                   paddingAngle={2}
-//                   dataKey="value"
-//                   label={({ name, percentage }) => `${name}: ${percentage}%`}
-//                   labelLine={false}
-//                 >
-//                   {revenueChartData.map((entry, index) => (
-//                     <Cell key={`cell-${index}`} fill={COLORS[index]} />
-//                   ))}
-//                 </Pie>
-//                 <Tooltip 
-//                   formatter={(value) => `GH₵${Number(value).toLocaleString()}`}
-//                   contentStyle={{ 
-//                     borderRadius: '8px',
-//                     border: '1px solid #E2E8F0',
-//                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-//                   }}
-//                 />
-//               </PieChart>
-//             </ResponsiveContainer>
-//           </div>
-//         </div>
-
-//         {/* Revenue Breakdown LIST */}
-//         <div className="bg-white rounded-xl p-6 border border-gray-200">
-//           <div className="mb-6">
-//             <h3 className="text-lg font-semibold text-gray-900">Revenue Breakdown</h3>
-//             <p className="text-sm text-gray-500">Detailed revenue sources</p>
-//           </div>
-//           <div className="space-y-4">
-//             {revenueChartData.map((item, index) => (
-//               <div key={index} className="flex items-center justify-between p-3 hover:bg-gray-50 rounded-lg transition-colors">
-//                 <div className="flex items-center gap-3">
-//                   <div className="w-3 h-3 rounded-full" style={{ backgroundColor: COLORS[index] }} />
-//                   <div>
-//                     <div className="font-medium text-gray-900">{item.name}</div>
-//                     <div className="text-sm text-gray-500">{item.percentage}% of total</div>
-//                   </div>
-//                 </div>
-//                 <div className="font-bold text-gray-900">GH₵{Number(item.value).toLocaleString()}</div>
-//               </div>
-//             ))}
-//           </div>
-//         </div>
-//       </div>
-
-//       {/* Summary Cards */}
-//       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-//         {/* Sales Summary */}
-//         <div className="bg-white rounded-xl p-6 border border-gray-200">
-//           <div className="flex items-center justify-between mb-4">
-//             <h3 className="font-semibold text-gray-900">Sales Summary</h3>
-//             <div className="p-2 bg-blue-50 rounded-lg">
-//               <span className="text-sm font-medium text-blue-600">💰</span>
-//             </div>
-//           </div>
-//           <div className="space-y-3">
-//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//               <span className="text-gray-600">Total Sales</span>
-//               <span className="font-semibold">{sales.totalSales || 0}</span>
-//             </div>
-//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//               <span className="text-gray-600">Total Revenue</span>
-//               <span className="font-semibold">GH₵{Number(sales.totalRevenue || 0).toLocaleString()}</span>
-//             </div>
-//             <div className="flex justify-between items-center py-2">
-//               <span className="text-gray-600">Average Sale</span>
-//               <span className="font-semibold">GH₵{Number(sales.averageSale || 0).toFixed(2)}</span>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Jobs Summary */}
-//         <div className="bg-white rounded-xl p-6 border border-gray-200">
-//           <div className="flex items-center justify-between mb-4">
-//             <h3 className="font-semibold text-gray-900">Jobs Summary</h3>
-//             <div className="p-2 bg-green-50 rounded-lg">
-//               <span className="text-sm font-medium text-green-600">🔧</span>
-//             </div>
-//           </div>
-//           <div className="space-y-3">
-//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//               <span className="text-gray-600">Total Jobs</span>
-//               <span className="font-semibold">{jobs.totalJobs || 0}</span>
-//             </div>
-//             <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//               <span className="text-gray-600">Total Revenue</span>
-//               <span className="font-semibold">GH₵{Number(jobs.totalRevenue || 0).toLocaleString()}</span>
-//             </div>
-//             <div className="flex justify-between items-center py-2">
-//               <span className="text-gray-600">Average Job</span>
-//               <span className="font-semibold">GH₵{Number(jobs.averageJob || 0).toFixed(2)}</span>
-//             </div>
-//           </div>
-//         </div>
-
-//         {/* Expenses Summary */}
-//         {/* Expenses Summary - UPDATED to show ONLY operational expenses */}
-// <div className="bg-white rounded-xl p-6 border border-gray-200">
-//   <div className="flex items-center justify-between mb-4">
-//     <h3 className="font-semibold text-gray-900">Expenses Overview</h3>
-//     <div className="p-2 bg-red-50 rounded-lg">
-//       <span className="text-sm font-medium text-red-600">📉</span>
-//     </div>
-//   </div>
-//   <div className="space-y-3">
-//     <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//       <span className="text-gray-600">Operational Expenses</span>
-//       <span className="font-semibold">GH₵{Number(operationalExpenses).toLocaleString()}</span>
-//     </div>
-//     <div className="flex justify-between items-center py-2 border-b border-gray-100">
-//       <span className="text-gray-600">Total Transactions</span>
-//       <span className="font-semibold">{expenses.operationalCount || 0}</span>
-//     </div>
-//     <div className="flex justify-between items-center py-2">
-//       <span className="text-gray-600">This Period</span>
-//       <span className="font-semibold">GH₵{Number(expenses.operationalTotal || 0).toLocaleString()}</span>
-//     </div>
-//   </div>
- 
-// </div>
-//       </div>
-//     </div>
-//   );
-// }
 function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
+
+  console.log("FULL EXPENSES PROP:", expenses);
+  console.log("Is it nested inside data?", expenses?.data);
+  console.log("Direct breakdown?", expenses?.breakdown);
+  // State to toggle between COGS (Sold/Used) and Purchases (Restock/Cash)
+  const [showPurchases, setShowPurchases] = useState(false);
+
   // Safely extract values
   const grossRevenue = Number(pl.grossRevenue || 0);
   const grossProfit = Number(pl.grossProfit || 0);
   const netProfit = Number(pl.netProfit || 0);
-  const totalCOGS = Number(pl.cogs || 0);
   const operationalExpenses = Number(pl.operationalExpenses || 0);
+  const byCategory = expenses?.breakdown?.byCategory || [];
+  const totalExpenses = expenses?.summary?.totalExpenses || 0;
+
+  
+  // 1. COGS (Usage) 
+  // Source: P&L Report (calculated based on jobs done/items sold)
+  const totalCOGS = Number(pl.cogs || 0);
+
+  // 2. Purchases (Restocks)
+  // Source: Expense Report (sum of 'Cost of Goods' category from Expense Table)
+  // We use expenses.cogTotal here because that represents the actual money spent buying materials
+  const totalMaterialPurchases = Number(expenses.cogTotal || 0);
+
+  // ---------------------------
+
+  // Determine which data to show on the dynamic card
+  const cogsCardData = showPurchases
+    ? {
+        title: "Material Purchases",
+        value: totalMaterialPurchases,
+        label: "Inventory restock costs",
+        tag: "EXPENSES", // Visual cue this comes from expenses
+        iconPath: "M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z", // Shopping bag
+        colorClass: "orange"
+      }
+    : {
+        title: "Cost of Goods Sold",
+        value: totalCOGS,
+        label: "Direct material usage",
+        tag: "P&L", // Visual cue this comes from P&L
+        iconPath: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4", // Inventory box
+        colorClass: "amber"
+      };
 
   // Revenue breakdown for chart
   const materialSalesRevenue = Number(pl.materialsSales || revenue.materialsSales || 0);
@@ -774,7 +358,7 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
   return (
     <div className="space-y-6">
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
         {/* 1. Gross Revenue */}
         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-indigo-200 transition-colors">
           <div className="flex items-center justify-between mb-3">
@@ -789,7 +373,40 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
           <div className="text-xs text-gray-500 mt-1">Total revenue</div>
         </div>
 
-        {/* 2. Gross Profit */}
+        {/* 2. DYNAMIC COGS / PURCHASES CARD */}
+        <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-orange-200 transition-colors relative group">
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-2">
+               <span className="text-sm font-medium text-gray-600 whitespace-nowrap">
+                 {cogsCardData.title}
+               </span>
+               <button 
+                 onClick={() => setShowPurchases(!showPurchases)}
+                 className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-orange-500 transition-all"
+                 title="Switch between Usage (Sold) and Purchases (Restock)"
+               >
+                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                 </svg>
+               </button>
+            </div>
+            <div className={`p-2 bg-${cogsCardData.colorClass}-50 rounded-lg`}>
+              <svg className={`w-4 h-4 text-${cogsCardData.colorClass}-600`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={cogsCardData.iconPath} />
+              </svg>
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-gray-900">GH₵{cogsCardData.value.toLocaleString()}</div>
+          <div className="flex justify-between items-center mt-1">
+             <span className="text-xs text-gray-500">{cogsCardData.label}</span>
+             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide
+               ${showPurchases ? 'bg-orange-100 text-orange-700' : 'bg-amber-100 text-amber-700'}`}>
+               {cogsCardData.tag}
+             </span>
+          </div>
+        </div>
+
+        {/* 3. Gross Profit */}
         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-green-200 transition-colors">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-gray-600">Gross Profit</span>
@@ -803,7 +420,21 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
           <div className="text-sm text-green-600 font-medium">{pl.grossProfitMargin}% margin</div>
         </div>
 
-        {/* 3. Net Profit */}
+        {/* 4. Operating Expenses */}
+        <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-red-200 transition-colors">
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm font-medium text-gray-600">Op. Expenses</span>
+            <div className="p-2 bg-red-50 rounded-lg">
+              <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+              </svg>
+            </div>
+          </div>
+          <div className="text-2xl font-bold text-gray-900">GH₵{operationalExpenses.toLocaleString()}</div>
+          <div className="text-xs text-gray-500 mt-1">Rent, utilities, salaries</div>
+        </div>
+
+        {/* 5. Net Profit */}
         <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-gray-200 transition-colors">
           <div className="flex items-center justify-between mb-3">
             <span className="text-sm font-medium text-gray-600">Net Profit</span>
@@ -820,23 +451,11 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
             {pl.netProfitMargin}% margin
           </div>
         </div>
-
-        {/* 4. Operating Expenses - FIXED: Shows ONLY operational, not COGS */}
-        <div className="bg-white rounded-xl p-5 border border-gray-200 hover:border-red-200 transition-colors">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-sm font-medium text-gray-600">Operating Expenses</span>
-            <div className="p-2 bg-red-50 rounded-lg">
-              <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-gray-900">GH₵{operationalExpenses.toLocaleString()}</div>
-          <div className="text-xs text-gray-500 mt-1">Rent, utilities, salaries, etc.</div>
-        </div>
       </div>
-
-      {/* Charts Section - Keep as is */}
+      
+      {/* ... Rest of the component (Charts, Summaries) remains same ... */}
+      
+      {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Revenue Distribution PIE CHART */}
         <div className="bg-white rounded-xl p-6 border border-gray-200">
@@ -950,7 +569,7 @@ function OverviewTab({ pl, revenue, sales, jobs, expenses }) {
           </div>
         </div>
 
-        {/* Expenses Summary - UPDATED: Shows ONLY operational */}
+        {/* Expenses Summary */}
         <div className="bg-white rounded-xl p-6 border border-gray-200">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-semibold text-gray-900">Expenses Overview</h3>
@@ -1756,37 +1375,44 @@ function JobsTab({ jobs, dateRange }) {
 }
 
 function ExpensesTab({ expenses, dateRange }) {
-  const handleExport = () => exportExpensesReport(expenses, dateRange);
 
-  // Get breakdown array
-  const byCategory = expenses.breakdown?.byCategory || [];
+  console.log('expenses tab data:', expenses);
+  // const handleExport = () => exportExpensesReport(expenses, dateRange); // Uncomment if you have the export function
+
+  // --- FIX START: Define variables safely at the top ---
+  // 1. Get the total (Safety check: if expenses is null, default to 0)
+  const totalExpenses = expenses?.totalExpenses || 0;
+
+  // 2. Get the breakdown array
+  const byCategory = expenses?.breakdown?.byCategory || [];
+  // --- FIX END ---
 
   return (
     <div className="space-y-6">
-      {/* Header - Keep as is */}
-      {/* ... */}
-
-      {/* Stats - UPDATED to show only operational */}
+      
+      {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white rounded-xl p-5 border border-gray-200">
           <div className="text-sm font-medium text-gray-600 mb-2">Total Expenses</div>
           <div className="text-2xl font-bold text-gray-900">
-            GH₵{Number(expenses.totalExpenses || 0).toLocaleString()}
+            GH₵{Number(totalExpenses).toLocaleString()}
           </div>
           <div className="text-xs text-gray-500 mt-1">Operational expenses only</div>
         </div>
+        
         <div className="bg-white rounded-xl p-5 border border-gray-200">
           <div className="text-sm font-medium text-gray-600 mb-2">Total Transactions</div>
           <div className="text-2xl font-bold text-gray-900">
-            {expenses.operationalCount || 0}
+            {expenses?.operationalCount || 0}
           </div>
           <div className="text-xs text-gray-500 mt-1">Expense entries</div>
         </div>
+        
         <div className="bg-white rounded-xl p-5 border border-gray-200">
           <div className="text-sm font-medium text-gray-600 mb-2">Average Expense</div>
           <div className="text-2xl font-bold text-gray-900">
-            GH₵{expenses.operationalCount > 0 
-              ? (Number(expenses.operationalTotal || 0) / expenses.operationalCount).toFixed(2)
+            GH₵{expenses?.operationalCount > 0 
+              ? (Number(expenses?.operationalTotal || 0) / expenses.operationalCount).toFixed(2)
               : '0.00'
             }
           </div>
@@ -1794,7 +1420,7 @@ function ExpensesTab({ expenses, dateRange }) {
         </div>
       </div>
 
-      {/* Category Breakdown - FIXED */}
+      {/* Category Breakdown Table */}
       <div className="bg-white rounded-xl p-6 border border-gray-200">
         <h3 className="text-lg font-semibold text-gray-900 mb-6">Expenses by Category</h3>
         {byCategory.length > 0 ? (
@@ -1812,7 +1438,10 @@ function ExpensesTab({ expenses, dateRange }) {
                 {byCategory.map((cat, index) => (
                   <tr key={index} className="hover:bg-gray-50 transition-colors">
                     <td className="py-3 px-4 capitalize font-medium text-gray-900">
-                      {cat.category?.replace('_', ' ') || 'Unknown'}
+                      {/* Handle 'cog' specifically, otherwise format normally */}
+                      {cat.category === 'cog' || cat.category === 'Material Purchases' 
+                        ? 'Material Purchases' 
+                        : (cat.category?.replace('_', ' ') || 'Unknown')}
                     </td>
                     <td className="py-3 px-4 text-right text-gray-600">{cat.count || 0}</td>
                     <td className="py-3 px-4 text-right font-semibold text-gray-900">
@@ -1823,13 +1452,16 @@ function ExpensesTab({ expenses, dateRange }) {
                     </td>
                   </tr>
                 ))}
+                
+                {/* Total Row */}
                 <tr className="bg-gray-50 font-semibold">
                   <td className="py-3 px-4">Total</td>
                   <td className="py-3 px-4 text-right">
                     {byCategory.reduce((sum, cat) => sum + (cat.count || 0), 0)}
                   </td>
                   <td className="py-3 px-4 text-right text-gray-900">
-                    GH₵{Number(expenses.totalExpenses || 0).toLocaleString()}
+                    {/* This variable is now correctly defined at the top */}
+                    GH₵{Number(totalExpenses).toLocaleString()}
                   </td>
                   <td className="py-3 px-4 text-right">100%</td>
                 </tr>
@@ -1847,7 +1479,6 @@ function ExpensesTab({ expenses, dateRange }) {
         )}
       </div>
 
-      {/* Remove the COGS vs Operational section since we're only showing operational now */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
         <div className="flex items-start gap-3">
           <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

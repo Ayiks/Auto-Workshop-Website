@@ -131,7 +131,7 @@ export const createSale = asyncHandler(async (req, res) => {
         paymentMethod,
         soldBy: req.user.id,
         status: 'completed',
-        createdAt: saleDate ? new Date(saleDate) : undefined,
+        saleDate: saleDate ? new Date(saleDate) : undefined,
       },
     });
 

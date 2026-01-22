@@ -9,7 +9,7 @@ import Input from "@components/common/Input";
 import { format } from "date-fns";
 
 export default function SaleForm({ onSubmit, onCancel, isLoading }) {
-  const [saleType, setSaleType] = useState("counter"); // "counter" or "booth"
+  const [saleType, setSaleType] = useState("counter");
   const [items, setItems] = useState([]);
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [saleDate, setSaleDate] = useState(format(new Date(), "yyyy-MM-dd"));
@@ -56,32 +56,23 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   }, [saleType]);
 
   // Auto-fill price when both categories are selected
-// Update the Auto-fill price effect with better debugging
-useEffect(() => {
-  console.log('=== Service Selection Effect ===');
-  console.log('Service Category:', serviceCategory);
-  console.log('Item Category:', itemCategory);
-  console.log('Available Item Categories:', itemCategories);
-  
-  if (serviceCategory && itemCategory) {
-    const selected = itemCategories.find(i => i.itemCategory === itemCategory);
-    console.log('Found selected service:', selected);
-    
-    if (selected) {
-      setBoothPrice(parseFloat(selected.price));
-      setSelectedService(selected);
-      console.log('Set selected service with ID:', selected.id);
+  useEffect(() => {
+    if (serviceCategory && itemCategory) {
+      const selected = itemCategories.find(
+        (i) => i.itemCategory === itemCategory
+      );
+      if (selected) {
+        setBoothPrice(parseFloat(selected.price));
+        setSelectedService(selected);
+      } else {
+        setBoothPrice(0);
+        setSelectedService(null);
+      }
     } else {
-      console.log('No matching service found!');
       setBoothPrice(0);
       setSelectedService(null);
     }
-  } else {
-    setBoothPrice(0);
-    setSelectedService(null);
-  }
-  console.log('=================================');
-}, [serviceCategory, itemCategory, itemCategories]);
+  }, [serviceCategory, itemCategory, itemCategories]);
 
   // Counter Sale Functions
   const addItem = () => {
@@ -125,14 +116,14 @@ useEffect(() => {
           return updated;
         }
         return item;
-      }),
+      })
     );
   };
 
   // Calculate totals
   const itemsTotal = items.reduce(
     (sum, item) => sum + parseFloat(item.subtotal || 0),
-    0,
+    0
   );
   const grandTotal = saleType === "counter" ? itemsTotal : boothPrice;
 
@@ -145,14 +136,12 @@ useEffect(() => {
   const handleSubmit = (e) => {
     e.preventDefault();
 
-    // Validate date
     if (isFutureDate) {
       alert("Cannot create a sale with a future date");
       return;
     }
 
     if (saleType === "counter") {
-      // Validate counter sale
       if (items.length === 0) {
         alert("Please add at least one item");
         return;
@@ -171,13 +160,12 @@ useEffect(() => {
         const availableQty = Number(item.maxQuantity);
         if (selectedQty > availableQty) {
           alert(
-            `Not enough stock for ${item.materialName}. Available: ${item.maxQuantity}`,
+            `Not enough stock for ${item.materialName}. Available: ${item.maxQuantity}`
           );
           return;
         }
       }
 
-      // Submit counter sale
       const saleItems = items.map((item) => ({
         itemType: "material",
         materialId: Number(item.materialId),
@@ -190,40 +178,29 @@ useEffect(() => {
         saleDate: new Date(saleDate).toISOString(),
       });
     } else {
-      // Validate booth sale
-  if (!serviceCategory || !itemCategory) {
-    alert("Please select both service and item category");
-    return;
-  }
-console.log('=== Booth Sale Submission ===');
-  console.log('Selected Service Category:', serviceCategory);
-  console.log('Selected Item Category:', itemCategory);
-  console.log('Selected Service Object:', selectedService);
-  console.log('Service ID to submit:', selectedService?.id);
-  console.log('============================');
-
-  if (!selectedService?.id) {
-    alert("Service ID not found. Please reselect the service.");
-    console.error('ERROR: Selected service has no ID:', selectedService);
-    return;
-  }
-
-     
-  // Submit booth sale - single booth item
-  const submitData = {
-    items: [
-      {
-        itemType: "booth",
-        serviceId: selectedService.id
+      if (!serviceCategory || !itemCategory) {
+        alert("Please select both service and item category");
+        return;
       }
-    ],
-    paymentMethod,
-    saleDate: new Date(saleDate).toISOString(),
-  };
-  
-  console.log('Final submit data:', JSON.stringify(submitData, null, 2));
-  onSubmit(submitData);
-}
+
+      if (!selectedService?.id) {
+        alert("Service ID not found. Please reselect the service.");
+        return;
+      }
+
+      const submitData = {
+        items: [
+          {
+            itemType: "booth",
+            serviceId: selectedService.id,
+          },
+        ],
+        paymentMethod,
+        saleDate: new Date(saleDate).toISOString(),
+      };
+
+      onSubmit(submitData);
+    }
   };
 
   return (
@@ -315,125 +292,143 @@ console.log('=== Booth Sale Submission ===');
       {/* COUNTER SALE SECTION */}
       {saleType === "counter" && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-6">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Sale Items</h3>
-              <p className="text-sm text-gray-500 mt-1">Add materials to this sale</p>
-            </div>
-            <Button
-              type="button"
-              variant="secondary"
-              size="sm"
-              onClick={addItem}
-              icon={
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                </svg>
-              }
-            >
-              Add Item
-            </Button>
+          <div className="mb-6">
+            <h3 className="text-lg font-semibold text-gray-900">Sale Items</h3>
+            <p className="text-sm text-gray-500 mt-1">Add materials to this sale</p>
           </div>
 
           {items.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300">
+            <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 mb-4">
               <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
               </svg>
               <p className="text-gray-500">No items added yet</p>
-              <p className="text-sm text-gray-400 mt-1">Click "Add Item" to start</p>
+              <p className="text-sm text-gray-400 mt-1">Click "Add Item" below to start</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {items.map((item, index) => (
-                <div key={item.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                  <div className="grid grid-cols-12 gap-3 items-center">
-                    <div className="col-span-1">
-                      <span className="inline-flex items-center justify-center w-8 h-8 rounded-full bg-white border border-gray-300 text-sm font-medium text-gray-700">
-                        {index + 1}
-                      </span>
-                    </div>
-                    <div className="col-span-4">
-                      <Select
-                        name={`material-${item.id}`}
-                        value={item.materialId}
-                        onChange={(e) => updateItem(item.id, "materialId", e.target.value)}
-                        options={activeMaterials.map((m) => ({
-                          value: m.id.toString(),
-                          label: `${m.name} (Stock: ${m.quantity})`,
-                        }))}
-                        placeholder="Select material"
-                        required
-                        disabled={isLoading}
-                      />
-                    </div>
-                    <div className="col-span-3">
-                      <div className="relative">
-                        <Input
-                          name={`quantity-${item.id}`}
-                          type="number"
-                          step="any"
-                          value={item.quantity}
-                          onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
-                          min="0"
-                          max={item.maxQuantity}
-                          placeholder="Qty"
+            <>
+              {/* Desktop Header Row */}
+              <div className="hidden md:grid grid-cols-12 gap-4 mb-2 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                <div className="col-span-3">Material</div>
+                <div className="col-span-3">Quantity</div>
+                <div className="col-span-3">Unit Price (GH₵)</div>
+                <div className="col-span-3 text-right">Subtotal (GH₵)</div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {items.map((item) => (
+                  <div key={item.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+                      
+                      {/* Material: 3 Cols */}
+                      <div className="col-span-1 md:col-span-3">
+                        <label className="block md:hidden text-xs font-medium text-gray-500 mb-1">Material</label>
+                        <Select
+                          name={`material-${item.id}`}
+                          value={item.materialId}
+                          onChange={(e) => updateItem(item.id, "materialId", e.target.value)}
+                          options={activeMaterials.map((m) => ({
+                            value: m.id.toString(),
+                            label: m.name, // Simplified label, stock shown in quantity field now
+                          }))}
+                          placeholder="Select material"
                           required
                           disabled={isLoading}
-                          className="pr-12"
                         />
-                        {item.maxQuantity && (
-                          <span className="absolute right-3 top-2.5 text-xs text-gray-400">
-                            /{item.maxQuantity}
-                          </span>
-                        )}
                       </div>
-                    </div>
-                    <div className="col-span-2">
-                      <div className="relative">
-                        <span className="absolute left-3 top-2.5 text-gray-500">GH₵</span>
+
+                      {/* Quantity: 3 Cols */}
+                      <div className="col-span-1 md:col-span-3">
+                        <label className="block md:hidden text-xs font-medium text-gray-500 mb-1">Quantity</label>
+                        <div className="flex flex-col">
+                          <Input
+                            name={`quantity-${item.id}`}
+                            type="number"
+                            step="any"
+                            value={item.quantity}
+                            onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
+                            min="0"
+                            max={item.maxQuantity}
+                            placeholder="0"
+                            required
+                            disabled={isLoading}
+                            // Removed arrows, standard padding
+                            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                          />
+                          {item.maxQuantity && (
+                            <div className="mt-1 text-xs text-gray-500 flex justify-between px-1">
+                              <span>Max Stock:</span>
+                              <span className="font-medium">{item.maxQuantity}</span>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Price: 3 Cols */}
+                      <div className="col-span-1 md:col-span-3">
+                        <label className="block md:hidden text-xs font-medium text-gray-500 mb-1">Unit Price (GH₵)</label>
                         <Input
                           name={`price-${item.id}`}
                           type="number"
                           value={item.unitPrice}
                           disabled
                           step="0.01"
-                          className="pl-10"
+                          placeholder="0.00"
+                          // Standard padding since GHC is in header
+                          className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                         />
                       </div>
-                    </div>
-                    <div className="col-span-2 flex items-center justify-between">
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-gray-900">
-                          GH₵{parseFloat(item.subtotal || 0).toFixed(2)}
-                        </p>
+
+                      {/* Subtotal & Delete: 3 Cols */}
+                      <div className="col-span-1 md:col-span-3 flex items-center justify-between h-[42px]">
+                        <div className="flex-1 md:text-right mr-4">
+                          <span className="md:hidden text-xs text-gray-500 mr-2">Subtotal:</span>
+                          <span className="text-sm font-semibold text-gray-900 truncate block">
+                            {parseFloat(item.subtotal || 0).toFixed(2)}
+                          </span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => removeItem(item.id)}
+                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors flex-shrink-0"
+                          disabled={isLoading}
+                          title="Remove item"
+                        >
+                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => removeItem(item.id)}
-                        className="text-gray-400 hover:text-red-500 transition-colors"
-                        disabled={isLoading}
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
                     </div>
                   </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           )}
+
+          {/* ADD ITEM BUTTON */}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={addItem}
+            className="w-full py-3 border-2 border-dashed border-gray-300 bg-gray-50 text-gray-600 hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50 transition-all"
+            icon={
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+              </svg>
+            }
+          >
+            Add New Item
+          </Button>
         </div>
       )}
 
-      {/* BOOTH SALE SECTION */}
+      {/* BOOTH SALE SECTION (unchanged) */}
       {saleType === "booth" && (
         <div className="bg-white rounded-xl border border-gray-200 p-6">
           <h3 className="text-lg font-semibold text-gray-900 mb-6">Booth Service Details</h3>
           
           <div className="space-y-4">
-            {/* Service Category */}
             <Select
               label="Service Category"
               value={serviceCategory}
@@ -452,7 +447,6 @@ console.log('=== Booth Sale Submission ===');
               disabled={isLoading}
             />
 
-            {/* Item Category */}
             {serviceCategory && (
               <Select
                 label="Item Category"
@@ -460,7 +454,7 @@ console.log('=== Booth Sale Submission ===');
                 onChange={(e) => setItemCategory(e.target.value)}
                 options={itemCategories.map(item => ({
                   value: item.itemCategory,
-                  label: `${item.itemCategory} - GH₵${parseFloat(item.price).toFixed(2)}`,
+                  label: `${item.itemCategory} - GH₵ ${parseFloat(item.price).toFixed(2)}`,
                 }))}
                 placeholder="Select item (e.g., 4x4, Saloon, Fridge)"
                 required
@@ -468,7 +462,6 @@ console.log('=== Booth Sale Submission ===');
               />
             )}
 
-            {/* Price Display */}
             {serviceCategory && itemCategory && boothPrice > 0 && (
               <div className="bg-success-50 border border-success-200 rounded-lg p-4">
                 <div className="flex justify-between items-center">
@@ -479,7 +472,7 @@ console.log('=== Booth Sale Submission ===');
                     </p>
                   </div>
                   <p className="text-2xl font-bold text-success-700">
-                    GH₵{boothPrice.toFixed(2)}
+                    GH₵&nbsp;{boothPrice.toFixed(2)}
                   </p>
                 </div>
               </div>
@@ -490,17 +483,15 @@ console.log('=== Booth Sale Submission ===');
 
       {/* Totals & Payment */}
       <div className="bg-white rounded-xl border border-gray-200 p-6">
-        {/* Totals */}
         <div className="space-y-3 mb-6">
           <div className="border-t border-gray-200 pt-3">
             <div className="flex justify-between text-lg font-bold">
               <span className="text-gray-900">Total Amount</span>
-              <span className="text-primary-600">GH₵{grandTotal.toFixed(2)}</span>
+              <span className="text-primary-600">GH₵&nbsp;{grandTotal.toFixed(2)}</span>
             </div>
           </div>
         </div>
 
-        {/* Payment Method */}
         <div className="mb-8">
           <label className="block text-sm font-medium text-gray-900 mb-3">
             Payment Method
@@ -529,7 +520,6 @@ console.log('=== Booth Sale Submission ===');
           </div>
         </div>
 
-        {/* Actions */}
         <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
           <Button
             type="button"
@@ -552,7 +542,7 @@ console.log('=== Booth Sale Submission ===');
             }
             className="px-8 shadow-sm"
           >
-            Complete Sale • GH₵{grandTotal.toFixed(2)}
+            Complete Sale • GH₵&nbsp;{grandTotal.toFixed(2)}
           </Button>
         </div>
       </div>

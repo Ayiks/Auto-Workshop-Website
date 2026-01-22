@@ -17,7 +17,7 @@ const generateReceiptNumber = () => {
 // @route   POST /api/sales
 // @access  Private (requires 'sales:create' permission)
 export const createSale = asyncHandler(async (req, res) => {
-  const { items, paymentMethod = 'cash' } = req.body;
+  const { items, paymentMethod = 'cash', saleDate } = req.body;
 
 
   console.log('=== Create Sale Request ===');
@@ -131,6 +131,7 @@ export const createSale = asyncHandler(async (req, res) => {
         paymentMethod,
         soldBy: req.user.id,
         status: 'completed',
+        createdAt: saleDate ? new Date(saleDate) : undefined,
       },
     });
 
@@ -176,6 +177,7 @@ export const createSale = asyncHandler(async (req, res) => {
         businessLogo: businessSettings.logo,
         businessAddress: businessSettings.address,
         businessContact: businessSettings.phone,
+        issuedDate: saleDate ? new Date(saleDate) : undefined,
       },
     });
 
@@ -238,12 +240,6 @@ export const updateSale = asyncHandler(async (req, res) => {
     throw new AppError('Sale not found', 404, 'NOT_FOUND');
   }
 
-  // Check if sale can be edited (within 24 hours or based on permission)
-  const saleDateTime = new Date(existingSale.saleDate);
-  const hoursSinceSale = (new Date() - saleDateTime) / (1000 * 60 * 60);
-  
-
-
   // Validate request
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new AppError('Please provide sale items', 400, 'VALIDATION_ERROR');
@@ -300,25 +296,54 @@ export const updateSale = asyncHandler(async (req, res) => {
         );
       }
 
-      // Check stock availability considering the current sale items
+      // FIXED: Only validate stock if quantity changed or material changed
       let availableQuantity = material.quantity;
       
-      // If we're reversing inventory, add back the current sale quantity
-      if (reverseInventory) {
-        const currentMaterialItem = existingSale.items.find(
-          i => i.itemType === 'material' && i.materialId === material.id
-        );
-        if (currentMaterialItem) {
-          availableQuantity += currentMaterialItem.quantity;
-        }
-      }
+      // Find the existing item for this material in the old sale
+      const existingMaterialItem = existingSale.items.find(
+        i => i.itemType === 'material' && i.materialId === material.id
+      );
 
-      if (availableQuantity < item.quantity) {
-        throw new AppError(
-          `Insufficient stock for "${material.name}". Available: ${availableQuantity}`,
-          400,
-          'INSUFFICIENT_STOCK'
-        );
+      if (existingMaterialItem) {
+        // This material was in the original sale
+        const oldQuantity = parseFloat(existingMaterialItem.quantity);
+        const newQuantity = parseFloat(item.quantity);
+        
+        // Add back the old quantity to available stock
+        availableQuantity += oldQuantity;
+        
+        // Only validate if quantity actually increased
+        if (newQuantity > oldQuantity) {
+          const additionalNeeded = newQuantity - oldQuantity;
+          if (material.quantity < additionalNeeded) {
+            throw new AppError(
+              `Insufficient stock for "${material.name}". You're increasing quantity by ${additionalNeeded.toFixed(2)}, but only ${material.quantity} available in stock.`,
+              400,
+              'INSUFFICIENT_STOCK'
+            );
+          }
+        }
+      } else {
+        // This is a new material being added to the sale
+        // Only validate if reverseInventory is true (old items will be returned)
+        if (reverseInventory) {
+          if (material.quantity < item.quantity) {
+            throw new AppError(
+              `Insufficient stock for "${material.name}". Available: ${material.quantity}`,
+              400,
+              'INSUFFICIENT_STOCK'
+            );
+          }
+        } else {
+          // If not reversing, we need to account for current stock only
+          if (material.quantity < item.quantity) {
+            throw new AppError(
+              `Insufficient stock for "${material.name}". Available: ${material.quantity}`,
+              400,
+              'INSUFFICIENT_STOCK'
+            );
+          }
+        }
       }
 
       const subtotal = material.sellingPrice * item.quantity;
@@ -326,7 +351,7 @@ export const updateSale = asyncHandler(async (req, res) => {
         itemType: 'material',
         materialId: material.id,
         materialName: material.name,
-        quantity: item.quantity,
+        quantity: parseFloat(item.quantity),
         unitPrice: material.sellingPrice,
         unitCost: material.unitCost,
         subtotal,
@@ -334,13 +359,19 @@ export const updateSale = asyncHandler(async (req, res) => {
       totalAmount += subtotal;
 
     } else if (item.itemType === 'booth') {
-      // Fetch booth service
+      // Fetch booth service - FIXED: Use serviceId from item
       const service = await prisma.service.findUnique({
-        where: { type: 'booth', isActive: true },
+        where: { 
+          id: parseInt(item.serviceId)
+        },
       });
 
       if (!service) {
-        throw new AppError('Booth service not configured', 404, 'NOT_FOUND');
+        throw new AppError('Booth service not found', 404, 'NOT_FOUND');
+      }
+
+      if (!service.isActive) {
+        throw new AppError('Booth service is inactive', 400, 'INVALID_OPERATION');
       }
 
       validatedItems.push({
@@ -364,7 +395,7 @@ export const updateSale = asyncHandler(async (req, res) => {
             where: { id: item.materialId },
             data: {
               quantity: {
-                increment: item.quantity,
+                increment: parseFloat(item.quantity),
               },
             },
           });
@@ -383,7 +414,7 @@ export const updateSale = asyncHandler(async (req, res) => {
       paymentMethod: paymentMethod || existingSale.paymentMethod,
     };
 
-    // Only update saleDate if provided and valid
+    // Update saleDate if provided
     if (saleDate) {
       const parsedDate = new Date(saleDate);
       if (!isNaN(parsedDate.getTime())) {
@@ -411,7 +442,7 @@ export const updateSale = asyncHandler(async (req, res) => {
           where: { id: item.materialId },
           data: {
             quantity: {
-              decrement: item.quantity,
+              decrement: parseFloat(item.quantity),
             },
           },
         });

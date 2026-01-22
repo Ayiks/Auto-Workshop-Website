@@ -40,15 +40,22 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
     e.preventDefault();
     if (validate()) {
       onReorder({
-        quantityOrdered: parseInt(formData.quantityOrdered),
-        unitCost: parseFloat(formData.unitCost),
+        // Changed parseInt to Number to preserve decimals and ensure it's a number
+        quantityOrdered: Number(formData.quantityOrdered),
+        unitCost: Number(formData.unitCost),
         notes: formData.notes.trim(),
       });
     }
   };
 
-  const totalCost = (formData.quantityOrdered || 0) * (formData.unitCost || 0);
-  const newStockLevel = (material?.quantity || 0) + parseInt(formData.quantityOrdered || 0);
+  // --- FIX START ---
+  // We use Number() on both values to force math addition instead of string concatenation
+  const currentStock = Number(material?.quantity || 0);
+  const quantityToAdd = Number(formData.quantityOrdered || 0);
+  const newStockLevel = currentStock + quantityToAdd;
+  
+  const totalCost = quantityToAdd * Number(formData.unitCost || 0);
+  // --- FIX END ---
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -57,7 +64,7 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-sm text-gray-600">Current Stock</p>
-            <p className="text-2xl font-bold text-gray-900">{material?.quantity || 0}</p>
+            <p className="text-2xl font-bold text-gray-900">{currentStock}</p>
           </div>
           <div>
             <p className="text-sm text-gray-600">Threshold</p>

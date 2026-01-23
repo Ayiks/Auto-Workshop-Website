@@ -50,11 +50,7 @@ export default function Materials() {
   // Filter materials based on search term
  const filteredMaterials = useMemo(() => {
   return materials.filter(material => {
-    // 1. Search Filter
     const matchesSearch = material.name.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    // 2. Low Stock Filter
-    // We only show items if the toggle is OFF OR if the item is truly low AND active
     const isLow = Number(material.quantity) <= Number(material.lowStockThreshold);
     const matchesLowStock = !showLowStock || (isLow && material.isActive);
 

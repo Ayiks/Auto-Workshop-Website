@@ -205,8 +205,18 @@ export const updateMaterial = asyncHandler(async (req, res) => {
   if (sellingPrice !== undefined) updateData.sellingPrice = parseFloat(sellingPrice);
   if (lowStockThreshold !== undefined) updateData.lowStockThreshold = parseFloat(lowStockThreshold);
   if (quantity !== undefined) updateData.quantity = parseFloat(quantity);
-  if (isActive !== undefined) updateData.isActive = Boolean(isActive);
-
+// Status Toggle Logic
+  if (isActive !== undefined) {
+    const newStatus = Boolean(isActive);
+    
+    // Check if we are transitioning from INACTIVE (false) to ACTIVE (true)
+    if (newStatus === true && material.isActive === false) {
+      updateData.quantity = 0; // FORCE reset to 0 on reactivation
+      updateData.isActive = true;
+    } else {
+      updateData.isActive = newStatus;
+    }
+  }
   const updatedMaterial = await prisma.material.update({
     where: { id: parseInt(id) },
     data: updateData,
@@ -235,10 +245,14 @@ export const updateMaterial = asyncHandler(async (req, res) => {
 // @access  Private (requires 'materials:delete' permission)
 export const deleteMaterial = asyncHandler(async (req, res) => {
   const { id } = req.params;
+  const materialId = parseInt(id);
 
   const material = await prisma.material.findUnique({
-    where: { id: parseInt(id) },
+    where: { id: materialId },
     include: {
+      reorders: {
+        select: { expenseId: true }
+      },
       _count: {
         select: {
           saleItems: true,
@@ -252,49 +266,65 @@ export const deleteMaterial = asyncHandler(async (req, res) => {
     throw new AppError('Material not found', 404, 'NOT_FOUND');
   }
 
-  // Check if material is used in any sales or jobs
-  if (material._count.saleItems > 0 || material._count.jobMaterials > 0) {
-    // Soft delete - just deactivate
-    const deactivatedMaterial = await prisma.material.update({
-      where: { id: parseInt(id) },
-      data: { isActive: false },
+  // Extract all expense IDs linked to this material's reorders
+  const expenseIds = material.reorders
+    .map(r => r.expenseId)
+    .filter(id => id !== null);
+
+  await prisma.$transaction(async (tx) => {
+    // 1. Delete associated Expenses (COGS)
+    if (expenseIds.length > 0) {
+      await tx.expense.deleteMany({
+        where: { id: { in: expenseIds } }
+      });
+    }
+
+    // 2. Delete all Material Reorder records
+    await tx.materialReorder.deleteMany({
+      where: { materialId: materialId }
     });
 
-    await prisma.auditLog.create({
-      data: {
-        userId: req.user.id,
-        action: 'DEACTIVATE',
-        entity: 'Material',
-        entityId: deactivatedMaterial.id,
-        description: `Deactivated material: ${deactivatedMaterial.name} (has transaction history)`,
-      },
-    });
+    // 3. Handle the Material Status
+    // If it has sales/jobs history, we MUST keep the record but deactivate it
+    if (material._count.saleItems > 0 || material._count.jobMaterials > 0) {
+      await tx.material.update({
+        where: { id: materialId },
+        data: { 
+          isActive: false, 
+          quantity: 0  // Reset quantity to 0 as requested
+        },
+      });
+      
+      await tx.auditLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'DEACTIVATE_CLEANUP',
+          entity: 'Material',
+          entityId: materialId,
+          description: `Deactivated ${material.name}: Reset quantity to 0 and deleted COGS history.`,
+        },
+      });
+    } else {
+      // If no sales/jobs history at all, we can safely hard delete the material
+      await tx.material.delete({
+        where: { id: materialId },
+      });
 
-    return res.status(200).json({
-      success: true,
-      message: 'Material deactivated successfully (has transaction history)',
-      data: deactivatedMaterial,
-    });
-  }
-
-  // Hard delete if no transaction history
-  await prisma.material.delete({
-    where: { id: parseInt(id) },
-  });
-
-  await prisma.auditLog.create({
-    data: {
-      userId: req.user.id,
-      action: 'DELETE',
-      entity: 'Material',
-      entityId: parseInt(id),
-      description: `Deleted material: ${material.name}`,
-    },
+      await tx.auditLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'DELETE_CLEANUP',
+          entity: 'Material',
+          entityId: materialId,
+          description: `Hard deleted ${material.name} and all related purchase history.`,
+        },
+      });
+    }
   });
 
   res.status(200).json({
     success: true,
-    message: 'Material deleted successfully',
+    message: 'Material deactivated, stock reset, and financial records cleaned.',
   });
 });
 

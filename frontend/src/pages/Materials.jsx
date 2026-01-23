@@ -55,13 +55,32 @@ export default function Materials() {
   }, [materials, searchTerm]);
 
   // Calculate Stats (Based on ALL materials, not just filtered)
-  const inventoryStats = useMemo(() => ({
-    totalItems: materials.length,
-    lowStockItems: materials.filter(m =>Number(m.quantity) <= Number(m.lowStockThreshold)).length,
-    totalValue: materials.reduce((sum, m) => sum + (Number(m.quantity) * Number(m.unitCost || 0)), 0),
-    activeItems: materials.filter(m => m.isActive).length,
-  }), [materials]);
+ const inventoryStats = useMemo(() => {
+  // If materials is null or undefined, return defaults immediately
+  if (!materials || materials.length === 0) {
+    return {
+      totalItems: 0,
+      lowStockItems: 0,
+      totalCostValue: 0,
+      totalRetailValue: 0,
+    };
+  }
 
+  const activeMaterials = materials.filter(m => m.isActive);
+
+  return {
+    totalItems: activeMaterials.length,
+    lowStockItems: activeMaterials.filter(m => 
+      Number(m.quantity) <= Number(m.lowStockThreshold)
+    ).length,
+    totalCostValue: activeMaterials.reduce((sum, m) => 
+      sum + (Number(m.quantity || 0) * Number(m.unitCost || 0)), 0
+    ),
+    totalRetailValue: activeMaterials.reduce((sum, m) => 
+      sum + (Number(m.quantity || 0) * Number(m.sellingPrice || 0)), 0
+    ),
+  };
+}, [materials]);
   // --- Selection Logic ---
   const toggleSelectAll = () => {
     if (selectedIds.length === filteredMaterials.length && filteredMaterials.length > 0) {
@@ -203,20 +222,19 @@ export default function Materials() {
       render: (row) => (
         
         <div className="flex items-center">
-          <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center mr-3">
-            <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
-          </div>
-          <div>
-            <p className="font-medium text-gray-900">{row.name}</p>
-            {Number(row.quantity) <= Number(row.lowStockThreshold) && (
-              <p className="text-xs text-red-600 font-medium mt-0.5 flex items-center gap-1">
-                Low Stock
-              </p>
-            )}
-          </div>
-        </div>
+      <div>
+        <p className={`font-medium ${row.isActive ? 'text-gray-900' : 'text-gray-400 italic'}`}>
+          {row.name} {!row.isActive && "(Deactivated)"}
+        </p>
+        
+        {/* FIX: Only show "Low Stock" if the material IS ACTIVE */}
+        {row.isActive && Number(row.quantity) <= Number(row.lowStockThreshold) && (
+          <p className="text-xs text-red-600 font-medium mt-0.5 flex items-center gap-1">
+            Low Stock
+          </p>
+        )}
+      </div>
+    </div>
       ),
     },
     {
@@ -438,9 +456,9 @@ export default function Materials() {
           <Card className="bg-white border border-gray-200 hover:border-gray-300 transition-colors">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600">Total Value</p>
+                <p className="text-sm font-medium text-gray-600">Total Value GH₵</p>
                 <p className="text-2xl font-semibold text-gray-900 mt-0.5">
-                  GH₵{inventoryStats.totalValue.toFixed(2)}
+                  {inventoryStats.totalCostValue.toFixed(2)}
                 </p>
               </div>
               <div className="p-3 bg-green-50 rounded-lg">

@@ -92,29 +92,23 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
       {/* Quantity and Threshold */}
       <div className="grid grid-cols-2 gap-4">
         {/* Quantity (only for new materials) */}
-        {!material && (
-          <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">Initial Quantity</label>
-            <input
-              type="number"
-              step="any"
-              name="quantity"
-              value={formData.quantity}
-              onChange={handleChange}
-              placeholder="0"
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.quantity ? 'border-red-500' : 'border-gray-300'
-              }`}
-              disabled={isLoading}
-            />
-            {errors.quantity && (
-              <p className="text-sm text-red-600 mt-2">{errors.quantity}</p>
-            )}
-          </div>
-        )}
+  <div>
+    <label className="block text-sm font-medium text-gray-900 mb-2">
+      {material ? 'Current Quantity' : 'Initial Quantity'}
+    </label>
+    <input
+      type="number"
+      step="any"
+      name="quantity"
+      value={formData.quantity}
+      onChange={handleChange}
+      className={`w-full px-4 py-3 border rounded-lg ...`}
+      disabled={isLoading}
+    />
+  </div>
 
         {/* Low Stock Threshold */}
-        <div className={!material ? '' : 'col-span-2'}>
+       <div>
           <label className="block text-sm font-medium text-gray-900 mb-2">Low Stock Threshold</label>
           <input
             type="number"

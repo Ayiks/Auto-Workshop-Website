@@ -11,7 +11,7 @@ jobs:
         uses: hostinger/deploy-on-vps@v1
         with:
           
-          api-key: ${{ secrets.HOSTINGER_API_KEY }}
-          virtual-machine: ${{ secrets.HOSTINGER_VM_ID }}
+          api-key: $${{ secrets.HOSTINGER_API_KEY }}
+          virtual-machine: $${{ secrets.HOSTINGER_VM_ID }}
           
           project-name: "auto-workshop-website" 

@@ -48,11 +48,19 @@ export default function Materials() {
   // --- Derived State (Filtering & Stats) ---
   
   // Filter materials based on search term
-  const filteredMaterials = useMemo(() => {
-    return materials.filter((material) =>
-      material.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-  }, [materials, searchTerm]);
+ const filteredMaterials = useMemo(() => {
+  return materials.filter(material => {
+    // 1. Search Filter
+    const matchesSearch = material.name.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    // 2. Low Stock Filter
+    // We only show items if the toggle is OFF OR if the item is truly low AND active
+    const isLow = Number(material.quantity) <= Number(material.lowStockThreshold);
+    const matchesLowStock = !showLowStock || (isLow && material.isActive);
+
+    return matchesSearch && matchesLowStock;
+  });
+}, [materials, searchTerm, showLowStock]);
 
   // Calculate Stats (Based on ALL materials, not just filtered)
  const inventoryStats = useMemo(() => {

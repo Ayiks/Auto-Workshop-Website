@@ -2,6 +2,8 @@ FROM node:18-alpine AS build
 WORKDIR /app
 COPY package*.json ./
 RUN npm install
+
+RUN npm ci 
 COPY . .
 # Build-time variable for React
 RUN VITE_API_URL=/api npm run build

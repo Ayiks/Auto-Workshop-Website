@@ -8,10 +8,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to VPS
-        uses: hostinger/deploy-on-vps@v3
+        uses: hostinger/deploy-on-vps@v1
         with:
+          
           api-key: ${{ secrets.HOSTINGER_API_KEY }}
           virtual-machine: ${{ secrets.HOSTINGER_VM_ID }}
-          project-name: "auto-workshop-website"
           
-          docker-compose: docker-compose.yml
+          project-name: "auto-workshop-website" 

@@ -157,6 +157,7 @@ export const updateMaterial = asyncHandler(async (req, res) => {
     unitCost,
     sellingPrice,
     lowStockThreshold,
+    quantity,
     isActive,
   } = req.body;
 
@@ -203,6 +204,7 @@ export const updateMaterial = asyncHandler(async (req, res) => {
   if (unitCost !== undefined) updateData.unitCost = parseFloat(unitCost);
   if (sellingPrice !== undefined) updateData.sellingPrice = parseFloat(sellingPrice);
   if (lowStockThreshold !== undefined) updateData.lowStockThreshold = parseFloat(lowStockThreshold);
+  if (quantity !== undefined) updateData.quantity = parseFloat(quantity);
   if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
   const updatedMaterial = await prisma.material.update({

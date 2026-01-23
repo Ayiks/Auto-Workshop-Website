@@ -57,8 +57,8 @@ export default function Materials() {
   // Calculate Stats (Based on ALL materials, not just filtered)
   const inventoryStats = useMemo(() => ({
     totalItems: materials.length,
-    lowStockItems: materials.filter(m => m.quantity <= m.lowStockThreshold).length,
-    totalValue: materials.reduce((sum, m) => sum + (m.quantity * (m.unitCost || 0)), 0),
+    lowStockItems: materials.filter(m =>Number(m.quantity) <= Number(m.lowStockThreshold)).length,
+    totalValue: materials.reduce((sum, m) => sum + (Number(m.quantity) * Number(m.unitCost || 0)), 0),
     activeItems: materials.filter(m => m.isActive).length,
   }), [materials]);
 
@@ -131,6 +131,14 @@ export default function Materials() {
     onError: (err) => alert(err.message || "Failed to process bulk reorder"),
   });
 
+  const toggleStatusMutation = useMutation({
+  mutationFn: ({ id, isActive }) => materialsApi.updateMaterial(id, { isActive }),
+  onSuccess: () => {
+    queryClient.invalidateQueries(["materials"]);
+  },
+  onError: (err) => alert(err.message || "Failed to update status"),
+});
+
   // --- Handlers ---
 
   const handleAdd = (formData) => createMutation.mutate(formData);
@@ -193,6 +201,7 @@ export default function Materials() {
       header: "Material",
       accessor: "name",
       render: (row) => (
+        
         <div className="flex items-center">
           <div className="w-10 h-10 rounded-lg bg-blue-50 flex items-center justify-center mr-3">
             <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -201,7 +210,7 @@ export default function Materials() {
           </div>
           <div>
             <p className="font-medium text-gray-900">{row.name}</p>
-            {row.quantity <= row.lowStockThreshold && (
+            {Number(row.quantity) <= Number(row.lowStockThreshold) && (
               <p className="text-xs text-red-600 font-medium mt-0.5 flex items-center gap-1">
                 Low Stock
               </p>
@@ -214,27 +223,30 @@ export default function Materials() {
       header: "Stock",
       accessor: "quantity",
       render: (row) => {
-        const isLow = row.quantity <= row.lowStockThreshold;
-        // Prevent division by zero if threshold is 0
-        const percentage = row.lowStockThreshold > 0 
-          ? Math.min((row.quantity / (row.lowStockThreshold * 3)) * 100, 100)
-          : 100;
+        const qty = Number(row.quantity);
+    const threshold = Number(row.lowStockThreshold);
+    const isLow = qty <= threshold;
+    
+    // Prevent division by zero and ensure numbers
+    const percentage = threshold > 0 
+      ? Math.min((qty / (threshold * 3)) * 100, 100)
+      : 100;
 
         return (
-          <div className="flex items-center">
-            <div className="flex-1 mr-3 w-24">
-              <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full ${isLow ? 'bg-red-500' : 'bg-green-500'}`}
-                  style={{ width: `${percentage}%` }}
-                />
-              </div>
-            </div>
-            <span className={`text-sm font-medium ${isLow ? 'text-red-600' : 'text-gray-900'}`}>
-              {row.quantity}
-            </span>
+      <div className="flex items-center">
+        <div className="flex-1 mr-3 w-24">
+          <div className="h-2 bg-gray-100 rounded-full overflow-hidden">
+            <div 
+              className={`h-full rounded-full ${isLow ? 'bg-red-500' : 'bg-green-500'}`}
+              style={{ width: `${percentage}%` }}
+            />
           </div>
-        );
+        </div>
+        <span className={`text-sm font-medium ${isLow ? 'text-red-600' : 'text-gray-900'}`}>
+          {qty}
+        </span>
+      </div>
+    );
       },
     },
     {
@@ -260,11 +272,27 @@ export default function Materials() {
       ),
     },
     {
-      header: "",
-      accessor: "actions",
-      render: (row) => (
-        <div className="flex items-center justify-end gap-2">
-          {/* Reorder Button: Visible for everyone with permission, regardless of stock */}
+  header: "",
+  accessor: "actions",
+  render: (row) => (
+    <div className="flex items-center justify-end gap-2">
+      {/* 1. REACTIVATE BUTTON (Only shown if inactive) */}
+      {!row.isActive && hasPermission("materials", "edit") && (
+        <button
+          onClick={() => toggleStatusMutation.mutate({ id: row.id, isActive: true })}
+          className="text-green-600 hover:text-green-800 font-medium text-sm flex items-center gap-1.5 transition-colors px-2 py-1 rounded hover:bg-green-50"
+          title="Reactivate material"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          Reactivate
+        </button>
+      )}
+
+      {/* 2. STANDARD ACTIONS (Only shown if active) */}
+      {row.isActive && (
+        <>
           {hasPermission("materials", "reorder") && (
             <button
               onClick={() => openReorderModal(row)}
@@ -289,21 +317,24 @@ export default function Materials() {
               </svg>
             </button>
           )}
+        </>
+      )}
 
-          {hasPermission("materials", "delete") && (
-            <button
-              onClick={() => handleDelete(row)}
-              className="text-gray-400 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-red-50"
-              title="Delete"
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          )}
-        </div>
-      ),
-    },
+      {/* 3. DELETE BUTTON (Available for both, but styled differently) */}
+      {hasPermission("materials", "delete") && (
+        <button
+          onClick={() => handleDelete(row)}
+          className="text-gray-400 hover:text-red-500 transition-colors p-1.5 rounded-lg hover:bg-red-50"
+          title="Delete"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        </button>
+      )}
+    </div>
+  ),
+},,
   ];
 
   if (error) {

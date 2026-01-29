@@ -18,6 +18,7 @@ import bookingRoutes from './routes/bookings.routes.js';
 import userRoutes from './routes/user.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 import serviceRoutes from './routes/service.routes.js';
+import customerRoutes from './routes/customer.routes.js';
 
 const app = express();
 
@@ -85,7 +86,7 @@ app.use(`${API_PREFIX}/bookings`, bookingRoutes);
 app.use(`${API_PREFIX}/users`, userRoutes);
 app.use(`${API_PREFIX}/settings`, settingsRoutes);
 app.use(`${API_PREFIX}/services`, serviceRoutes);
-
+app.use(`${API_PREFIX}/customers`, customerRoutes);
 // ============================================
 // ERROR HANDLING
 // ============================================

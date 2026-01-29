@@ -1,16 +1,15 @@
-// src/components/features/settings/ServiceSettings.jsx
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '@api/settings';
 import Card from '@components/common/Card';
 import Button from '@components/common/Button';
-import Input from '@components/common/Input';
 import Modal from '@components/common/Modal';
+import LoadingSpinner from '@components/common/LoadingSpinner';
 
 export default function ServiceSettings() {
   const queryClient = useQueryClient();
   
-  // Fetch all booth services with debugging
+  // Fetch all booth services
   const { 
     data: servicesResponse, 
     isLoading, 
@@ -18,22 +17,8 @@ export default function ServiceSettings() {
     refetch 
   } = useQuery({
     queryKey: ['booth-services'],
-    queryFn: async () => {
-      try {
-        console.log('Fetching booth services...');
-        const response = await settingsApi.getBoothServices();
-        console.log('API Response:', response);
-        return response;
-      } catch (err) {
-        console.error('Error fetching booth services:', err);
-        throw err;
-      }
-    },
+    queryFn: settingsApi.getBoothServices,
   });
-
-  console.log('servicesResponse:', servicesResponse);
-  console.log('isLoading:', isLoading);
-  console.log('queryError:', queryError);
 
   const services = servicesResponse?.data || [];
 
@@ -57,7 +42,6 @@ export default function ServiceSettings() {
       alert('Booth service created successfully!');
     },
     onError: (error) => {
-      console.error('Create error:', error);
       alert(error.response?.data?.message || error.message || 'Failed to create booth service');
     },
   });
@@ -71,7 +55,6 @@ export default function ServiceSettings() {
       alert('Booth service updated successfully!');
     },
     onError: (error) => {
-      console.error('Update error:', error);
       alert(error.response?.data?.message || error.message || 'Failed to update booth service');
     },
   });
@@ -83,7 +66,6 @@ export default function ServiceSettings() {
       alert('Booth service deleted successfully!');
     },
     onError: (error) => {
-      console.error('Delete error:', error);
       alert(error.response?.data?.message || error.message || 'Failed to delete booth service');
     },
   });
@@ -92,10 +74,8 @@ export default function ServiceSettings() {
     mutationFn: settingsApi.toggleBoothService,
     onSuccess: () => {
       queryClient.invalidateQueries(['booth-services']);
-      alert('Booth service status updated successfully!');
     },
     onError: (error) => {
-      console.error('Toggle error:', error);
       alert(error.response?.data?.message || error.message || 'Failed to update booth service status');
     },
   });
@@ -169,134 +149,116 @@ export default function ServiceSettings() {
     toggleMutation.mutate(id);
   };
 
-  if (isLoading) {
-    return (
-      <Card>
-        <div className="text-center py-8 text-gray-500">Loading service settings...</div>
-      </Card>
-    );
-  }
+  if (isLoading) return <div className="p-8 text-center"><LoadingSpinner /></div>;
 
   if (queryError) {
     return (
-      <Card>
-        <div className="text-center py-8 text-red-600">
-          <p>Error loading services: {queryError.message}</p>
-          <Button variant="primary" onClick={() => refetch()} className="mt-4">
+      <div className="p-6">
+        <div className="bg-red-50 border border-red-100 text-red-600 px-4 py-4 rounded-xl text-center">
+          <p className="font-medium">Error loading services</p>
+          <p className="text-sm mt-1">{queryError.message}</p>
+          <Button variant="outline" size="sm" onClick={() => refetch()} className="mt-4 border-red-200 text-red-700 hover:bg-red-50">
             Retry
           </Button>
         </div>
-      </Card>
+      </div>
     );
   }
 
-  console.log('Services data:', services);
-  console.log('Services length:', services.length);
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <Card>
-        <div className="flex justify-between items-center mb-6">
+      {/* Header Card */}
+      <Card className="bg-white border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900">Booth Service Pricing</h2>
-            <p className="text-sm text-gray-600 mt-1">
-              Manage booth service pricing for different categories
-            </p>
+            <h2 className="text-base font-bold text-gray-900">Service Pricing</h2>
+            <p className="text-xs text-gray-500 mt-0.5">Manage booth service pricing and categories</p>
           </div>
-          <Button variant="primary" onClick={handleOpenCreate}>
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+          <Button variant="primary" size="sm" onClick={handleOpenCreate} className="bg-gray-900 text-white hover:bg-black">
+            <svg className="w-3.5 h-3.5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             Add Service
           </Button>
         </div>
-      </Card>
 
-      {/* Services Table */}
-      <Card>
+        {/* Stats Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-gray-100 border-b border-gray-100 bg-white">
+           <div className="p-4 text-center">
+              <span className="block text-2xl font-bold text-gray-900">{services.length}</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Total</span>
+           </div>
+           <div className="p-4 text-center">
+              <span className="block text-2xl font-bold text-gray-900">{services.filter(s => s.isActive).length}</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Active</span>
+           </div>
+           <div className="p-4 text-center">
+              <span className="block text-2xl font-bold text-gray-400">{services.filter(s => !s.isActive).length}</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Inactive</span>
+           </div>
+           <div className="p-4 text-center">
+              <span className="block text-2xl font-bold text-gray-900">GH₵{services.reduce((sum, s) => sum + parseFloat(s.price), 0).toFixed(0)}</span>
+              <span className="text-xs text-gray-500 uppercase tracking-wider font-semibold">Value</span>
+           </div>
+        </div>
+
         {services.length === 0 ? (
-          <div className="text-center py-12">
-            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-            </svg>
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No booth services yet</h3>
-            <p className="text-gray-500 mb-4">Get started by creating your first booth service.</p>
-            <Button variant="primary" onClick={handleOpenCreate}>
-              Create Booth Service
-            </Button>
+          <div className="text-center py-16">
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-full bg-gray-100 mb-4">
+                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+            </div>
+            <h3 className="text-sm font-medium text-gray-900">No services found</h3>
+            <p className="text-sm text-gray-500 mt-1 mb-4">Get started by adding your first service price.</p>
+            <Button variant="outline" size="sm" onClick={handleOpenCreate}>Create Service</Button>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Service Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Item Category
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Price
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b border-gray-100 bg-gray-50/50">
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Service</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Category</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Price</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-center">Status</th>
+                  <th className="px-6 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-gray-100 bg-white">
                 {services.map((service) => (
-                  <tr key={service.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {service.name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {service.category}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-gray-900">
-                      GH₵{parseFloat(service.price).toFixed(2)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          service.isActive
-                            ? 'bg-success-100 text-success-800'
-                            : 'bg-gray-100 text-gray-800'
-                        }`}
-                      >
+                  <tr key={service.id} className="hover:bg-gray-50 transition-colors group">
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{service.name}</td>
+                    <td className="px-6 py-4 text-sm text-gray-500">{service.category}</td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 font-mono">GH₵{parseFloat(service.price).toFixed(2)}</td>
+                    <td className="px-6 py-4 text-center">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                        service.isActive 
+                          ? 'bg-green-50 text-green-700 border-green-100' 
+                          : 'bg-gray-100 text-gray-500 border-gray-200'
+                      }`}>
                         {service.isActive ? 'Active' : 'Inactive'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end gap-2">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleToggle(service.id)}
-                          className="text-blue-600 hover:text-blue-900"
+                    <td className="px-6 py-4 text-right">
+                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <button 
+                            onClick={() => handleToggle(service.id)} 
+                            className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${service.isActive ? 'text-gray-400 hover:text-gray-600' : 'text-green-600 hover:bg-green-50'}`}
+                            title={service.isActive ? "Deactivate" : "Activate"}
                         >
-                          {service.isActive ? 'Deactivate' : 'Activate'}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleOpenEdit(service)}
-                          className="text-indigo-600 hover:text-indigo-900"
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        </button>
+                        <button 
+                            onClick={() => handleOpenEdit(service)} 
+                            className="p-1.5 text-gray-400 hover:text-gray-900 hover:bg-gray-100 rounded transition-colors"
+                            title="Edit"
                         >
-                          Edit
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDelete(service.id)}
-                          className="text-red-600 hover:text-red-900"
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                        </button>
+                        <button 
+                            onClick={() => handleDelete(service.id)} 
+                            className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                            title="Delete"
                         >
-                          Delete
-                        </Button>
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -307,35 +269,6 @@ export default function ServiceSettings() {
         )}
       </Card>
 
-      {/* Service Statistics */}
-      <Card>
-        <h2 className="text-xl font-semibold text-gray-900 mb-4">Service Statistics</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="text-2xl font-bold text-gray-900">{services.length}</div>
-            <div className="text-gray-600">Total Services</div>
-          </div>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="text-2xl font-bold text-success-600">
-              {services.filter(s => s.isActive).length}
-            </div>
-            <div className="text-gray-600">Active Services</div>
-          </div>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="text-2xl font-bold text-gray-600">
-              {services.filter(s => !s.isActive).length}
-            </div>
-            <div className="text-gray-600">Inactive Services</div>
-          </div>
-          <div className="bg-gray-50 p-4 rounded-lg">
-            <div className="text-2xl font-bold text-primary-600">
-              GH₵{services.reduce((sum, s) => sum + parseFloat(s.price), 0).toFixed(2)}
-            </div>
-            <div className="text-gray-600">Total Value</div>
-          </div>
-        </div>
-      </Card>
-
       {/* Add/Edit Modal */}
       <Modal
         isOpen={showModal}
@@ -343,66 +276,75 @@ export default function ServiceSettings() {
           setShowModal(false);
           resetForm();
         }}
-        title={editingService ? 'Edit Booth Service' : 'Add New Booth Service'}
+        title={editingService ? 'Edit Service' : 'Add Service'}
+        size="md"
       >
-        <div className="space-y-4">
-          <Input
-            label="Service Category"
-            placeholder="e.g., Full Body, Touch Up, Detailing"
-            value={formData.serviceCategory}
-            onChange={(e) =>
-              setFormData({ ...formData, serviceCategory: e.target.value })
-            }
-            required
-          />
+        <div className="space-y-4 p-1">
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">Service Name</label>
+            <input
+                type="text"
+                placeholder="e.g., Full Body Wash"
+                value={formData.serviceCategory}
+                onChange={(e) => setFormData({ ...formData, serviceCategory: e.target.value })}
+                className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm"
+            />
+          </div>
           
-          <Input
-            label="Item Category"
-            placeholder="e.g., 4x4, Saloon, Fridge, TV"
-            value={formData.itemCategory}
-            onChange={(e) =>
-              setFormData({ ...formData, itemCategory: e.target.value })
-            }
-            required
-          />
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">Item Category</label>
+            <input
+                type="text"
+                placeholder="e.g., SUV / 4x4"
+                value={formData.itemCategory}
+                onChange={(e) => setFormData({ ...formData, itemCategory: e.target.value })}
+                className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm"
+            />
+          </div>
           
-          <Input
-            label="Price (GH₵)"
-            type="number"
-            step="0.01"
-            min="0"
-            placeholder="e.g., 200.00"
-            value={formData.price}
-            onChange={(e) =>
-              setFormData({ ...formData, price: e.target.value })
-            }
-            required
-          />
+          <div>
+            <label className="block text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">Price</label>
+            <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 text-sm">GH₵</span>
+                <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="0.00"
+                    value={formData.price}
+                    onChange={(e) => setFormData({ ...formData, price: e.target.value })}
+                    className="block w-full pl-10 rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm"
+                />
+            </div>
+          </div>
 
           {error && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-700">{error}</p>
+            <div className="bg-red-50 border border-red-100 rounded-lg p-3">
+              <p className="text-xs text-red-600 font-medium">{error}</p>
             </div>
           )}
-        </div>
 
-        <div className="flex justify-end gap-3 mt-6">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setShowModal(false);
-              resetForm();
-            }}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            onClick={handleSave}
-            loading={createMutation.isPending || updateMutation.isPending}
-          >
-            {editingService ? 'Update Service' : 'Create Service'}
-          </Button>
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-4">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                setShowModal(false);
+                resetForm();
+              }}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={handleSave}
+              loading={createMutation.isPending || updateMutation.isPending}
+              className="bg-gray-900 text-white hover:bg-black"
+            >
+              {editingService ? 'Save Changes' : 'Create Service'}
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>

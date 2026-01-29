@@ -32,13 +32,15 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    // Filter out items with no quantity entered
+    
+    // 1. Prepare the array (This part is fine)
     const validItems = orderItems
       .filter(item => item.quantityOrdered && Number(item.quantityOrdered) > 0)
       .map(item => ({
-        materialId: item.id,
+        id: item.id, 
         quantityOrdered: Number(item.quantityOrdered),
-        unitCost: Number(item.unitCost)
+        unitCost: Number(item.unitCost),
+        notes: "Bulk Restock"
       }));
 
     if (validItems.length === 0) {
@@ -46,7 +48,8 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
       return;
     }
 
-    onReorder(validItems);
+    // 2. THE FIX: Wrap the array in an object with the key 'items'
+    onReorder(validItems); 
   };
 
   return (
@@ -77,7 +80,8 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
                   <td className="px-3 py-2 whitespace-nowrap">
                     <input
                       type="number"
-                      min="1"
+                      step="0.01"
+                      min=""
                       placeholder="Qty"
                       value={item.quantityOrdered}
                       onChange={(e) => handleItemChange(item.id, 'quantityOrdered', e.target.value)}
@@ -90,7 +94,7 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
                       type="number"
                       min="0"
                       step="0.01"
-                      value={item.unitCost}
+                      value={item.unitCost === 0 ? '' : item.unitCost}
                       onChange={(e) => handleItemChange(item.id, 'unitCost', e.target.value)}
                       className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 focus:border-blue-500 text-sm"
                     />

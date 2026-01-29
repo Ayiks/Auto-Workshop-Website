@@ -1,4 +1,3 @@
-// src/components/features/sales/EditSaleModal.jsx
 import { useState, useEffect, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { materialsApi } from '@api/materials';
@@ -7,10 +6,14 @@ import Modal from '@components/common/Modal';
 import Button from '@components/common/Button';
 import Select from '@components/common/Select';
 import Input from '@components/common/Input'; 
+// 1. Import the Customer Select component
+import CustomerSelect from '@components/common/CustomerSelect';
 
 export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoading }) {
   // --- State ---
   const [items, setItems] = useState([]);
+  // 2. Add Customer State
+  const [customer, setCustomer] = useState(null);
   const [paymentMethod, setPaymentMethod] = useState('cash');
   const [saleDate, setSaleDate] = useState('');
   const [saleTime, setSaleTime] = useState('');
@@ -18,16 +21,12 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
   const [errors, setErrors] = useState({});
 
   // --- Data Fetching ---
-  
-  // 1. Fetch Materials
   const { data: materialsData } = useQuery({
     queryKey: ['materials', { status: 'active' }],
     queryFn: () => materialsApi.getMaterials({ status: 'active' }),
     enabled: isOpen,
   });
 
-  // 2. Fetch Services (Booths)
-  // Assuming getServices returns a list of active services including booths
   const { data: servicesData } = useQuery({
     queryKey: ['services'],
     queryFn: () => servicesApi.getServices(), 
@@ -40,18 +39,34 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
   // --- Initialization ---
   useEffect(() => {
     if (isOpen && sale) {
+      // 3. Initialize Customer Data
+      if (sale.customerId) {
+        // It was a registered customer
+        setCustomer({
+          type: 'registered',
+          id: sale.customerId,
+          // Handle case where customer object might be nested or just flattened
+          name: sale.customer 
+            ? `${sale.customer.firstName} ${sale.customer.lastName}`.trim() 
+            : (sale.customerName || 'Unknown Registered'),
+          phone: sale.customer?.phone || ''
+        });
+      } else {
+        // It was a walking customer
+        setCustomer({
+          type: 'walking',
+          id: null,
+          name: sale.customerName || 'Walking Customer',
+          phone: ''
+        });
+      }
+
       // Map existing items
       const formattedItems = sale.items.map(item => ({
-        id: Date.now() + Math.random(), // Frontend temporary ID
-        itemType: item.itemType, // 'material' or 'booth'
-        
-        // Material Fields
+        id: Date.now() + Math.random(),
+        itemType: item.itemType,
         materialId: item.materialId ? item.materialId.toString() : '',
-        
-        // Booth Fields
         serviceId: item.serviceId ? item.serviceId.toString() : '',
-        
-        // Common Fields
         quantity: parseFloat(item.quantity) || 1,
         unitPrice: parseFloat(item.unitPrice || 0),
         subtotal: parseFloat(item.subtotal || 0),
@@ -88,7 +103,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
       ...items,
       {
         id: Date.now(),
-        itemType: 'material', // Default to material
+        itemType: 'material',
         materialId: '',
         serviceId: '',
         quantity: 1,
@@ -108,7 +123,6 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
 
       const updated = { ...item, [field]: value };
 
-      // 1. Handle Type Change (Material <-> Booth)
       if (field === 'itemType') {
         updated.materialId = '';
         updated.serviceId = '';
@@ -117,7 +131,6 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
         updated.subtotal = 0;
       }
 
-      // 2. Handle Material Selection
       if (field === 'materialId') {
         const material = materials.find(m => m.id.toString() === value.toString());
         if (material) {
@@ -126,17 +139,15 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
         }
       }
 
-      // 3. Handle Service (Booth) Selection
       if (field === 'serviceId') {
         const service = services.find(s => s.id.toString() === value.toString());
         if (service) {
           updated.unitPrice = service.price;
-          updated.quantity = 1; // Usually booths are single quantity per line, but can be changed if needed
+          updated.quantity = 1;
           updated.subtotal = service.price * 1;
         }
       }
 
-      // 4. Handle Quantity Change
       if (field === 'quantity') {
         const qty = parseFloat(value) || 0;
         updated.quantity = qty;
@@ -155,13 +166,15 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
   const validate = () => {
     const newErrors = {};
 
+    // 4. Validate Customer
+    if (!customer || !customer.name) newErrors.customer = 'Customer is required';
+
     if (items.length === 0) newErrors.items = 'Please add at least one item';
     if (!saleDate) newErrors.saleDate = 'Sale date is required';
     if (!saleTime) newErrors.saleTime = 'Sale time is required';
 
-    // Item Validation
     let hasItemErrors = false;
-    items.forEach((item, index) => {
+    items.forEach((item) => {
       if (item.itemType === 'material') {
         if (!item.materialId) hasItemErrors = true;
         if (item.quantity <= 0) hasItemErrors = true;
@@ -170,7 +183,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
       }
     });
 
-    if (hasItemErrors) newErrors.items = 'Please complete all item fields (Select Material/Service and Quantity)';
+    if (hasItemErrors) newErrors.items = 'Please complete all item fields';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -180,19 +193,20 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
     e.preventDefault();
     if (!validate()) return;
 
-    // Combine Date & Time
     const combinedDateTime = new Date(`${saleDate}T${saleTime}`);
 
-    // Format items for Backend
     const formattedItems = items.map(item => ({
       itemType: item.itemType,
-      // Send correct ID based on type
       materialId: item.itemType === 'material' ? parseInt(item.materialId) : undefined,
       serviceId: item.itemType === 'booth' ? parseInt(item.serviceId) : undefined,
       quantity: parseFloat(item.quantity)
     }));
 
     onSubmit({
+      // 5. Send Customer Data
+      customerId: customer.type === 'registered' ? customer.id : null,
+      customerName: customer.name,
+      // Common Sale Data
       items: formattedItems,
       paymentMethod,
       saleDate: combinedDateTime.toISOString(),
@@ -200,7 +214,6 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
     });
   };
 
-  // Calculations for Warnings
   const hoursSinceSale = sale ? (new Date() - new Date(sale.saleDate)) / (1000 * 60 * 60) : 0;
   const currentDate = new Date().toISOString().split('T')[0];
 
@@ -209,14 +222,12 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
       isOpen={isOpen}
       onClose={onClose}
       title="Edit Sale"
-      size="xl" // Made slightly wider for better table layout
+      size="xl"
     >
       <form onSubmit={handleSubmit} className="flex flex-col h-[calc(100vh-200px)]">
         
-        {/* Scrollable Content Area */}
         <div className="flex-1 overflow-y-auto pr-2 space-y-6">
           
-          {/* Warning Section */}
           {hoursSinceSale > 12 && (
             <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-start gap-3">
               <svg className="w-5 h-5 text-amber-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -225,34 +236,50 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
               <div>
                 <p className="text-sm font-medium text-amber-900">Older Record</p>
                 <p className="text-sm text-amber-700">
-                  This sale is {Math.floor(hoursSinceSale)} hours old. Editing will reverse inventory for old items and deduct for new ones.
+                  This sale is {Math.floor(hoursSinceSale)} hours old. Inventory changes will be applied retroactively.
                 </p>
               </div>
             </div>
           )}
 
-          {/* Date & Time Settings */}
-          <div className="grid grid-cols-2 gap-4">
-            <Input
-              type="date"
-              label="Sale Date"
-              value={saleDate}
-              onChange={(e) => setSaleDate(e.target.value)}
-              max={currentDate}
-              error={errors.saleDate}
-              disabled={isLoading}
-              required
-            />
-            <Input
-              type="time"
-              label="Sale Time"
-              value={saleTime}
-              onChange={(e) => setSaleTime(e.target.value)}
-              error={errors.saleTime}
-              disabled
-              required
-            />
+          {/* 6. Header Grid: Customer + Date + Time */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* Customer Column */}
+            <div className="relative z-20"> 
+               {/* z-20 ensures dropdown goes over other inputs */}
+              <CustomerSelect 
+                value={customer}
+                onChange={setCustomer}
+                label="Customer"
+              />
+              {errors.customer && <p className="text-xs text-red-500 mt-1">{errors.customer}</p>}
+            </div>
+
+            {/* Date/Time Column */}
+            <div className="grid grid-cols-2 gap-2">
+              <Input
+                type="date"
+                label="Sale Date"
+                value={saleDate}
+                onChange={(e) => setSaleDate(e.target.value)}
+                max={currentDate}
+                error={errors.saleDate}
+                disabled={isLoading}
+                required
+              />
+              <Input
+                type="time"
+                label="Sale Time"
+                value={saleTime}
+                onChange={(e) => setSaleTime(e.target.value)}
+                error={errors.saleTime}
+                disabled
+                required
+              />
+            </div>
           </div>
+
+          <hr className="border-gray-100" />
 
           {/* Items Section */}
           <div>
@@ -274,7 +301,6 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
               </Button>
             </div>
 
-            {/* Global Item Error */}
             {errors.items && (
               <div className="mb-3 p-2 bg-red-50 border border-red-100 text-red-600 text-sm rounded">
                 {errors.items}
@@ -291,7 +317,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
                 >
                   <div className="flex gap-3 items-start">
                     
-                    {/* 1. Type Selector */}
+                    {/* Type Selector */}
                     <div className="w-32">
                       <Select
                         label={index === 0 ? "Type" : ""}
@@ -305,10 +331,9 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
                       />
                     </div>
 
-                    {/* 2. DYNAMIC FIELDS BASED ON TYPE */}
+                    {/* DYNAMIC FIELDS */}
                     <div className="flex-1">
                       {item.itemType === 'material' ? (
-                        // --- MATERIAL FIELDS ---
                         <div className="flex gap-3">
                           <div className="flex-1">
                             <Select
@@ -317,7 +342,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
                               onChange={(e) => updateItem(item.id, 'materialId', e.target.value)}
                               options={materials.map(m => ({
                                 value: m.id,
-                                label: `${m.name} (Stock: ${m.quantity})`
+                                label: `${m.name}`
                               }))}
                               placeholder="Choose material..."
                               disabled={isLoading}
@@ -336,7 +361,6 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
                           </div>
                         </div>
                       ) : (
-                        // --- BOOTH FIELDS ---
                         <div className="flex gap-3">
                           <div className="flex-1">
                             <Select
@@ -351,7 +375,6 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
                               disabled={isLoading}
                             />
                           </div>
-                          {/* Hidden Quantity for Booth (visual only or locked to 1) */}
                           <div className="w-24 opacity-50">
                             <Input
                               label={index === 0 ? "Qty" : ""}
@@ -364,7 +387,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
                       )}
                     </div>
 
-                    {/* 3. Price & Delete (Common) */}
+                    {/* Price & Delete */}
                     <div className="w-24 pt-1">
                       <label className={`block text-xs font-medium text-gray-700 mb-1 ${index === 0 ? 'visible' : 'invisible'}`}>
                         Total
@@ -388,24 +411,17 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
                     </div>
                   </div>
                   
-                  {/* Validation message per item */}
                   {((item.itemType === 'material' && !item.materialId) || (item.itemType === 'booth' && !item.serviceId)) && (
                      <p className="text-xs text-red-500 mt-1 ml-1">* Selection required</p>
                   )}
                 </div>
               ))}
             </div>
-
-            {items.length === 0 && (
-              <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
-                <p className="text-gray-500 text-sm">No items added to this sale yet.</p>
-              </div>
-            )}
           </div>
 
         </div>
 
-        {/* Footer Area (Fixed at bottom) */}
+        {/* Footer Area */}
         <div className="border-t border-gray-200 pt-4 mt-4 bg-white">
           <div className="grid grid-cols-2 gap-6 mb-4">
             <div>
@@ -421,7 +437,6 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
               />
             </div>
             
-            {/* Inventory Reversal Toggle */}
             <div className="flex items-center pt-6">
               <label className="flex items-center gap-2 cursor-pointer select-none">
                 <input
@@ -432,7 +447,6 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
                   disabled={isLoading}
                 />
                 <span className="text-sm text-gray-700">Auto-reverse inventory</span>
-                
               </label>
             </div>
           </div>

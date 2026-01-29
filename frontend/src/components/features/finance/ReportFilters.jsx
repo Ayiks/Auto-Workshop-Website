@@ -1,4 +1,3 @@
-// src/components/features/finance/ReportFilters.jsx
 import { format, startOfMonth, endOfMonth } from 'date-fns';
 import Button from '@components/common/Button';
 import Card from '@components/common/Card';
@@ -22,7 +21,8 @@ export default function ReportFilters({
         start = end = format(now, 'yyyy-MM-dd');
         break;
       case 'this-week':
-        start = format(new Date(now.setDate(now.getDate() - now.getDay())), 'yyyy-MM-dd');
+        const firstDay = new Date(now.setDate(now.getDate() - now.getDay()));
+        start = format(firstDay, 'yyyy-MM-dd');
         end = format(new Date(), 'yyyy-MM-dd');
         break;
       case 'this-month':
@@ -46,68 +46,64 @@ export default function ReportFilters({
   };
 
   return (
-    <Card>
-      <div className="flex flex-col lg:flex-row gap-4 items-end">
+    <Card className="bg-white border border-gray-200 shadow-sm p-4">
+      <div className="flex flex-col lg:flex-row gap-4 items-end justify-between">
+        
         {/* Date Inputs */}
-        <div className="flex-1 grid grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Start Date
-            </label>
+        <div className="flex items-center gap-3 w-full lg:w-auto">
+          <div className="relative group">
+            <label className="absolute -top-2 left-2 bg-white px-1 text-[10px] font-semibold text-gray-500 group-focus-within:text-gray-900 transition-colors">Start Date</label>
             <input
               type="date"
               name="startDate"
               value={dateRange.startDate}
               onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full lg:w-40 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 outline-none transition-all"
             />
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              End Date
-            </label>
+          <span className="text-gray-400">-</span>
+          <div className="relative group">
+            <label className="absolute -top-2 left-2 bg-white px-1 text-[10px] font-semibold text-gray-500 group-focus-within:text-gray-900 transition-colors">End Date</label>
             <input
               type="date"
               name="endDate"
               value={dateRange.endDate}
               onChange={handleInputChange}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
+              className="w-full lg:w-40 px-3 py-2 text-sm border border-gray-300 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 outline-none transition-all"
             />
           </div>
         </div>
 
-        {/* Preset Buttons */}
-        <div className="flex gap-2 flex-wrap">
-          <Button size="sm" variant="outline" onClick={() => setPresetRange('today')}>
-            Today
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setPresetRange('this-week')}>
-            This Week
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setPresetRange('this-month')}>
-            This Month
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setPresetRange('last-month')}>
-            Last Month
-          </Button>
-          <Button size="sm" variant="outline" onClick={() => setPresetRange('this-year')}>
-            This Year
-          </Button>
-        </div>
+        {/* Action Group */}
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          <div className="flex bg-gray-100 p-1 rounded-lg">
+            {['today', 'this-week', 'this-month'].map((preset) => (
+               <button
+                 key={preset}
+                 onClick={() => setPresetRange(preset)}
+                 className="px-3 py-1.5 text-xs font-medium text-gray-600 hover:text-gray-900 hover:bg-white rounded-md transition-all capitalize"
+               >
+                 {preset.replace('-', ' ')}
+               </button>
+            ))}
+          </div>
 
-        {/* Export Button */}
-        {onExport && (
-          <Button 
-            size="sm" 
-            variant="primary"
-            onClick={onExport}
-          >
-            <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
-            Export CSV
-          </Button>
-        )}
+          {onExport && (
+            <Button 
+              size="sm" 
+              variant="primary"
+              onClick={onExport}
+              className="bg-gray-900 hover:bg-black text-white border-transparent"
+              icon={
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                </svg>
+              }
+            >
+              Export Report
+            </Button>
+          )}
+        </div>
       </div>
     </Card>
   );

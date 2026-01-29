@@ -20,14 +20,25 @@ export default function Receipt({ receipt, sale }) {
     window.print();
   };
 
+  // Helper to safely parse numbers
+  const val = (num) => parseFloat(num || 0);
+
+  // Calculate subtotal (Total + Discount) to show the value before savings
+  const totalAmount = val(sale.totalAmount);
+  const discount = val(sale.discount);
+  const subtotal = totalAmount + discount;
+  const amountPaid = val(sale.amountPaid);
+  const balance = val(sale.balance);
+
   return (
     <div className="max-w-md mx-auto">
       {/* Receipt Content */}
       <div className="bg-white p-8 border border-gray-200 rounded-xl shadow-sm print:shadow-none print:border-0 print:p-0">
+        
         {/* Header */}
         <div className="text-center mb-8">
           <div className="mb-4">
-            <h1 className="text-2xl font-bold text-gray-900 tracking-tight">
+            <h1 className="text-2xl font-bold text-gray-900 tracking-tight uppercase">
               {receipt.businessName || 'Business Name'}
             </h1>
             <p className="text-sm text-gray-600 mt-2">
@@ -37,68 +48,55 @@ export default function Receipt({ receipt, sale }) {
               {receipt.businessContact || 'Business Contact'}
             </p>
           </div>
-          <div className="border-t border-b border-gray-200 py-3">
-            <p className="text-sm font-semibold text-gray-700 uppercase tracking-wider">SALES RECEIPT</p>
+          <div className="border-t border-b border-gray-200 py-2 mt-4">
+            <p className="text-sm font-bold text-gray-800 uppercase tracking-widest">Sales Receipt</p>
           </div>
         </div>
 
-        {/* Receipt Info */}
-        <div className="mb-8 space-y-3 text-sm">
-          <div className="flex justify-between py-2 border-b border-gray-100">
-            <span className="text-gray-600">Receipt No</span>
-            <span className="font-semibold text-gray-900">
-              {receipt.receiptNumber || 'N/A'}
-            </span>
+        {/* Receipt Details & Customer Info Grid */}
+        <div className="mb-6 grid grid-cols-2 gap-4 text-sm">
+          <div className="space-y-1">
+            <p className="text-gray-500 text-xs uppercase tracking-wide">Receipt Details</p>
+            <p><span className="text-gray-600">No:</span> <span className="font-semibold text-gray-900">#{receipt.receiptNumber}</span></p>
+            <p><span className="text-gray-600">Date:</span> <span className="text-gray-900">{receipt.issuedDate ? format(new Date(receipt.issuedDate), 'dd/MM/yy HH:mm') : 'N/A'}</span></p>
+            <p><span className="text-gray-600">Pay Via:</span> <span className="font-medium uppercase text-gray-900">{receipt.paymentMethod}</span></p>
           </div>
-          <div className="flex justify-between py-2 border-b border-gray-100">
-            <span className="text-gray-600">Date</span>
-            <span>
-              {receipt.issuedDate 
-                ? format(new Date(receipt.issuedDate), 'MMM dd, yyyy HH:mm')
-                : 'N/A'}
-            </span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-gray-100">
-            <span className="text-gray-600">Payment Method</span>
-            <span className="font-medium uppercase">
-              {receipt.paymentMethod || 'N/A'}
-            </span>
-          </div>
-          <div className="flex justify-between py-2 border-b border-gray-100">
-            <span className="text-gray-600">Cashier</span>
-            <span>
-              {sale?.user?.fullName || sale?.user?.username || 'N/A'}
-            </span>
+          
+          <div className="space-y-1 text-right">
+            <p className="text-gray-500 text-xs uppercase tracking-wide">Bill To</p>
+            {sale.customerName ? (
+              <>
+                <p className="font-semibold text-gray-900">{sale.customerName}</p>
+                {sale.customerPhone && <p className="text-gray-600">{sale.customerPhone}</p>}
+              </>
+            ) : (
+              <p className="text-gray-500 italic">Walk-in Customer</p>
+            )}
+            <p className="text-xs text-gray-500 mt-1">Cashier: {sale?.user?.username || 'Staff'}</p>
           </div>
         </div>
 
-        {/* Items */}
-        <div className="mb-8">
-          <div className="overflow-hidden rounded-lg border border-gray-200">
-            <table className="w-full text-sm">
+        {/* Items Table */}
+        <div className="mb-6">
+          <div className="overflow-hidden border-t border-b border-gray-200">
+            <table className="w-full text-sm my-1">
               <thead>
-                <tr className="bg-gray-50 border-b border-gray-200">
-                  <th className="text-left py-3 px-4 font-medium text-gray-700">Item</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-700">Qty</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-700">Price</th>
-                  <th className="text-right py-3 px-4 font-medium text-gray-700">Total</th>
+                <tr className="border-b border-gray-100">
+                  <th className="text-left py-2 font-semibold text-gray-700">Item</th>
+                  <th className="text-center py-2 font-semibold text-gray-700">Qty</th>
+                  <th className="text-right py-2 font-semibold text-gray-700">Price</th>
+                  <th className="text-right py-2 font-semibold text-gray-700">Total</th>
                 </tr>
               </thead>
               <tbody>
                 {sale?.items?.map((item, index) => (
-                  <tr key={index} className="border-b border-gray-100 last:border-b-0">
-                    <td className="py-3 px-4">
-                      <span className="text-gray-900">
-                        {item.itemType === 'material' ? item.materialName : 'Booth Service'}
-                      </span>
+                  <tr key={index} className="border-b border-gray-50 last:border-b-0">
+                    <td className="py-2 text-gray-900">
+                      {item.itemType === 'material' ? item.materialName : 'Booth Service'}
                     </td>
-                    <td className="text-right py-3 px-4 text-gray-700">{item.quantity || 1}</td>
-                    <td className="text-right py-3 px-4 text-gray-700">
-                      GH₵{parseFloat(item.unitPrice || 0).toFixed(2)}
-                    </td>
-                    <td className="text-right py-3 px-4 font-medium text-gray-900">
-                      GH₵{parseFloat(item.subtotal || 0).toFixed(2)}
-                    </td>
+                    <td className="text-center py-2 text-gray-600">{Number(item.quantity)}</td>
+                    <td className="text-right py-2 text-gray-600">{val(item.unitPrice).toFixed(2)}</td>
+                    <td className="text-right py-2 font-medium text-gray-900">{val(item.subtotal).toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -106,20 +104,56 @@ export default function Receipt({ receipt, sale }) {
           </div>
         </div>
 
-        {/* Total */}
-        <div className="mb-8 bg-gray-50 rounded-lg p-4">
-          <div className="flex justify-between items-center">
-            <span className="text-lg font-semibold text-gray-900">TOTAL AMOUNT</span>
-            <span className="text-2xl font-bold text-gray-900">
-              GH₵{parseFloat(receipt.amount || 0).toFixed(2)}
-            </span>
+        {/* Financial Breakdown */}
+        <div className="flex justify-end mb-8">
+          <div className="w-2/3 space-y-2 text-sm">
+            {/* Subtotal (only show if discount exists to avoid redundancy) */}
+            {discount > 0 && (
+              <div className="flex justify-between text-gray-600">
+                <span>Subtotal</span>
+                <span>GH₵{subtotal.toFixed(2)}</span>
+              </div>
+            )}
+            
+            {/* Discount */}
+            {discount > 0 && (
+              <div className="flex justify-between text-green-600">
+                <span>Discount</span>
+                <span>- GH₵{discount.toFixed(2)}</span>
+              </div>
+            )}
+
+            {/* Total Amount */}
+            <div className="flex justify-between font-bold text-gray-900 text-base pt-2 border-t border-gray-200">
+              <span>Total Amount</span>
+              <span>GH₵{totalAmount.toFixed(2)}</span>
+            </div>
+
+            {/* Amount Paid */}
+            <div className="flex justify-between text-gray-700 pt-1">
+              <span>Amount Paid</span>
+              <span>GH₵{amountPaid.toFixed(2)}</span>
+            </div>
+
+            {/* Balance Due */}
+            {balance > 0 ? (
+              <div className="flex justify-between text-red-600 font-bold pt-1 border-t border-dashed border-gray-300 mt-2">
+                <span>Balance Due</span>
+                <span>GH₵{balance.toFixed(2)}</span>
+              </div>
+            ) : (
+              <div className="flex justify-between text-gray-500 italic pt-1 mt-2">
+                <span>Balance</span>
+                <span>GH₵0.00</span>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Footer */}
         <div className="text-center pt-6 border-t border-gray-200">
-          <p className="font-medium text-gray-900 mb-2">Thank you for your business!</p>
-          <p className="text-sm text-gray-600">Please keep this receipt for your records</p>
+          <p className="font-semibold text-gray-900 mb-1">Thank you for your business!</p>
+          <p className="text-xs text-gray-500">Please keep this receipt for your records.</p>
         </div>
       </div>
 

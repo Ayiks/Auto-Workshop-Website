@@ -37,432 +37,210 @@ export default function Dashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50/50">
       {/* Modern Header */}
-      <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur-sm">
-        <div className="px-6 py-4">
+      <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur-md">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-semibold text-gray-900">
-                Dashboard
+              <h1 className="text-xl font-bold text-gray-900 tracking-tight">
+                Overview
               </h1>
-              <p className="text-sm text-gray-500 mt-1">
-                Welcome back, {user?.fullName || user?.username}!
+              <p className="text-sm text-gray-500 mt-0.5">
+                Welcome back, {user?.fullName || user?.username}
               </p>
             </div>
-            <div className="text-sm text-gray-500 bg-gray-50 px-3 py-1.5 rounded-lg">
-              Period:{" "}
-              {format(
-                new Date(stats?.period?.startDate || new Date()),
-                "MMM d",
-              )}{" "}
-              -{" "}
-              {format(
-                new Date(stats?.period?.endDate || new Date()),
-                "MMM d, yyyy",
-              )}
+            <div className="hidden sm:flex items-center gap-2 text-xs font-medium text-gray-500 bg-gray-100/50 border border-gray-200 px-3 py-1.5 rounded-full">
+              <svg className="w-3.5 h-3.5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span>
+                {format(new Date(stats?.period?.startDate || new Date()), "MMM d")} - {format(new Date(stats?.period?.endDate || new Date()), "MMM d, yyyy")}
+              </span>
             </div>
           </div>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="p-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-8">
+        
         {/* Primary Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          
           {/* Total Sales */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 hover:border-gray-300 transition-colors">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-sm font-medium text-gray-700">
-                  Total Sales
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-[0_2px_4px_rgba(0,0,0,0.02)] hover:border-gray-300 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200">
+            <div className="flex justify-between items-start mb-4">
+                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                    </svg>
+                </div>
+                {/* Example of Green Trend Indicator */}
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                    +12%
                 </span>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
-                  {stats?.sales?.count || 0}
-                </p>
-              </div>
-
-              <div className="p-2 bg-white rounded-lg shadow-sm">
-                <svg
-                  className="w-6 h-6 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-              </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <span className="text-sm text-gray-600">
-                GH₵{Number(stats?.sales?.revenue || 0).toLocaleString()}
-              </span>
+            <div>
+                <p className="text-sm font-medium text-gray-500">Total Sales</p>
+                <h3 className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">{stats?.sales?.count || 0}</h3>
+                <p className="text-xs text-gray-400 mt-1">transactions this period</p>
             </div>
           </div>
 
           {/* Sales Revenue */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 hover:border-gray-300 transition-colors">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-sm font-medium text-gray-700">
-                  Sales Revenue
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-[0_2px_4px_rgba(0,0,0,0.02)] hover:border-gray-300 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200">
+            <div className="flex justify-between items-start mb-4">
+                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                </div>
+                {/* Example of Red Trend Indicator (if revenue was down) */}
+                {/* <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-red-50 text-red-700 border border-red-100">
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 14l-7 7m0 0l-7-7m7 7V3" /></svg>
+                    -2.5%
+                </span> */}
+                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-gray-100 text-gray-600 border border-gray-200">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-400"></span>
+                    Stable
                 </span>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
-                  GH₵{Number(stats?.sales?.revenue || 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="p-2 bg-white rounded-lg shadow-sm">
-                <svg
-                  className="w-6 h-6 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <span className="text-sm text-gray-600">
-                {stats?.sales?.count || 0} transactions
-              </span>
+            <div>
+                <p className="text-sm font-medium text-gray-500">Sales Revenue</p>
+                <h3 className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">GH₵{Number(stats?.sales?.revenue || 0).toLocaleString()}</h3>
+                <p className="text-xs text-gray-400 mt-1">gross revenue</p>
             </div>
           </div>
 
           {/* Total Jobs */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 hover:border-gray-300 transition-colors">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-sm font-medium text-gray-700">
-                  Total Jobs
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-[0_2px_4px_rgba(0,0,0,0.02)] hover:border-gray-300 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200">
+            <div className="flex justify-between items-start mb-4">
+                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                    </svg>
+                </div>
+                 <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-green-50 text-green-700 border border-green-100">
+                    <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" /></svg>
+                    +5%
                 </span>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
-                  {stats?.jobs?.count || 0}
-                </p>
-              </div>
-              <div className="p-2 bg-white rounded-lg shadow-sm">
-                <svg
-                  className="w-6 h-6 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                  />
-                </svg>
-              </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <span className="text-sm text-gray-600">
-                GH₵{Number(stats?.jobs?.revenue || 0).toLocaleString()}
-              </span>
+            <div>
+                <p className="text-sm font-medium text-gray-500">Total Jobs</p>
+                <h3 className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">{stats?.jobs?.count || 0}</h3>
+                <p className="text-xs text-gray-400 mt-1">active & completed</p>
             </div>
           </div>
 
           {/* Job Revenue */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5 hover:border-gray-300 transition-colors">
-            <div className="flex items-start justify-between">
-              <div>
-                <span className="text-sm font-medium text-gray-700">
-                  Job Revenue
-                </span>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
-                  GH₵{Number(stats?.jobs?.revenue || 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="p-2 bg-white rounded-lg shadow-sm">
-                <svg
-                  className="w-6 h-6 text-blue-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"
-                  />
-                </svg>
-              </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-[0_2px_4px_rgba(0,0,0,0.02)] hover:border-gray-300 hover:shadow-[0_4px_12px_rgba(0,0,0,0.05)] transition-all duration-200">
+            <div className="flex justify-between items-start mb-4">
+                <div className="p-2 bg-gray-50 rounded-lg border border-gray-100">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                </div>
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <span className="text-sm text-gray-600">
-                {stats?.jobs?.count || 0} jobs
-              </span>
+            <div>
+                <p className="text-sm font-medium text-gray-500">Job Revenue</p>
+                <h3 className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">GH₵{Number(stats?.jobs?.revenue || 0).toLocaleString()}</h3>
+                <p className="text-xs text-gray-400 mt-1">service earnings</p>
             </div>
           </div>
         </div>
 
-        {/* Secondary Stats & Performance */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-          {/* Total Revenue Card */}
-          <div className="bg-gradient-to-br from-blue-50 to-blue-100 border border-blue-200 rounded-xl p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-700">
-                  Total Revenue
-                </p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">
-                  GH₵{Number(stats?.totalRevenue || 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="p-3 bg-blue-600 rounded-lg">
-                <svg
-                  className="w-6 h-6 text-white"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"
-                  />
-                </svg>
-              </div>
+        {/* Secondary Stats Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          
+          {/* Total Revenue Summary */}
+          <div className="bg-black rounded-xl p-6 shadow-lg text-white relative overflow-hidden">
+            {/* Subtle Texture Overlay */}
+            <div className="absolute top-0 right-0 p-8 opacity-10 pointer-events-none">
+                <svg className="w-32 h-32" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"/></svg>
             </div>
-            <div className="mt-4">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">From Sales & Jobs</span>
-                {/* <span className="font-medium text-gray-900">
-                  GH₵{Number((stats?.sales?.revenue || 0) + (stats?.jobs?.revenue || 0)).toLocaleString()}
-                </span> */}
-              </div>
+            
+            <div className="relative z-10">
+                <p className="text-sm font-medium text-gray-400 uppercase tracking-wider">Net Revenue</p>
+                <div className="flex items-baseline gap-2 mt-2">
+                    <h3 className="text-3xl font-bold text-white tracking-tight">GH₵{Number(stats?.totalRevenue || 0).toLocaleString()}</h3>
+                </div>
+                <div className="mt-6 flex items-center gap-3 text-xs font-medium text-gray-400 border-t border-gray-800 pt-4">
+                    <span>Sales: {(stats?.sales?.revenue || 0).toLocaleString()}</span>
+                    <span className="w-1 h-1 rounded-full bg-gray-600"></span>
+                    <span>Jobs: {(stats?.jobs?.revenue || 0).toLocaleString()}</span>
+                </div>
             </div>
           </div>
 
           {/* Outstanding Payments */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
-                  Outstanding Payments
-                </p>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
-                  GH₵{Number(stats?.outstanding?.amount || 0).toLocaleString()}
-                </p>
-              </div>
-              <div className="p-2 bg-white rounded-lg shadow-sm">
-                <svg
-                  className="w-6 h-6 text-amber-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                  />
-                </svg>
-              </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+            <div className="flex justify-between items-start">
+                <div>
+                    <p className="text-sm font-semibold text-gray-900">Outstanding Payments</p>
+                    <p className="text-xs text-gray-500 mt-1">Pending collections</p>
+                </div>
+                {Number(stats?.outstanding?.amount) > 0 ? (
+                    <span className="px-2 py-1 bg-red-50 text-red-700 text-xs font-semibold rounded border border-red-100">Action Required</span>
+                ) : (
+                    <span className="px-2 py-1 bg-green-50 text-green-700 text-xs font-semibold rounded border border-green-100">All Good</span>
+                )}
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Pending collections</span>
-                <span className="text-amber-600 font-medium">
-                  Requires attention
-                </span>
-              </div>
+            <div className="mt-4">
+                <p className="text-2xl font-bold text-gray-900 tracking-tight">GH₵{Number(stats?.outstanding?.amount || 0).toLocaleString()}</p>
+                {/* Visual Progress Bar concept */}
+                <div className="w-full bg-gray-100 rounded-full h-1.5 mt-3">
+                    <div className="bg-red-500 h-1.5 rounded-full" style={{ width: '25%' }}></div>
+                </div>
             </div>
           </div>
 
           {/* Low Stock Alerts */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
-            <div className="flex items-start justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">
-                  Low Stock Items
-                </p>
-                <p className="text-3xl font-semibold text-gray-900 mt-2">
-                  {stats?.alerts?.lowStockMaterials || 0}
-                </p>
-              </div>
-              <div className="p-2 bg-white rounded-lg shadow-sm">
-                <svg
-                  className="w-6 h-6 text-red-600"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={1.5}
-                    d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                  />
-                </svg>
-              </div>
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+             <div className="flex justify-between items-start">
+                <div>
+                    <p className="text-sm font-semibold text-gray-900">Inventory Health</p>
+                    <p className="text-xs text-gray-500 mt-1">Stock level alerts</p>
+                </div>
+                <span className={`px-2 py-1 text-xs font-semibold rounded border ${Number(stats?.alerts?.lowStockMaterials) > 0 ? 'bg-amber-50 text-amber-700 border-amber-100' : 'bg-gray-50 text-gray-600 border-gray-200'}`}>
+                    {stats?.alerts?.lowStockMaterials || 0} Alerts
+                </span>
             </div>
-            <div className="mt-4 pt-4 border-t border-gray-100">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Items below threshold</span>
-                <span className="text-red-600 font-medium">Restock needed</span>
-              </div>
+            <div className="mt-4 flex items-end gap-2">
+                <p className="text-2xl font-bold text-gray-900 tracking-tight">{stats?.alerts?.lowStockMaterials || 0}</p>
+                <span className="text-sm text-gray-500 mb-1">items below threshold</span>
             </div>
           </div>
         </div>
 
-        {/* Quick Actions */}
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Quick Actions
-            </h2>
-            <p className="text-sm text-gray-500 mt-1">
-              Common tasks for your workshop
-            </p>
-          </div>
-          <div className="p-6">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <button className="group flex flex-col items-center p-5 rounded-xl border-2 border-gray-100 hover:border-blue-200 hover:bg-blue-50 transition-all duration-200"
-               onClick = {() => window.location.href = '/sales'}
-              >
-                <div className="w-12 h-12 rounded-lg bg-blue-100 flex items-center justify-center mb-3 group-hover:bg-blue-200 transition-colors">
-                  <svg
-                    className="w-6 h-6 text-blue-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                </div>
-                <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">
-                  New Sale
-                </span>
-                <span className="text-xs text-gray-400 mt-1">Counter sale</span>
-               
-              </button>
-
-              <button className="group flex flex-col items-center p-5 rounded-xl border-2 border-gray-100 hover:border-amber-200 hover:bg-amber-50 transition-all duration-200">
-                <div className="w-12 h-12 rounded-lg bg-amber-100 flex items-center justify-center mb-3 group-hover:bg-amber-200 transition-colors">
-                  <svg
-                    className="w-6 h-6 text-amber-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"
-                    />
-                  </svg>
-                </div>
-                <span className="text-sm font-medium text-gray-700 group-hover:text-amber-700">
-                  New Job
-                </span>
-                <span className="text-xs text-gray-400 mt-1">Service job</span>
-              </button>
-
-              <button className="group flex flex-col items-center p-5 rounded-xl border-2 border-gray-100 hover:border-green-200 hover:bg-green-50 transition-all duration-200">
-                <div className="w-12 h-12 rounded-lg bg-green-100 flex items-center justify-center mb-3 group-hover:bg-green-200 transition-colors">
-                  <svg
-                    className="w-6 h-6 text-green-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"
-                    />
-                  </svg>
-                </div>
-                <span className="text-sm font-medium text-gray-700 group-hover:text-green-700">
-                  Add Material
-                </span>
-                <span className="text-xs text-gray-400 mt-1">Inventory</span>
-              </button>
-
-              <button className="group flex flex-col items-center p-5 rounded-xl border-2 border-gray-100 hover:border-purple-200 hover:bg-purple-50 transition-all duration-200">
-                <div className="w-12 h-12 rounded-lg bg-purple-100 flex items-center justify-center mb-3 group-hover:bg-purple-200 transition-colors">
-                  <svg
-                    className="w-6 h-6 text-purple-600"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                    />
-                  </svg>
-                </div>
-                <span className="text-sm font-medium text-gray-700 group-hover:text-purple-700">
-                  View Reports
-                </span>
-                <span className="text-xs text-gray-400 mt-1">Analytics</span>
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Stock Overview */}
-          <div className="bg-white rounded-xl border border-gray-200 p-5">
+        {/* Quick Actions Section */}
+        <div>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="font-medium text-gray-900">Stock Status</h3>
-              <span className="text-sm text-gray-500">Overview</span>
+                <h2 className="text-lg font-bold text-gray-900">Quick Actions</h2>
             </div>
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">In Stock Items</span>
-                  <span className="font-medium text-gray-900">42 items</span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    className="bg-green-600 h-2 rounded-full"
-                    style={{ width: "85%" }}
-                  ></div>
-                </div>
-              </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-gray-600">Low Stock Items</span>
-                  <span className="font-medium text-red-600">
-                    {stats?.alerts?.lowStockMaterials || 0} items
-                  </span>
-                </div>
-                <div className="w-full bg-gray-100 rounded-full h-2">
-                  <div
-                    className="bg-amber-500 h-2 rounded-full"
-                    style={{ width: "15%" }}
-                  ></div>
-                </div>
-              </div>
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                {[
+                    { label: "New Sale", sub: "Process order", icon: "M12 4v16m8-8H4", action: () => window.location.href = '/sales' },
+                    { label: "New Job", sub: "Create service", icon: "M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" },
+                    { label: "Add Stock", sub: "Update inventory", icon: "M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" },
+                    { label: "Reports", sub: "View analytics", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2z" }
+                ].map((action, idx) => (
+                    <button 
+                        key={idx}
+                        onClick={action.action}
+                        className="group flex flex-col items-start p-4 bg-white border border-gray-200 rounded-xl hover:border-gray-400 hover:shadow-md transition-all duration-200 text-left"
+                    >
+                        <div className="p-2.5 bg-gray-50 rounded-lg group-hover:bg-black group-hover:text-white transition-colors duration-200 mb-3 text-gray-700">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={action.icon} /></svg>
+                        </div>
+                        <span className="font-semibold text-gray-900 text-sm">{action.label}</span>
+                        <span className="text-xs text-gray-500 mt-0.5">{action.sub}</span>
+                    </button>
+                ))}
             </div>
-          </div>
         </div>
+
       </div>
     </div>
   );

@@ -77,7 +77,8 @@ export const createMaterial = asyncHandler(async (req, res) => {
     quantity = 0.0,
     unitCost,
     sellingPrice,
-    lowStockThreshold = 10,
+    lowStockThreshold = 3,
+    imageUrl,
   } = req.body;
 
   // Validation
@@ -126,6 +127,7 @@ export const createMaterial = asyncHandler(async (req, res) => {
       unitCost: parseFloat(unitCost),
       sellingPrice: parseFloat(sellingPrice),
       lowStockThreshold: parseFloat(lowStockThreshold),
+      imageUrl: imageUrl || null,
     },
   });
 
@@ -159,6 +161,7 @@ export const updateMaterial = asyncHandler(async (req, res) => {
     lowStockThreshold,
     quantity,
     isActive,
+    imageUrl,
   } = req.body;
 
   const material = await prisma.material.findUnique({
@@ -205,6 +208,7 @@ export const updateMaterial = asyncHandler(async (req, res) => {
   if (sellingPrice !== undefined) updateData.sellingPrice = parseFloat(sellingPrice);
   if (lowStockThreshold !== undefined) updateData.lowStockThreshold = parseFloat(lowStockThreshold);
   if (quantity !== undefined) updateData.quantity = parseFloat(quantity);
+  if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
 // Status Toggle Logic
   if (isActive !== undefined) {
     const newStatus = Boolean(isActive);
@@ -337,8 +341,9 @@ export const getLowStockMaterials = asyncHandler(async (req, res) => {
     orderBy: { quantity: 'asc' },
   });
 
+  // FIX: Convert to Number() before comparing
   const lowStockMaterials = materials.filter(
-    m => m.quantity <= m.lowStockThreshold
+    m => Number(m.quantity) <= Number(m.lowStockThreshold)
   );
 
   res.status(200).json({
@@ -451,6 +456,110 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
       material: result.updatedMaterial,
       expense: result.expense,
     },
+  });
+});
+
+// @desc    Bulk Reorder materials
+// @route   POST /api/materials/bulk-reorder
+// @access  Private (requires 'materials:reorder' permission)
+export const bulkReorderMaterials = asyncHandler(async (req, res) => {
+  const { items } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new AppError('No items provided for reorder', 400, 'VALIDATION_ERROR');
+  }
+
+  // 1. Extract IDs and fetch all materials in one query for efficiency
+  const itemIds = items.map(item => parseInt(item.id));
+  const materials = await prisma.material.findMany({
+    where: { id: { in: itemIds } }
+  });
+
+  // 2. Map materials for quick access
+  const materialMap = new Map(materials.map(m => [m.id, m]));
+
+  // 3. Start Transaction
+  const results = await prisma.$transaction(async (tx) => {
+    const processedItems = [];
+
+    for (const item of items) {
+      const materialId = parseInt(item.id);
+      const material = materialMap.get(materialId);
+
+      // Validation within transaction
+      if (!material) throw new AppError(`Material ID ${materialId} not found`, 404);
+      if (!material.isActive) throw new AppError(`Material ${material.name} is inactive`, 400);
+      
+      const qtyToAdd = parseFloat(item.quantityOrdered);
+      if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
+        throw new AppError(`Invalid quantity for ${material.name}`, 400);
+      }
+
+      const reorderUnitCost = item.unitCost ? parseFloat(item.unitCost) : Number(material.unitCost);
+      const totalCost = reorderUnitCost * qtyToAdd;
+
+      // A. Create reorder record
+      const reorder = await tx.materialReorder.create({
+        data: {
+          materialId: material.id,
+          materialName: material.name,
+          quantityOrdered: qtyToAdd,
+          unitCost: reorderUnitCost,
+          totalCost,
+          reorderedBy: req.user.id,
+          notes: item.notes || 'Bulk Reorder',
+        },
+      });
+
+      // B. Update material quantity and unit cost
+      const updatedMaterial = await tx.material.update({
+        where: { id: material.id },
+        data: {
+          quantity: { increment: qtyToAdd },
+          unitCost: reorderUnitCost,
+        },
+      });
+
+      // C. Create COGS expense
+      const expense = await tx.expense.create({
+        data: {
+          type: 'cog',
+          category: 'material_reorder',
+          description: `Bulk Reorder: ${material.name} (${qtyToAdd} units)`,
+          amount: totalCost,
+          source: 'system',
+          isReadOnly: true,
+          recordedBy: req.user.id,
+          notes: `Auto-generated from bulk reorder item #${reorder.id}`,
+        },
+      });
+
+      // D. Link expense to reorder
+      await tx.materialReorder.update({
+        where: { id: reorder.id },
+        data: { expenseId: expense.id },
+      });
+
+      processedItems.push({ materialName: material.name, totalCost });
+    }
+
+    // 4. Single Bulk Audit Log
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'BULK_REORDER',
+        entity: 'Material',
+        description: `Bulk reordered ${processedItems.length} items. Total materials updated.`,
+      },
+    });
+
+    return processedItems;
+  });
+
+  res.status(201).json({
+    success: true,
+    message: `Successfully restocked ${results.length} materials`,
+    data: results,
   });
 });
 

@@ -1,4 +1,3 @@
-// src/components/features/finance/ChartCard.jsx
 import Card from '@components/common/Card';
 
 export default function ChartCard({ 
@@ -9,18 +8,20 @@ export default function ChartCard({
   height = 300 
 }) {
   return (
-    <Card>
-      <div className="flex items-center justify-between mb-4">
+    <Card className="flex flex-col h-full bg-white border border-gray-200 shadow-sm">
+      <div className="px-6 py-5 border-b border-gray-100 flex items-start justify-between bg-white rounded-t-xl">
         <div>
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wide">{title}</h3>
           {subtitle && (
-            <p className="text-sm text-gray-500 mt-1">{subtitle}</p>
+            <p className="text-xs text-gray-500 mt-1">{subtitle}</p>
           )}
         </div>
-        {action && <div>{action}</div>}
+        {action && <div className="ml-4">{action}</div>}
       </div>
-      <div style={{ height: `${height}px` }} className="w-full">
-        {children}
+      <div className="p-6 w-full flex-1 min-h-0">
+        <div style={{ height: `${height}px` }} className="w-full">
+          {children}
+        </div>
       </div>
     </Card>
   );

@@ -1,40 +1,55 @@
 // src/components/features/sales/SaleForm.jsx
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { materialsApi } from "@api/materials";
 import { settingsApi } from "@api/settings";
 import Button from "@components/common/Button";
-import Select from "@components/common/Select";
-import Input from "@components/common/Input";
+import CustomerSelect from "@components/common/CustomerSelect"; 
 import { format } from "date-fns";
 
+const getItemColor = (id) => {
+  const colors = ["bg-gray-800", "bg-gray-600", "bg-gray-700", "bg-black", "bg-gray-500"];
+  return colors[id % colors.length];
+};
+
 export default function SaleForm({ onSubmit, onCancel, isLoading }) {
-  const [saleType, setSaleType] = useState("counter");
-  const [items, setItems] = useState([]);
+  // --- STATE ---
+  const [searchTerm, setSearchTerm] = useState("");
+  const [saleType, setSaleType] = useState("counter"); 
+  const [items, setItems] = useState([]); 
   const [paymentMethod, setPaymentMethod] = useState("cash");
   const [saleDate, setSaleDate] = useState(format(new Date(), "yyyy-MM-dd"));
 
-  // Booth service state
+  // Customer
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  
+  // Payment & Discount
+  const [paymentStatus, setPaymentStatus] = useState("paid"); 
+  const [discount, setDiscount] = useState(0);
+  const [showDiscountInput, setShowDiscountInput] = useState(false);
+  
+  // NEW: Amount Paid (For partial payments)
+  const [partialAmount, setPartialAmount] = useState(""); 
+
+  // Booth
   const [serviceCategory, setServiceCategory] = useState("");
   const [itemCategory, setItemCategory] = useState("");
   const [boothPrice, setBoothPrice] = useState(0);
   const [selectedService, setSelectedService] = useState(null);
 
-  // Fetch materials for counter sale
+  // --- API ---
   const { data: materialsData } = useQuery({
     queryKey: ["materials", { status: "active" }],
     queryFn: () => materialsApi.getMaterials({ status: "active" }),
     enabled: saleType === "counter",
   });
 
-  // Fetch booth service categories
   const { data: serviceCategoriesData } = useQuery({
     queryKey: ["booth-service-categories"],
     queryFn: () => settingsApi.getServiceCategories(),
     enabled: saleType === "booth",
   });
 
-  // Fetch item categories when service category is selected
   const { data: itemCategoriesData } = useQuery({
     queryKey: ["booth-item-categories", serviceCategory],
     queryFn: () => settingsApi.getItemCategories(serviceCategory),
@@ -42,521 +57,393 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   });
 
   const materials = materialsData?.data || [];
-  const activeMaterials = materials.filter((m) => m.quantity > 0);
   const serviceCategories = serviceCategoriesData?.data || [];
   const itemCategories = itemCategoriesData?.data || [];
 
-  // Reset when switching sale type
-  useEffect(() => {
-    setItems([]);
-    setServiceCategory("");
-    setItemCategory("");
-    setBoothPrice(0);
-    setSelectedService(null);
-  }, [saleType]);
+  const filteredMaterials = useMemo(() => {
+    if (!searchTerm) return materials;
+    return materials.filter((m) => m.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  }, [materials, searchTerm]);
 
-  // Auto-fill price when both categories are selected
-  useEffect(() => {
-    if (serviceCategory && itemCategory) {
-      const selected = itemCategories.find(
-        (i) => i.itemCategory === itemCategory
-      );
-      if (selected) {
-        setBoothPrice(parseFloat(selected.price));
-        setSelectedService(selected);
+  // --- CART ACTIONS ---
+  const addToCart = (material) => {
+    setItems((prevItems) => {
+      const existingItem = prevItems.find((i) => i.materialId === material.id);
+      if (existingItem) {
+        if (existingItem.quantity + 1 > material.quantity) {
+          alert("Max stock reached!");
+          return prevItems;
+        }
+        return prevItems.map((i) =>
+          i.materialId === material.id
+            ? { ...i, quantity: i.quantity + 1, subtotal: (i.quantity + 1) * i.unitPrice }
+            : i
+        );
       } else {
-        setBoothPrice(0);
-        setSelectedService(null);
+        return [...prevItems, {
+          id: Date.now(),
+          itemType: "material",
+          materialId: material.id,
+          materialName: material.name,
+          quantity: 1,
+          maxQuantity: material.quantity,
+          unitPrice: Number(material.sellingPrice),
+          subtotal: Number(material.sellingPrice),
+          imageUrl: material.imageUrl,
+        }];
       }
-    } else {
-      setBoothPrice(0);
-      setSelectedService(null);
-    }
-  }, [serviceCategory, itemCategory, itemCategories]);
-
-  // Counter Sale Functions
-  const addItem = () => {
-    setItems([
-      ...items,
-      {
-        id: Date.now(),
-        itemType: "material",
-        materialId: "",
-        quantity: 0,
-        unitPrice: 0,
-        subtotal: 0,
-      },
-    ]);
+    });
   };
 
-  const removeItem = (id) => {
-    setItems(items.filter((item) => item.id !== id));
-  };
-
-  const updateItem = (id, field, value) => {
-    setItems(
-      items.map((item) => {
-        if (item.id === id) {
-          const updated = { ...item, [field]: value };
-
-          if (field === "materialId" && value) {
-            const material = materials.find((m) => m.id === parseInt(value));
-            if (material) {
-              updated.unitPrice = material.sellingPrice;
-              updated.subtotal = material.sellingPrice * updated.quantity;
-              updated.maxQuantity = material.quantity;
-              updated.materialName = material.name;
-            }
+  const updateQuantity = (itemId, change) => {
+    setItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.id === itemId) {
+          const newQty = item.quantity + change;
+          if (newQty <= 0) return item; 
+          if (newQty > item.maxQuantity) {
+            alert("Stock limit reached");
+            return item;
           }
-
-          if (field === "quantity") {
-            updated.subtotal = updated.unitPrice * parseFloat(value || 0);
-          }
-
-          return updated;
+          return { ...item, quantity: newQty, subtotal: newQty * item.unitPrice };
         }
         return item;
       })
     );
   };
 
-  // Calculate totals
-  const itemsTotal = items.reduce(
-    (sum, item) => sum + parseFloat(item.subtotal || 0),
-    0
-  );
-  const grandTotal = saleType === "counter" ? itemsTotal : boothPrice;
+  const removeItem = (id) => setItems(items.filter((item) => item.id !== id));
 
-  // Date validation
-  const isFutureDate = new Date(saleDate) > new Date();
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-  const isOldDate = new Date(saleDate) < thirtyDaysAgo;
+  const clearAll = () => {
+    setItems([]);
+    setBoothPrice(0);
+    setDiscount(0);
+    setSelectedCustomer(null);
+    setServiceCategory("");
+    setItemCategory("");
+    setPaymentStatus("paid");
+    setPartialAmount("");
+  };
 
-  const handleSubmit = (e) => {
+  useEffect(() => {
+    if (serviceCategory && itemCategory) {
+      const selected = itemCategories.find((i) => i.itemCategory === itemCategory);
+      if (selected) {
+        setBoothPrice(parseFloat(selected.price));
+        setSelectedService(selected);
+      }
+    } else {
+        setBoothPrice(0);
+        setSelectedService(null);
+    }
+  }, [serviceCategory, itemCategory, itemCategories]);
+
+  // --- TOTALS ---
+  const itemsTotal = items.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
+  const subTotal = saleType === "counter" ? itemsTotal : boothPrice;
+  const grandTotal = Math.max(0, subTotal - parseFloat(discount || 0));
+
+  // --- SUBMIT ---
+  const handleFinalSubmit = (e) => {
     e.preventDefault();
+    
+    if (saleType === "counter" && items.length === 0) return alert("Cart is empty");
+    if (saleType === "booth" && !selectedService?.id) return alert("Invalid Service");
+    if (paymentStatus === "partially" && (!partialAmount || partialAmount <= 0)) return alert("Please enter the amount paid");
 
-   const now = new Date();
-    const currentTimeString = format(now, "HH:mm:ss");
-    
-    // 2. Combine the selected date with the current time
-    // This creates a string like "2023-10-25T14:30:15"
-    const dateTimeString = `${saleDate}T${currentTimeString}`;
-    
-    // 3. Create the Date object
-    const saleDateTime = new Date(dateTimeString);
-    const formattedDateTime = saleDateTime.toISOString();
-    
-    if (isFutureDate) {
-      alert("Cannot create a sale with a future date");
-      return;
+    const now = new Date();
+    const formattedDateTime = new Date(`${saleDate}T${format(now, "HH:mm:ss")}`).toISOString();
+
+    // 1. Calculate Amount Paid Logic
+    let finalAmountPaid = 0;
+    if (paymentStatus === 'paid') {
+        finalAmountPaid = grandTotal;
+    } else if (paymentStatus === 'unpaid') {
+        finalAmountPaid = 0;
+    } else {
+        finalAmountPaid = parseFloat(partialAmount);
     }
 
+    // 2. Prepare Payload
+    const commonData = {
+        paymentMethod,
+        saleDate: formattedDateTime,
+        // Send ID if registered, otherwise null
+        customerId: selectedCustomer?.type === 'registered' ? selectedCustomer.id : null,
+        // Send Name explicitly (fallback to Walking Customer)
+        customerName: selectedCustomer?.name || 'Walking Customer',
+        customerPhone: selectedCustomer?.phone || '',
+        paymentStatus, 
+        discount: parseFloat(discount || 0),
+        amountPaid: finalAmountPaid, // <-- CRITICAL: Backend needs this to verify status
+        totalAmount: grandTotal      // <-- CRITICAL: Send total so backend can compare
+    };
+
+    // 3. DEBUGGING: Check console to see what is sent
+    console.log("🚀 SUBMITTING SALE DATA:", commonData);
+
     if (saleType === "counter") {
-      if (items.length === 0) {
-        alert("Please add at least one item");
-        return;
-      }
-
-      for (const item of items) {
-        if (!item.materialId) {
-          alert("Please select a material for all items");
-          return;
-        }
-        if (item.quantity <= 0) {
-          alert("Quantity must be greater than 0");
-          return;
-        }
-        const selectedQty = parseFloat(item.quantity);
-        const availableQty = Number(item.maxQuantity);
-        if (selectedQty > availableQty) {
-          alert(
-            `Not enough stock for ${item.materialName}. Available: ${item.maxQuantity}`
-          );
-          return;
-        }
-      }
-
       const saleItems = items.map((item) => ({
         itemType: "material",
         materialId: Number(item.materialId),
         quantity: parseFloat(item.quantity),
       }));
-
-      onSubmit({
-        items: saleItems,
-        paymentMethod,
-        saleDate: formattedDateTime,
-      });
+      onSubmit({ ...commonData, items: saleItems });
     } else {
-      if (!serviceCategory || !itemCategory) {
-        alert("Please select both service and item category");
-        return;
-      }
-
-      if (!selectedService?.id) {
-        alert("Service ID not found. Please reselect the service.");
-        return;
-      }
-
-      const submitData = {
-        items: [
-          {
-            itemType: "booth",
-            serviceId: selectedService.id,
-          },
-        ],
-        paymentMethod,
-        saleDate: new Date(saleDate).toISOString(),
-      };
-
-      onSubmit(submitData);
+      onSubmit({ ...commonData, items: [{ itemType: "booth", serviceId: selectedService.id }] });
     }
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-8">
-      {/* Sale Type Toggle */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <label className="block text-sm font-medium text-gray-900 mb-3">
-          Sale Type
-        </label>
-        <div className="grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={() => setSaleType("counter")}
-            className={`px-6 py-4 rounded-lg border-2 font-medium transition-all ${
-              saleType === "counter"
-                ? "border-primary-500 bg-primary-50 text-primary-700 shadow-sm"
-                : "border-gray-300 text-gray-700 hover:border-gray-400"
-            }`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              Counter Sale
-            </div>
-            <p className="text-xs mt-1 text-gray-500">Materials</p>
-          </button>
-          <button
-            type="button"
-            onClick={() => setSaleType("booth")}
-            className={`px-6 py-4 rounded-lg border-2 font-medium transition-all ${
-              saleType === "booth"
-                ? "border-success-500 bg-success-50 text-success-700 shadow-sm"
-                : "border-gray-300 text-gray-700 hover:border-gray-400"
-            }`}
-          >
-            <div className="flex items-center justify-center gap-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              Booth Service
-            </div>
-            <p className="text-xs mt-1 text-gray-500">Spray Services</p>
-          </button>
-        </div>
-      </div>
-
-      {/* Sale Date Section */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="flex items-start justify-between">
-          <div className="flex-1 max-w-md">
-            <label htmlFor="saleDate" className="block text-sm font-medium text-gray-900 mb-2">
-              Sale Date
-            </label>
-            <Input
-              id="saleDate"
-              type="date"
-              value={saleDate}
-              onChange={(e) => setSaleDate(e.target.value)}
-              max={format(new Date(), "yyyy-MM-dd")}
-              required
-              disabled={isLoading}
-            />
-            <p className="text-xs text-gray-500 mt-2">
-              {saleDate === format(new Date(), "yyyy-MM-dd")
-                ? "Recording sale for today"
-                : "Backdating sale record"}
-            </p>
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-140px)] gap-6">
+      
+      {/* LEFT COLUMN: PRODUCTS */}
+      <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full">
+        {/* Toggle Header */}
+        <div className="p-4 border-b border-gray-100 bg-white z-10 space-y-4">
+          <div className="flex p-1 bg-gray-100 rounded-lg">
+            <button
+              type="button"
+              onClick={() => setSaleType("counter")}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 ${saleType === "counter" ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              Materials
+            </button>
+            <button
+              type="button"
+              onClick={() => setSaleType("booth")}
+              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 ${saleType === "booth" ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5" : "text-gray-500 hover:text-gray-700"}`}
+            >
+              Booth Services
+            </button>
           </div>
-
-          {isOldDate && (
-            <div className="ml-4 bg-warning-50 border border-warning-200 rounded-lg p-3 max-w-xs">
-              <div className="flex items-start gap-2">
-                <svg className="w-5 h-5 text-warning-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-                <div>
-                  <p className="text-sm font-medium text-warning-900">Old Date</p>
-                  <p className="text-xs text-warning-700 mt-1">
-                    This sale is more than 30 days old. Make sure this is intentional.
-                  </p>
-                </div>
-              </div>
+          {saleType === "counter" && (
+            <div className="relative">
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <input
+                type="text"
+                placeholder="Search inventory..."
+                className="block w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                />
             </div>
           )}
         </div>
-      </div>
 
-      {/* COUNTER SALE SECTION */}
-      {saleType === "counter" && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <div className="mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Sale Items</h3>
-            <p className="text-sm text-gray-500 mt-1">Add materials to this sale</p>
-          </div>
-
-          {items.length === 0 ? (
-            <div className="text-center py-8 bg-gray-50 rounded-lg border-2 border-dashed border-gray-300 mb-4">
-              <svg className="w-12 h-12 text-gray-400 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-              </svg>
-              <p className="text-gray-500">No items added yet</p>
-              <p className="text-sm text-gray-400 mt-1">Click "Add Item" below to start</p>
-            </div>
-          ) : (
-            <>
-              {/* Desktop Header Row */}
-              <div className="hidden md:grid grid-cols-12 gap-4 mb-2 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">
-                <div className="col-span-3">Material</div>
-                <div className="col-span-3">Quantity</div>
-                <div className="col-span-3">Unit Price (GH₵)</div>
-                <div className="col-span-3 text-right">Subtotal (GH₵)</div>
-              </div>
-
-              <div className="space-y-4 mb-6">
-                {items.map((item) => (
-                  <div key={item.id} className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50/50">
+          {saleType === "counter" ? (
+            <div className="grid grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-4">
+              {filteredMaterials.map((material) => (
+                <div key={material.id} className="group bg-white p-3 rounded-xl border border-gray-200 hover:border-gray-300 shadow-sm transition-all flex flex-col relative">
+                  <div className={`aspect-square rounded-lg mb-3 flex items-center justify-center text-white font-bold text-xl relative overflow-hidden ${material.imageUrl ? "" : getItemColor(material.id)}`}>
+                    {material.imageUrl ? <img src={material.imageUrl} alt={material.name} className="w-full h-full object-cover" /> : <span>{material.name.substring(0, 2).toUpperCase()}</span>}
+                    {material.quantity < 10 && material.quantity > 0 && <span className="absolute top-2 right-2 bg-black/75 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full font-medium">{material.quantity} left</span>}
+                  </div>
+                  
+                  <div className="flex flex-col flex-1">
+                    <h3 className="font-medium text-gray-900 text-sm mb-1 truncate" title={material.name}>{material.name}</h3>
+                    <div className="flex items-end justify-between mt-auto">
+                      <div className="flex flex-col">
+                          <span className="font-bold text-gray-900">₵{Number(material.sellingPrice).toFixed(2)}</span>
+                      </div>
                       
-                      {/* Material: 3 Cols */}
-                      <div className="col-span-1 md:col-span-3">
-                        <label className="block md:hidden text-xs font-medium text-gray-500 mb-1">Material</label>
-                        <Select
-                          name={`material-${item.id}`}
-                          value={item.materialId}
-                          onChange={(e) => updateItem(item.id, "materialId", e.target.value)}
-                          options={activeMaterials.map((m) => ({
-                            value: m.id.toString(),
-                            label: m.name, // Simplified label, stock shown in quantity field now
-                          }))}
-                          placeholder="Select material"
-                          required
-                          disabled={isLoading}
-                        />
-                      </div>
-
-                      {/* Quantity: 3 Cols */}
-                      <div className="col-span-1 md:col-span-3">
-                        <label className="block md:hidden text-xs font-medium text-gray-500 mb-1">Quantity</label>
-                        <div className="flex flex-col">
-                          <Input
-                            name={`quantity-${item.id}`}
-                            type="number"
-                            step="any"
-                            value={item.quantity}
-                            onChange={(e) => updateItem(item.id, "quantity", e.target.value)}
-                            min="0"
-                            max={item.maxQuantity}
-                            placeholder="0"
-                            required
-                            disabled={isLoading}
-                            // Removed arrows, standard padding
-                            className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                          />
-                          {item.maxQuantity && (
-                            <div className="mt-1 text-xs text-gray-500 flex justify-between px-1">
-                              <span>Max Stock:</span>
-                              <span className="font-medium">{item.maxQuantity}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Price: 3 Cols */}
-                      <div className="col-span-1 md:col-span-3">
-                        <label className="block md:hidden text-xs font-medium text-gray-500 mb-1">Unit Price (GH₵)</label>
-                        <Input
-                          name={`price-${item.id}`}
-                          type="number"
-                          value={item.unitPrice}
-                          disabled
-                          step="0.01"
-                          placeholder="0.00"
-                          // Standard padding since GHC is in header
-                          className="[appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                        />
-                      </div>
-
-                      {/* Subtotal & Delete: 3 Cols */}
-                      <div className="col-span-1 md:col-span-3 flex items-center justify-between h-[42px]">
-                        <div className="flex-1 md:text-right mr-4">
-                          <span className="md:hidden text-xs text-gray-500 mr-2">Subtotal:</span>
-                          <span className="text-sm font-semibold text-gray-900 truncate block">
-                            {parseFloat(item.subtotal || 0).toFixed(2)}
-                          </span>
-                        </div>
-                        <button
-                          type="button"
-                          onClick={() => removeItem(item.id)}
-                          className="p-2 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-full transition-colors flex-shrink-0"
-                          disabled={isLoading}
-                          title="Remove item"
-                        >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                        </button>
-                      </div>
+                      {/* NEW ICON BUTTON */}
+                      <button 
+                        type="button" 
+                        onClick={() => addToCart(material)} 
+                        disabled={material.quantity <= 0} 
+                        className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${material.quantity > 0 ? "bg-black text-white hover:bg-gray-800 shadow-sm active:scale-95" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
+                      >
+                         {material.quantity > 0 ? (
+                             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                         ) : (
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                         )}
+                      </button>
                     </div>
                   </div>
-                ))}
-              </div>
-            </>
+                </div>
+              ))}
+              {filteredMaterials.length === 0 && <div className="col-span-full text-center text-gray-400 py-12 text-sm">No materials found.</div>}
+            </div>
+          ) : (
+           
+            <div className="flex flex-col  justify-center items-center p-6">
+                <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
+                   <div className="text-center mb-8">
+                       <div className="w-12 h-12 bg-gray-50 rounded-xl mx-auto flex items-center justify-center mb-4 border border-gray-100">
+                           <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" /></svg>
+                       </div>
+                       <h3 className="text-lg font-bold text-gray-900">Service Configuration</h3>
+                       <p className="text-gray-500 text-sm mt-1">Configure the booth session details below.</p>
+                   </div>
+
+                   <div className="space-y-5">
+                       <div className="space-y-1.5">
+                           <label className="text-xs font-semibold text-gray-700 uppercase tracking-wide ml-1">Service Type</label>
+                           <div className="relative">
+                                <select 
+                                    className="w-full pl-4 pr-10 py-3 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent appearance-none transition-shadow" 
+                                    value={serviceCategory} 
+                                    onChange={(e) => { setServiceCategory(e.target.value); setItemCategory(""); }}
+                                >
+                                    <option value="">Select Category</option>
+                                    {serviceCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+                                </select>
+                                <svg className="w-4 h-4 text-gray-400 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                           </div>
+                       </div>
+
+                       <div className="space-y-1.5">
+                           <label className={`text-xs font-semibold uppercase tracking-wide ml-1 transition-colors ${!serviceCategory ? 'text-gray-300' : 'text-gray-700'}`}>Vehicle Category</label>
+                           <div className="relative">
+                                <select 
+                                    className={`w-full pl-4 pr-10 py-3 bg-white border rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent appearance-none transition-all ${!serviceCategory ? 'border-gray-100 text-gray-300 cursor-not-allowed' : 'border-gray-200'}`} 
+                                    value={itemCategory} 
+                                    disabled={!serviceCategory} 
+                                    onChange={(e) => setItemCategory(e.target.value)}
+                                >
+                                    <option value="">Select Option</option>
+                                    {itemCategories.map((i) => <option key={i.id} value={i.itemCategory}>{i.itemCategory}</option>)}
+                                </select>
+                                <svg className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${!serviceCategory ? 'text-gray-200' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                           </div>
+                       </div>
+
+                       {/* Price Display */}
+                       {/* <div className="pt-4 border-t border-gray-100 mt-4">
+                           <div className="flex justify-between items-center bg-gray-50 rounded-lg p-4 border border-gray-100">
+                               <span className="text-sm font-medium text-gray-600">Estimated Cost</span>
+                               <span className={`text-xl font-bold ${boothPrice > 0 ? 'text-gray-900' : 'text-gray-300'}`}>
+                                   GH₵ {boothPrice.toFixed(2)}
+                               </span>
+                           </div>
+                       </div> */}
+                   </div>
+                </div>
+            </div>
           )}
-
-          {/* ADD ITEM BUTTON */}
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={addItem}
-            className="w-full py-3 border-2 border-dashed border-gray-300 bg-gray-50 text-gray-600 hover:border-primary-500 hover:text-primary-600 hover:bg-primary-50 transition-all"
-            icon={
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
-            }
-          >
-            Add New Item
-          </Button>
         </div>
-      )}
+      </div>
 
-      {/* BOOTH SALE SECTION (unchanged) */}
-      {saleType === "booth" && (
-        <div className="bg-white rounded-xl border border-gray-200 p-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-6">Booth Service Details</h3>
-          
-          <div className="space-y-4">
-            <Select
-              label="Service Category"
-              value={serviceCategory}
-              onChange={(e) => {
-                setServiceCategory(e.target.value);
-                setItemCategory("");
-                setBoothPrice(0);
-                setSelectedService(null);
-              }}
-              options={serviceCategories.map(cat => ({
-                value: cat,
-                label: cat,
-              }))}
-              placeholder="Select service (e.g., Full Body, Touch Up)"
-              required
-              disabled={isLoading}
-            />
+      {/* RIGHT COLUMN: CHECKOUT */}
+      <div className="w-full lg:w-[400px] flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 h-full relative">
+        <div className="p-4 border-b border-gray-100 bg-white rounded-t-xl flex justify-between items-center">
+           <h2 className="font-bold text-base text-gray-900">Current Order</h2>
+           <button onClick={clearAll} className="text-xs font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 px-3 py-1.5 rounded-md transition-colors">Clear</button>
+        </div>
 
-            {serviceCategory && (
-              <Select
-                label="Item Category"
-                value={itemCategory}
-                onChange={(e) => setItemCategory(e.target.value)}
-                options={itemCategories.map(item => ({
-                  value: item.itemCategory,
-                  label: `${item.itemCategory} - GH₵ ${parseFloat(item.price).toFixed(2)}`,
-                }))}
-                placeholder="Select item (e.g., 4x4, Saloon, Fridge)"
-                required
-                disabled={isLoading}
-              />
-            )}
-
-            {serviceCategory && itemCategory && boothPrice > 0 && (
-              <div className="bg-success-50 border border-success-200 rounded-lg p-4">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium text-success-900">Service Price</p>
-                    <p className="text-xs text-success-700 mt-1">
-                      {serviceCategory} - {itemCategory}
-                    </p>
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+          {saleType === 'counter' && items.length === 0 && (
+             <div className="flex flex-col items-center justify-center h-40 text-gray-400">
+                <svg className="w-10 h-10 mb-2 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
+                <span className="text-sm">Cart is empty</span>
+             </div>
+          )}
+          {saleType === "counter" && items.map((item) => (
+              <div key={item.id} className="flex gap-3 bg-white group hover:bg-gray-50 border border-gray-100 p-2.5 rounded-lg transition-colors">
+                <div className={`w-10 h-10 rounded-md flex items-center justify-center text-white text-xs font-bold shrink-0 ${item.imageUrl ? "" : getItemColor(item.materialId)}`}>
+                  {item.imageUrl ? <img src={item.imageUrl} className="w-full h-full object-cover rounded-md" alt="" /> : item.materialName.charAt(0)}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex justify-between items-start mb-1">
+                      <h4 className="font-medium text-sm text-gray-900 truncate pr-2">{item.materialName}</h4>
+                      <span className="text-sm font-bold text-gray-900 whitespace-nowrap">₵{Number(item.subtotal).toFixed(2)}</span>
                   </div>
-                  <p className="text-2xl font-bold text-success-700">
-                    GH₵&nbsp;{boothPrice.toFixed(2)}
-                  </p>
+                  <div className="flex justify-between items-center">
+                    <div className="flex items-center border border-gray-200 rounded bg-white h-7">
+                      <button onClick={() => updateQuantity(item.id, -1)} className="px-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 h-full transition-colors">-</button>
+                      <span className="px-1 text-xs font-medium w-6 text-center text-gray-900">{item.quantity}</span>
+                      <button onClick={() => updateQuantity(item.id, 1)} className="px-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 h-full transition-colors">+</button>
+                    </div>
+                    <button onClick={() => removeItem(item.id)} className="text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                    </button>
+                  </div>
                 </div>
               </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Totals & Payment */}
-      <div className="bg-white rounded-xl border border-gray-200 p-6">
-        <div className="space-y-3 mb-6">
-          <div className="border-t border-gray-200 pt-3">
-            <div className="flex justify-between text-lg font-bold">
-              <span className="text-gray-900">Total Amount</span>
-              <span className="text-primary-600">GH₵&nbsp;{grandTotal.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="mb-8">
-          <label className="block text-sm font-medium text-gray-900 mb-3">
-            Payment Method
-          </label>
-          <div className="grid grid-cols-3 gap-3">
-            {["cash", "momo", "cheque"].map((method) => (
-              <button
-                key={method}
-                type="button"
-                onClick={() => setPaymentMethod(method)}
-                className={`px-4 py-3 rounded-lg border text-sm font-medium transition-colors ${
-                  paymentMethod === method
-                    ? method === "cash"
-                      ? "border-primary-500 bg-primary-50 text-primary-700"
-                      : method === "momo"
-                        ? "border-success-500 bg-success-50 text-success-700"
-                        : "border-secondary-500 bg-secondary-50 text-secondary-700"
-                    : "border-gray-300 text-gray-700 hover:bg-gray-50"
-                }`}
-              >
-                {method === "momo"
-                  ? "Mobile Money"
-                  : method.charAt(0).toUpperCase() + method.slice(1)}
-              </button>
             ))}
-          </div>
+          {saleType === "booth" && serviceCategory && itemCategory && (
+            <div className="bg-gray-50 border border-gray-200 p-4 rounded-xl">
+                <h4 className="font-bold text-gray-900">{serviceCategory}</h4>
+                <p className="text-gray-600 text-sm mt-0.5">{itemCategory}</p>
+                <div className="mt-3 pt-3 border-t border-gray-200 flex justify-between items-center">
+                    <span className="text-xs text-gray-500">Service Fee</span>
+                    <span className="font-bold text-gray-900">GH₵ {boothPrice.toFixed(2)}</span>
+                </div>
+            </div>
+          )}
         </div>
 
-        <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-          <Button
-            type="button"
-            variant="secondary"
-            onClick={onCancel}
-            disabled={isLoading}
-            className="px-6"
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            loading={isLoading}
-            disabled={
-              isFutureDate || 
-              grandTotal === 0 ||
-              (saleType === "counter" && items.length === 0) || 
-              (saleType === "booth" && (!serviceCategory || !itemCategory))
-            }
-            className="px-8 shadow-sm"
-          >
-            Complete Sale • GH₵&nbsp;{grandTotal.toFixed(2)}
+        {/* BOTTOM SECTION */}
+        <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-4 text-sm rounded-b-xl">
+          
+          {/* CUSTOMER SELECT */}
+          <div className="relative z-20">
+            <CustomerSelect value={selectedCustomer} onChange={setSelectedCustomer} label="Customer (Optional)" />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3 z-10 relative">
+             <div>
+                 <label className="text-xs font-semibold text-gray-500 mb-1 block">Date</label>
+                 <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:ring-1 focus:ring-gray-900 focus:border-gray-900" />
+             </div>
+             <div>
+                <label className="text-xs font-semibold text-gray-500 mb-1 block">Method</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:ring-1 focus:ring-gray-900 focus:border-gray-900">
+                  <option value="cash">Cash</option>
+                  <option value="momo">MoMo</option>
+                  <option value="card">Card</option>
+                  <option value="cheque">Cheque</option>
+                </select>
+             </div>
+          </div>
+
+          {/* PAYMENT STATUS */}
+          <div className="z-0 relative">
+             <label className="block text-xs font-semibold text-gray-500 mb-1">Payment Status</label>
+             <div className="grid grid-cols-3 gap-1 p-1 bg-gray-200 rounded-lg">
+                {['paid', 'partially', 'unpaid'].map(status => (
+                   <button key={status} type="button" onClick={() => setPaymentStatus(status)} className={`py-1.5 text-xs font-medium rounded-md capitalize transition-all ${paymentStatus === status ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{status}</button>
+                ))}
+             </div>
+             
+             {/* NEW: PARTIAL AMOUNT INPUT */}
+             {paymentStatus === 'partially' && (
+                <div className="mt-3 animate-in fade-in slide-in-from-top-1 bg-white border border-gray-200 p-2 rounded-lg">
+                    <label className="text-xs text-gray-700 font-semibold mb-1 block">Amount Paid:</label>
+                    <div className="relative">
+                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">GH₵</span>
+                        <input 
+                            type="number" 
+                            value={partialAmount} 
+                            onChange={(e) => setPartialAmount(e.target.value)}
+                            className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-gray-900 outline-none"
+                            placeholder="0.00"
+                        />
+                    </div>
+                </div>
+             )}
+          </div>
+
+          <div className="border-t border-gray-200 pt-3 space-y-1">
+             <div className="flex justify-between text-xs text-gray-600"><span>Subtotal</span><span>GH₵ {subTotal.toFixed(2)}</span></div>
+             <button type="button" onClick={() => setShowDiscountInput(!showDiscountInput)} className="text-xs text-gray-500 hover:text-gray-900 hover:underline text-left transition-colors">Add Discount?</button>
+             {showDiscountInput && (
+                <div className="flex items-center gap-2 mt-1">
+                    <span className="text-xs text-gray-500">Disc:</span>
+                    <input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-24 p-1 text-xs border border-gray-300 rounded focus:border-gray-900 focus:ring-0" placeholder="0.00" />
+                </div>
+             )}
+             <div className="flex justify-between text-xl font-bold text-gray-900 pt-2"><span>Total</span><span>GH₵ {grandTotal.toFixed(2)}</span></div>
+          </div>
+
+          <Button onClick={handleFinalSubmit} variant="primary" className="w-full py-3 bg-gray-900 hover:bg-black text-white rounded-lg shadow-sm" loading={isLoading} disabled={grandTotal < 0 || (saleType === "counter" && items.length === 0)}>
+            Complete Order
           </Button>
         </div>
       </div>
-    </form>
+    </div>
   );
 }

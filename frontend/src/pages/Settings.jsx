@@ -1,67 +1,67 @@
-// src/pages/Settings.jsx
 import { useState } from 'react';
 import { useAuthStore } from '@stores/authStore';
 import Card from '@components/common/Card';
 import BusinessSettings from '@components/features/settings/BusinessSettings';
 import ProfileSettings from '@components/features/settings/ProfileSettings';
 import ServiceSettings from '@components/features/settings/ServiceSettings';
+import CustomersManager from '@components/features/settings/CustomersManager';
+import { Users, User, Building2, Wrench } from 'lucide-react';
 
 const TABS = [
-  { id: 'profile', label: 'My Profile' },
-  { id: 'business', label: 'Business Settings', adminOnly: true },
-  { id: 'services', label: 'Service Pricing',  adminOnly: true },
+  { id: 'profile', label: 'My Profile', icon: <User className="w-4 h-4" /> },
+  { id: 'business', label: 'Business Profile', adminOnly: true, icon: <Building2 className="w-4 h-4" /> },
+  { id: 'services', label: 'Service Pricing', adminOnly: true, icon: <Wrench className="w-4 h-4" /> },
+  { id: 'customers', label: 'Customer Base', adminOnly: false, icon: <Users className="w-4 h-4" /> },
 ];
 
 export default function Settings() {
   const { user, hasPermission } = useAuthStore();
   const [activeTab, setActiveTab] = useState('profile');
 
-  // Filter tabs based on permissions
   const visibleTabs = TABS.filter(tab => {
     if (!tab.adminOnly) return true;
     return user?.role === 'admin' || hasPermission('settings', 'update');
   });
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="min-h-screen bg-gray-50/50">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Settings</h1>
-        <p className="text-gray-600 mt-1">
-          Manage your profile and system configuration
-        </p>
+      <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur-md">
+        <div className="px-6 py-4 max-w-5xl mx-auto">
+          <h1 className="text-xl font-bold text-gray-900 tracking-tight">Settings</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Manage your workspace preferences</p>
+        </div>
       </div>
 
-      {/* Tabs */}
-      <Card>
-        <div className="border-b border-gray-200">
-          <nav className="-mb-px flex space-x-8">
-            {visibleTabs.map((tab) => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`
-                  py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2
-                  ${
-                    activeTab === tab.id
-                      ? 'border-primary-500 text-primary-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }
-                `}
-              >
-                <span className="text-lg">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </nav>
+      <div className="p-6 lg:p-8 max-w-5xl mx-auto flex flex-col md:flex-row gap-8">
+        {/* Sidebar Navigation */}
+        <div className="w-full md:w-64 flex-shrink-0 space-y-1">
+          <h3 className="px-3 text-xs font-bold text-gray-400 uppercase tracking-wider mb-2 font-mono">Configuration</h3>
+          {visibleTabs.map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`
+                w-full flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200
+                ${activeTab === tab.id
+                  ? 'bg-gray-900 text-white shadow-sm'
+                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
+                }
+              `}
+            >
+              <span className={activeTab === tab.id ? 'text-gray-300' : 'text-gray-400'}>{tab.icon}</span>
+              {tab.label}
+            </button>
+          ))}
         </div>
-      </Card>
 
-      {/* Tab Content */}
-      <div>
-        {activeTab === 'profile' && <ProfileSettings />}
-        {activeTab === 'business' && <BusinessSettings />}
-        {activeTab === 'services' && <ServiceSettings />}
+        {/* Content Area */}
+        <div className="flex-1 min-w-0 animate-in fade-in slide-in-from-bottom-2 duration-300">
+          {activeTab === 'profile' && <ProfileSettings />}
+          {activeTab === 'business' && <BusinessSettings />}
+          {activeTab === 'services' && <ServiceSettings />}
+          {activeTab === 'customers' && <CustomersManager />}
+        </div>
       </div>
     </div>
   );

@@ -24,7 +24,7 @@ export default {
         danger: '#ef4444',
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Rubik', 'system-ui', 'Arial'],
       },
     },
   },

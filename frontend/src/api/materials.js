@@ -48,4 +48,10 @@ export const materialsApi = {
     const response = await apiClient.get(`/materials/${id}/reorders`);
     return response;
   },
+
+bulkReorderMaterials: async (data) => {
+  const payload = Array.isArray(data) ? { items: data } : data;
+    const response = await apiClient.post('/materials/bulk-reorder', payload);
+    return response.data; 
+},
 };

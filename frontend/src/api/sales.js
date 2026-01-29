@@ -40,6 +40,11 @@ export const salesApi = {
     const response = await apiClient.get('/sales/stats', { params });
     return response;
   },
+
+  addPayment:async (id, data) => {
+    const reponse = await apiClient.post(`/sales/${id}/payment`, data);
+    return reponse;
+  }
 };
 
 // ============================================

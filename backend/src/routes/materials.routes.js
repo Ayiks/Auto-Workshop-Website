@@ -8,6 +8,7 @@ import {
   getLowStockMaterials,
   reorderMaterial,
   getMaterialReorders,
+  bulkReorderMaterials
 } from '../controllers/materials.controller.js';
 import { protect, requirePermission } from '../middleware/auth.js';
 
@@ -34,5 +35,8 @@ router
   .get(requirePermission('materials', 'view'), getMaterial)
   .put(requirePermission('materials', 'edit'), updateMaterial)
   .delete(requirePermission('materials', 'delete'), deleteMaterial);
+
+// Bulk reorder route
+router.post('/bulk-reorder', requirePermission('materials', 'reorder'), bulkReorderMaterials);
 
 export default router;

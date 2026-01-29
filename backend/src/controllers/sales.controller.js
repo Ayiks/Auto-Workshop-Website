@@ -17,19 +17,26 @@ const generateReceiptNumber = () => {
 // @route   POST /api/sales
 // @access  Private (requires 'sales:create' permission)
 export const createSale = asyncHandler(async (req, res) => {
-  const { items, paymentMethod, saleDate: userProvidedDate } = req.body;
+  // 1. EXTRACT ALL DATA (Fixed: Added customer & payment fields)
+  const { 
+    items, 
+    paymentMethod, 
+    saleDate: userProvidedDate,
+    customerId,
+    customerName,
+    paymentStatus,
+    amountPaid,
+    discount 
+  } = req.body;
 
   let finalSaleDate = new Date();
   if (userProvidedDate) {
     const datePart = new Date(userProvidedDate);
-
     const timePart = new Date();
-
     datePart.setHours(timePart.getHours());
     datePart.setMinutes(timePart.getMinutes());
     datePart.setSeconds(timePart.getSeconds());
     datePart.setMilliseconds(timePart.getMilliseconds());
-
     finalSaleDate = datePart;
   }
 
@@ -38,63 +45,29 @@ export const createSale = asyncHandler(async (req, res) => {
     throw new AppError('Please provide sale items', 400, 'VALIDATION_ERROR');
   }
 
-  if (!['cash', 'momo', 'cheque'].includes(paymentMethod)) {
-    throw new AppError(
-      'Invalid payment method. Must be cash, momo, or cheque',
-      400,
-      'VALIDATION_ERROR'
-    );
-  }
-
   // Validate and calculate total
-  let totalAmount = 0;
+  let calculatedSubtotal = 0;
   const validatedItems = [];
 
   for (const item of items) {
     if (!item.itemType || !['material', 'booth'].includes(item.itemType)) {
-      throw new AppError(
-        'Invalid item type. Must be material or booth',
-        400,
-        'VALIDATION_ERROR'
-      );
+      throw new AppError('Invalid item type', 400, 'VALIDATION_ERROR');
     }
 
     if (item.itemType === 'material') {
       if (!item.materialId || !item.quantity || item.quantity <= 0) {
-        throw new AppError(
-          'Material items require valid materialId and quantity',
-          400,
-          'VALIDATION_ERROR'
-        );
+        throw new AppError('Invalid material data', 400, 'VALIDATION_ERROR');
       }
 
-      // Fetch material
       const material = await prisma.material.findUnique({
         where: { id: parseInt(item.materialId) },
       });
 
-      if (!material) {
-        throw new AppError(
-          `Material with ID ${item.materialId} not found`,
-          404,
-          'NOT_FOUND'
-        );
-      }
-
-      if (!material.isActive) {
-        throw new AppError(
-          `Material "${material.name}" is inactive`,
-          400,
-          'INVALID_OPERATION'
-        );
-      }
-
+      if (!material) throw new AppError(`Material ID ${item.materialId} not found`, 404, 'NOT_FOUND');
+      if (!material.isActive) throw new AppError(`Material "${material.name}" is inactive`, 400, 'INVALID_OPERATION');
+      
       if (material.quantity < item.quantity) {
-        throw new AppError(
-          `Insufficient stock for "${material.name}". Available: ${material.quantity}`,
-          400,
-          'INSUFFICIENT_STOCK'
-        );
+        throw new AppError(`Insufficient stock for "${material.name}". Available: ${material.quantity}`, 400, 'INSUFFICIENT_STOCK');
       }
 
       const subtotal = material.sellingPrice * item.quantity;
@@ -107,17 +80,14 @@ export const createSale = asyncHandler(async (req, res) => {
         unitPrice: material.sellingPrice,
         subtotal,
       });
-      totalAmount += subtotal;
+      calculatedSubtotal += subtotal;
 
     } else if (item.itemType === 'booth') {
-      // Fetch booth service
       const service = await prisma.service.findUnique({
         where: { type: 'booth', isActive: true, id: parseInt(item.serviceId) },
       });
 
-      if (!service) {
-        throw new AppError('Booth service not configured', 404, 'NOT_FOUND');
-      }
+      if (!service) throw new AppError('Booth service not configured', 404, 'NOT_FOUND');
 
       validatedItems.push({
         itemType: 'booth',
@@ -126,24 +96,41 @@ export const createSale = asyncHandler(async (req, res) => {
         unitCost: 0,
         subtotal: service.price,
       });
-      totalAmount += service.price;
+      calculatedSubtotal += service.price;
     }
   }
 
+  // 2. APPLY DISCOUNT & CALCULATE BALANCE (Fixed)
+  const finalDiscount = parseFloat(discount || 0);
+  const finalTotalAmount = Math.max(0, calculatedSubtotal - finalDiscount);
+  const finalAmountPaid = parseFloat(amountPaid || 0);
+  
+  // If status is paid, balance is 0. If partial, calculate diff.
+  const balance = Math.max(0, finalTotalAmount - finalAmountPaid);
+
   // Start transaction
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Create sale
+    
+    // 3. CREATE SALE WITH NEW FIELDS (Fixed)
     const sale = await tx.sale.create({
       data: {
-        totalAmount,
+        totalAmount: finalTotalAmount,
+        discount: finalDiscount,
+        amountPaid: finalAmountPaid,
+        balance: balance, // Ensure your schema has a 'balance' float column. If not, remove this.
         paymentMethod,
+        paymentStatus: paymentStatus || 'paid', // Save 'partially', 'unpaid', or 'paid'
         soldBy: req.user.id,
-        status: 'completed',
+        status: 'completed', // Workflow status
         saleDate: finalSaleDate,
+        // Customer Linking
+        customerId: customerId ? parseInt(customerId) : null,
+        customerName: customerName || (customerId ? undefined : 'Walking Customer'), // Fallback name
+        customerPhone: req.body.customerPhone || null,
       },
     });
 
-    // 2. Create sale items and update inventory
+    // 4. Create sale items
     for (const item of validatedItems) {
       await tx.saleItem.create({
         data: {
@@ -152,69 +139,55 @@ export const createSale = asyncHandler(async (req, res) => {
         },
       });
 
-      // Deduct material stock
       if (item.itemType === 'material') {
         await tx.material.update({
           where: { id: item.materialId },
-          data: {
-            quantity: {
-              decrement: item.quantity,
-            },
-          },
+          data: { quantity: { decrement: item.quantity } },
         });
       }
     }
 
-    // 3. Get business settings for receipt
+    // 5. Generate Receipt
     const businessSettings = await tx.businessSettings.findFirst();
-    if (!businessSettings) {
-      throw new AppError('Business settings not configured', 500, 'CONFIG_ERROR');
-    }
-
-    // 4. Generate receipt
+    // (Optional: handle if no settings exist nicely, or keep throw)
+    
     const receiptNumber = await generateReceiptNumber();
     const receipt = await tx.receipt.create({
       data: {
         receiptNumber,
         receiptType: 'sale',
         saleId: sale.id,
-        amount: totalAmount,
+        amount: finalTotalAmount,
         paymentMethod,
         issuedBy: req.user.id,
-        businessName: businessSettings.name,
-        businessLogo: businessSettings.logo,
-        businessAddress: businessSettings.address,
-        businessContact: businessSettings.phone,
+        businessName: businessSettings?.name || 'Default Store',
+        businessLogo: businessSettings?.logo,
+        businessAddress: businessSettings?.address,
+        businessContact: businessSettings?.phone,
         issuedDate: finalSaleDate,
       },
     });
 
-    // 5. Log audit
+    // 6. Audit Log
     await tx.auditLog.create({
       data: {
         userId: req.user.id,
         action: 'CREATE',
         entity: 'Sale',
         entityId: sale.id,
-        description: `Created sale #${sale.id}. Total: GH₵${totalAmount}. Payment: ${paymentMethod}`,
+        description: `Created sale #${sale.id}. Total: ${finalTotalAmount}. Paid: ${finalAmountPaid}. Status: ${paymentStatus}`,
       },
     });
 
     return { sale, receipt };
   });
 
-  // Fetch complete sale with items
   const completeSale = await prisma.sale.findUnique({
     where: { id: result.sale.id },
     include: {
       items: true,
       receipt: true,
-      user: {
-        select: {
-          fullName: true,
-          username: true,
-        },
-      },
+      user: { select: { fullName: true, username: true } },
     },
   });
 
@@ -504,12 +477,115 @@ export const updateSale = asyncHandler(async (req, res) => {
     data: completeSale,
   });
 });
+// @desc    Add payment to an existing sale (Top Up)
+// @route   POST /api/sales/:id/payment
+// @access  Private
+export const addPayment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { amount, paymentMethod } = req.body;
+
+  // 1. Validation
+  if (!amount || amount <= 0) {
+    throw new AppError('Please provide a valid amount', 400, 'VALIDATION_ERROR');
+  }
+
+  // 2. Find the Sale
+  const sale = await prisma.sale.findUnique({
+    where: { id: parseInt(id) },
+    include: { receipt: true }
+  });
+
+  if (!sale) {
+    throw new AppError('Sale not found', 404, 'NOT_FOUND');
+  }
+
+  if (sale.paymentStatus === 'paid') {
+    throw new AppError('This sale is already fully paid', 400, 'INVALID_OPERATION');
+  }
+
+  // 3. Calculations
+  const newAmountPaid = parseFloat(sale.amountPaid) + parseFloat(amount);
+  const newBalance = parseFloat(sale.totalAmount) - newAmountPaid;
+  
+  // Determine new status
+  // Allow for small floating point errors (epsilon)
+  const isPaid = newBalance <= 0.01; 
+  const newStatus = isPaid ? 'paid' : 'partial';
+
+  if (newBalance < -0.01) {
+     throw new AppError(`Overpayment detected. Remaining balance is only ${sale.balance}`, 400, 'VALIDATION_ERROR');
+  }
+
+  // 4. Update Database Transaction
+  const result = await prisma.$transaction(async (tx) => {
+    // A. Update Sale Record
+    const updatedSale = await tx.sale.update({
+      where: { id: parseInt(id) },
+      data: {
+        amountPaid: newAmountPaid,
+        balance: Math.max(0, newBalance),
+        paymentStatus: newStatus,
+        // Optional: Update payment method to the latest one used, or keep original
+        // paymentMethod: paymentMethod 
+      }
+    });
+
+    // B. Create a Payment History Record (Optional but recommended)
+    // If you have a 'Payment' table, create a record here.
+    // await tx.payment.create({ ... })
+
+    // C. Update Receipt (Reflect the new total paid)
+    if (sale.receipt) {
+       await tx.receipt.update({
+         where: { id: sale.receipt.id },
+         data: {
+           // You might want to track history, but for now we update the main receipt
+           paymentMethod: paymentMethod // Update to latest method?
+         }
+       });
+    }
+
+    // D. Audit Log
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'PAYMENT',
+        entity: 'Sale',
+        entityId: parseInt(id),
+        description: `Added payment of GH₵${amount} via ${paymentMethod}. New Balance: ${newBalance.toFixed(2)}`
+      }
+    });
+
+    return updatedSale;
+  });
+
+  // 5. Return Result
+  // Fetch fresh data including items for the receipt view
+  const finalSale = await prisma.sale.findUnique({
+    where: { id: parseInt(id) },
+    include: { 
+      items: true, 
+      receipt: true,
+      user: { select: { fullName: true, username: true } }
+    }
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Payment added successfully',
+    data: {
+      sale: finalSale,
+      receipt: finalSale.receipt // Send back receipt so frontend can show it
+    }
+  });
+});
 
 // @desc    Get all sales
 // @route   GET /api/sales
 // @access  Private (requires 'sales:view' or 'sales:viewOwn' permission)
 export const getSales = asyncHandler(async (req, res) => {
-  const { startDate, endDate, paymentMethod, soldBy, page = 1, limit = 10 } = req.query;
+  // 1. EXTRACT 'paymentStatus' FROM QUERY
+  const { startDate, endDate, paymentMethod, paymentStatus, soldBy, page = 1, limit = 10 } = req.query;
 
   const pageNumber = parseInt(page);
   const limitNumber = parseInt(limit);
@@ -533,6 +609,11 @@ export const getSales = asyncHandler(async (req, res) => {
     where.paymentMethod = paymentMethod;
   }
 
+  // 2. FILTER BY PAYMENT STATUS (Paid, Partial, Unpaid)
+  if (paymentStatus) {
+    where.paymentStatus = paymentStatus;
+  }
+
   // Filter by seller
   if (soldBy) {
     where.soldBy = parseInt(soldBy);
@@ -543,42 +624,64 @@ export const getSales = asyncHandler(async (req, res) => {
     where.soldBy = req.user.id;
   }
 
-  const [sales, totalCount, revenueAgg, paymentStats] = await prisma.$transaction([
+  // 3. UPDATE TRANSACTION (Added 'statusStats' as the 5th item)
+  const [sales, totalCount, revenueAgg, paymentStats, statusStats] = await prisma.$transaction([
+    // Query 1: Get Sales
     prisma.sale.findMany({
-    where,
-    skip: skip,          // <--- Skip previous pages
-    take: limitNumber,
-    include: {
-      items: true,
-      user: {
-        select: {
-          fullName: true,
-          username: true,
+      where,
+      skip: skip,
+      take: limitNumber,
+      include: {
+        items: true,
+        user: {
+          select: {
+            fullName: true,
+            username: true,
+          },
+        },
+        receipt: {
+          select: {
+            receiptNumber: true,
+          },
         },
       },
-      receipt: {
-        select: {
-          receiptNumber: true,
-        },
-      },
-    },
-    orderBy: { saleDate: 'desc' },
-  }),
+      orderBy: { saleDate: 'desc' },
+    }),
+
+    // Query 2: Total Count
     prisma.sale.count({ where }),
+
+    // Query 3: Revenue
     prisma.sale.aggregate({
       _sum: { totalAmount: true },
-      where, // Important: Use same 'where' to respect date filters!
+      where,
     }),
+
+    // Query 4: Group by Payment Method
     prisma.sale.groupBy({
       by: ['paymentMethod'],
       _count: { paymentMethod: true },
       where,
     }),
+
+    // Query 5: Group by Payment Status (NEW)
+    prisma.sale.groupBy({
+      by: ['paymentStatus'],
+      _count: { paymentStatus: true },
+      where,
+    }),
   ]);
 
-  const statsMap = {};
+  // Map Payment Method Stats
+  const methodMap = {};
   paymentStats.forEach((stat) => {
-    statsMap[stat.paymentMethod] = stat._count.paymentMethod;
+    methodMap[stat.paymentMethod] = stat._count.paymentMethod;
+  });
+
+  // 4. MAP STATUS STATS (NEW)
+  const statusMap = {};
+  statusStats.forEach((stat) => {
+    statusMap[stat.paymentStatus] = stat._count.paymentStatus;
   });
 
   res.status(200).json({
@@ -592,8 +695,14 @@ export const getSales = asyncHandler(async (req, res) => {
     stats: {
       totalRevenue: revenueAgg._sum.totalAmount || 0,
       totalSales: totalCount,
-      cashCount: statsMap['cash'] || 0,
-      momoCount: statsMap['momo'] || 0,
+      // Method Counts
+      cashCount: methodMap['cash'] || 0,
+      momoCount: methodMap['momo'] || 0,
+      chequeCount: methodMap['cheque'] || 0,
+      // Status Counts (Added these)
+      paidCount: statusMap['paid'] || 0,
+      partialCount: statusMap['partially'] || 0,
+      unpaidCount: statusMap['unpaid'] || 0,
     }
   });
 });

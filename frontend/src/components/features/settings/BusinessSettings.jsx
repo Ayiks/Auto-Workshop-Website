@@ -87,7 +87,7 @@ export default function BusinessSettings() {
               value={isEditing ? formData.name : settings?.name || ''}
               onChange={handleChange}
               disabled={!isEditing}
-              className="block w-full rounded-lg p-2 border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+              className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
               placeholder="e.g. Acme Corp"
             />
           </div>
@@ -107,7 +107,7 @@ export default function BusinessSettings() {
                 value={isEditing ? formData.email : settings?.email || ''}
                 onChange={handleChange}
                 disabled={!isEditing}
-                className="block w-full rounded-lg p-2 border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
                 />
             </div>
             <div>
@@ -118,7 +118,7 @@ export default function BusinessSettings() {
                 value={isEditing ? formData.phone : settings?.phone || ''}
                 onChange={handleChange}
                 disabled={!isEditing}
-                className="block w-full rounded-lg p-2 border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
                 />
             </div>
             <div>
@@ -129,7 +129,7 @@ export default function BusinessSettings() {
                 value={isEditing ? formData.website : settings?.website || ''}
                 onChange={handleChange}
                 disabled={!isEditing}
-                className="block w-full rounded-lg p-2 border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500"
+                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
                 />
             </div>
           </div>
@@ -147,7 +147,7 @@ export default function BusinessSettings() {
               value={isEditing ? formData.address : settings?.address || ''}
               onChange={handleChange}
               disabled={!isEditing}
-              className="block w-full rounded-lg p-2 border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 resize-none"
+                        className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
             />
           </div>
         </div>

@@ -237,7 +237,7 @@ export default function ServiceSettings() {
                       </span>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end gap-2 transition-opacity">
                         <button 
                             onClick={() => handleToggle(service.id)} 
                             className={`p-1.5 rounded hover:bg-gray-100 transition-colors ${service.isActive ? 'text-gray-400 hover:text-gray-600' : 'text-green-600 hover:bg-green-50'}`}
@@ -287,7 +287,7 @@ export default function ServiceSettings() {
                 placeholder="e.g., Full Body Wash"
                 value={formData.serviceCategory}
                 onChange={(e) => setFormData({ ...formData, serviceCategory: e.target.value })}
-                className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm"
+                className="block w-full rounded-lg p-2 border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm"
             />
           </div>
           
@@ -298,7 +298,7 @@ export default function ServiceSettings() {
                 placeholder="e.g., SUV / 4x4"
                 value={formData.itemCategory}
                 onChange={(e) => setFormData({ ...formData, itemCategory: e.target.value })}
-                className="block w-full rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm"
+                className="block w-full rounded-lg p-2 border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm"
             />
           </div>
           
@@ -313,7 +313,7 @@ export default function ServiceSettings() {
                     placeholder="0.00"
                     value={formData.price}
                     onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                    className="block w-full pl-10 rounded-lg border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm"
+                    className="block w-full pl-10 rounded-lg p-2 border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm"
                 />
             </div>
           </div>

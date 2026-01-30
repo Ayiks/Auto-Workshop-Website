@@ -115,4 +115,9 @@ export const useAuthStore = create((set, get) => ({
     
     return user.role === role;
   },
+
+  setUser: (userData) => {
+    localStorage.setItem('user', JSON.stringify(userData));
+    set({ user: userData });
+  },
 }));

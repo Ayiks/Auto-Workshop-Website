@@ -105,6 +105,12 @@ export const invoicesApi = {
     const response = await apiClient.get('/invoices/stats');
     return response;
   },
+
+  // Void an Invoice (Restock items)
+  voidInvoice: async (id) => {
+    const response = await api.post(`/invoices/${id}/void`);
+    return response.data;
+  }
 };
 
 // ============================================

@@ -81,21 +81,7 @@ export const getMe = asyncHandler(async (req, res) => {
   });
 });
 
-// @desc    Logout user
-// @route   POST /api/auth/logout
-// @access  Private
-export const logout = asyncHandler(async (req, res) => {
-  // In a JWT system, logout is typically handled client-side
-  // by removing the token from storage
-  
-  // Optionally, you can blacklist the token here
-  // For now, we'll just return success
-  
-  res.json({
-    success: true,
-    message: 'Logout successful',
-  });
-});
+
 
 // @desc    Change password
 // @route   PUT /api/auth/change-password
@@ -136,5 +122,47 @@ export const changePassword = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'Password changed successfully',
+  });
+});
+
+// @desc    Update current user profile
+// @route   PUT /api/auth/profile
+// @access  Private
+export const updateProfile = asyncHandler(async (req, res) => {
+  const { fullName, email, phone } = req.body;
+
+  // 1. Validation (Optional: Check if email is valid, etc.)
+
+  // 2. Prepare data object
+  const updateData = {};
+  if (fullName !== undefined) updateData.fullName = fullName?.trim();
+  if (email !== undefined) updateData.email = email?.trim();
+  if (phone !== undefined) updateData.phone = phone?.trim();
+
+  // 3. Update using req.user.id (from the auth token middleware)
+  const user = await prisma.user.update({
+    where: { id: req.user.id }, 
+    data: updateData,
+    select: {
+      id: true,
+      username: true,
+      fullName: true,
+      email: true,
+      phone: true,
+      role: true,
+      permissions: true,
+      isActive: true,
+      createdAt: true,
+      lastLogin: true,
+    },
+  });
+
+  const token = generateToken(user);
+
+  res.json({
+    success: true,
+    message: 'Profile updated successfully',
+    user, // Send back the updated user object to update local state
+    token,  // Send back a new token in case user info in token payload is used
   });
 });

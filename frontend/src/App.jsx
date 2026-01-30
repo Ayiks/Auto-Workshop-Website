@@ -233,7 +233,7 @@ function App() {
           </Route>
 
           {/* 404 Route */}
-          <Route path="*" element={<Navigate to="/dashboard" replace />} />
+          <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
     </QueryClientProvider>

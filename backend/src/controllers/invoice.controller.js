@@ -67,10 +67,11 @@ export const generateInvoice = asyncHandler(async (req, res) => {
     );
   }
 
-  // Job must be completed
-  if (job.status !== 'completed') {
+  // ALLOW invoicing if job is active or completed. 
+  // We only stop it if it's cancelled or already invoiced.
+  if (['cancelled', 'invoiced'].includes(job.status)) {
     throw new AppError(
-      'Job must be completed before invoicing',
+      `Cannot generate invoice. Job status is ${job.status}`,
       400,
       'INVALID_OPERATION'
     );
@@ -515,4 +516,68 @@ export const getInvoiceStats = asyncHandler(async (req, res) => {
       recentInvoices,
     },
   });
+});
+
+// @desc    Void invoice and restock inventory
+// @route   POST /api/invoices/:id/void
+// @access  Private (Admin only)
+export const voidInvoice = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { reason } = req.body;
+
+  const invoice = await prisma.invoice.findUnique({
+    where: { id: parseInt(id) },
+    include: {
+      job: { include: { materials: true } },
+      payments: true
+    }
+  });
+
+  if (!invoice) throw new AppError('Invoice not found', 404);
+
+  // Don't void if payments exist (unless you want to refund them manually)
+  if (parseFloat(invoice.amountPaid) > 0) {
+    throw new AppError('Cannot void invoice with existing payments. Delete payments first.', 400);
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // 1. Restock Inventory
+    for (const material of invoice.job.materials) {
+      if (!material.isExternal && material.materialId) {
+        await tx.material.update({
+          where: { id: material.materialId },
+          data: { quantity: { increment: material.quantity } } // ADD BACK
+        });
+      }
+    }
+
+    // 2. Revert Job Status
+    await tx.job.update({
+      where: { id: invoice.jobId },
+      data: { status: 'in_progress' } // Send back to mechanics
+    });
+
+    // 3. Delete or Void Invoice
+    // Option A: Delete (Cleanest for drafts)
+    await tx.invoice.delete({ where: { id: invoice.id } });
+    
+    // Option B: Mark Void (Better for auditing)
+    // await tx.invoice.update({ 
+    //   where: { id: invoice.id }, 
+    //   data: { status: 'VOIDED', notes: `Voided: ${reason}` } 
+    // });
+
+    // 4. Log Audit
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'DELETE',
+        entity: 'Invoice',
+        entityId: invoice.id,
+        description: `Voided Invoice ${invoice.invoiceNumber}. Inventory restocked.`,
+      },
+    });
+  });
+
+  res.status(200).json({ success: true, message: 'Invoice voided and inventory restocked' });
 });

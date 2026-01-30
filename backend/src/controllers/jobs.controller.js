@@ -36,9 +36,9 @@ export const createJob = asyncHandler(async (req, res) => {
     );
   }
 
-  if (!problemType || !problemDescription) {
+  if (!problemType) {
     throw new AppError(
-      'Please provide problem type and description',
+      'Please provide problem type',
       400,
       'VALIDATION_ERROR'
     );
@@ -378,107 +378,178 @@ export const updateJob = asyncHandler(async (req, res) => {
     problemType,
     problemDescription,
     labourCost,
+    materials, // Array of materials from form
     status,
   } = req.body;
 
-  const job = await prisma.job.findUnique({
+  // 1. Fetch existing job to check permissions and status
+  const existingJob = await prisma.job.findUnique({
     where: { id: parseInt(id) },
     include: {
       invoice: true,
     },
   });
 
-  if (!job) {
+  if (!existingJob) {
     throw new AppError('Job not found', 404, 'NOT_FOUND');
   }
 
-  // Check ownership if user has only editOwn permission
-  if (req.isOwnResource && job.assignedTo !== req.user.id) {
-    throw new AppError(
-      'Not authorized to edit this job',
-      403,
-      'PERMISSION_DENIED'
-    );
+  // 2. Permission Checks
+  if (req.isOwnResource && existingJob.assignedTo !== req.user.id) {
+    throw new AppError('Not authorized to edit this job', 403, 'PERMISSION_DENIED');
   }
 
-  // Check job type restriction
-  if (req.allowedJobType && job.jobType !== req.allowedJobType) {
-    throw new AppError(
-      `You can only edit ${req.allowedJobType} jobs`,
-      403,
-      'PERMISSION_DENIED'
-    );
+  if (req.allowedJobType && existingJob.jobType !== req.allowedJobType) {
+    throw new AppError(`You can only edit ${req.allowedJobType} jobs`, 403, 'PERMISSION_DENIED');
   }
 
-  // Cannot edit job once invoiced
-  if (job.invoice) {
-    throw new AppError(
-      'Cannot edit job that has been invoiced',
-      400,
-      'INVALID_OPERATION'
-    );
+  if (existingJob.invoice) {
+    throw new AppError('Cannot edit job that has been invoiced', 400, 'INVALID_OPERATION');
   }
 
-  // Validate status transition
+  // 3. Status Validation
   const validStatuses = ['pending', 'in_progress', 'completed', 'invoiced'];
   if (status && !validStatuses.includes(status)) {
-    throw new AppError(
-      'Invalid status. Must be pending, in_progress, completed, or invoiced',
-      400,
-      'VALIDATION_ERROR'
-    );
+    throw new AppError('Invalid status', 400, 'VALIDATION_ERROR');
   }
 
-  const updateData = {};
-  if (clientName) updateData.clientName = clientName.trim();
-  if (clientPhone) updateData.clientPhone = clientPhone.trim();
-  if (clientEmail !== undefined) updateData.clientEmail = clientEmail?.trim();
-  if (vehicleMake !== undefined) updateData.vehicleMake = vehicleMake?.trim();
-  if (vehicleModel !== undefined) updateData.vehicleModel = vehicleModel?.trim();
-  if (vehicleRegNumber !== undefined) updateData.vehicleRegNumber = vehicleRegNumber?.trim();
-  if (problemType) updateData.problemType = problemType.trim();
-  if (problemDescription) updateData.problemDescription = problemDescription.trim();
-  if (status) updateData.status = status;
+  // 4. Perform Updates inside a Transaction
+  const updatedJob = await prisma.$transaction(async (tx) => {
+    
+    // --- A. Handle Materials Logic (If materials array is provided) ---
+    let finalMaterialsCost = 0;
 
-  // Recalculate total if labour cost changed
-  if (labourCost !== undefined) {
-    const materials = await prisma.jobMaterial.findMany({
-      where: { jobId: parseInt(id) },
-    });
-    const materialsCost = materials.reduce((sum, m) => sum + parseFloat(m.subtotal), 0);
-    updateData.labourCost = parseFloat(labourCost);
-    updateData.totalCost = materialsCost + parseFloat(labourCost);
-  }
+    // If materials are provided, we do a full sync (Remove old, Add new)
+    if (materials && Array.isArray(materials)) {
+      
+      // i. Get current job materials to restore inventory
+      const currentJobMaterials = await tx.jobMaterial.findMany({
+        where: { jobId: existingJob.id },
+      });
 
-  const updatedJob = await prisma.job.update({
-    where: { id: parseInt(id) },
-    data: updateData,
-    include: {
-      materials: {
-        include: {
-          material: {
-            select: { name: true },
+      // ii. Restore stock for existing internal materials (Return to shelf)
+      for (const oldMat of currentJobMaterials) {
+        if (!oldMat.isExternal && oldMat.materialId) {
+          await tx.material.update({
+            where: { id: oldMat.materialId },
+            data: { quantity: { increment: oldMat.quantity } },
+          });
+        }
+      }
+
+      // iii. Delete all old job materials
+      await tx.jobMaterial.deleteMany({
+        where: { jobId: existingJob.id },
+      });
+
+      // iv. Process and Insert New Materials
+      for (const mat of materials) {
+        const quantity = parseInt(mat.quantity);
+        const unitPrice = parseFloat(mat.unitPrice);
+        const subtotal = quantity * unitPrice;
+        const isExternal = mat.isExternal === true;
+        let materialId = null;
+
+        // Validation
+        if (!mat.materialName || quantity <= 0) {
+          throw new AppError('Invalid material name or quantity', 400, 'VALIDATION_ERROR');
+        }
+
+        // Handle Inventory Deduction
+        if (!isExternal) {
+          if (!mat.materialId) throw new AppError('Inventory item missing ID', 400, 'VALIDATION_ERROR');
+          
+          const inventoryItem = await tx.material.findUnique({
+            where: { id: parseInt(mat.materialId) },
+          });
+
+          if (!inventoryItem || !inventoryItem.isActive) {
+            throw new AppError(`Material unavailable or inactive`, 400, 'INVALID_OPERATION');
+          }
+
+          if (inventoryItem.quantity < quantity) {
+            throw new AppError(
+              `Insufficient stock for "${inventoryItem.name}". Available: ${inventoryItem.quantity}`, 
+              400, 
+              'INSUFFICIENT_STOCK'
+            );
+          }
+
+          // Deduct from stock
+          await tx.material.update({
+            where: { id: inventoryItem.id },
+            data: { quantity: { decrement: quantity } },
+          });
+
+          materialId = inventoryItem.id;
+        }
+
+        // Create new JobMaterial Record
+        await tx.jobMaterial.create({
+          data: {
+            jobId: existingJob.id,
+            materialId,
+            materialName: mat.materialName,
+            quantity,
+            unitPrice,
+            subtotal,
+            isExternal,
           },
-        },
-      },
-      user: {
-        select: {
-          fullName: true,
-          username: true,
-        },
-      },
-    },
-  });
+        });
 
-  // Log audit
-  await prisma.auditLog.create({
-    data: {
-      userId: req.user.id,
-      action: 'UPDATE',
-      entity: 'Job',
-      entityId: updatedJob.id,
-      description: `Updated job #${updatedJob.id}${status ? ` - Status changed to ${status}` : ''}`,
-    },
+        finalMaterialsCost += subtotal;
+      }
+    } else {
+      // If materials not in body, calculate cost from existing DB records
+      const existingMats = await tx.jobMaterial.findMany({ where: { jobId: existingJob.id } });
+      finalMaterialsCost = existingMats.reduce((sum, m) => sum + Number(m.subtotal), 0);
+    }
+
+    // --- B. Calculate Grand Total ---
+    // Use new labour cost if provided, otherwise use existing
+    const finalLabourCost = labourCost !== undefined ? parseFloat(labourCost) : Number(existingJob.labourCost);
+    const totalCost = finalMaterialsCost + finalLabourCost;
+
+    // --- C. Update Job Record ---
+    const jobUpdateData = {
+      ...(clientName && { clientName: clientName.trim() }),
+      ...(clientPhone && { clientPhone: clientPhone.trim() }),
+      ...(clientEmail !== undefined && { clientEmail: clientEmail?.trim() }),
+      ...(vehicleMake !== undefined && { vehicleMake: vehicleMake?.trim() }),
+      ...(vehicleModel !== undefined && { vehicleModel: vehicleModel?.trim() }),
+      ...(vehicleRegNumber !== undefined && { vehicleRegNumber: vehicleRegNumber?.trim() }),
+      ...(problemType && { problemType: problemType.trim() }),
+      ...(problemDescription && { problemDescription: problemDescription.trim() }),
+      ...(status && { status }),
+      labourCost: finalLabourCost,
+      totalCost: totalCost,
+    };
+
+    const updated = await tx.job.update({
+      where: { id: existingJob.id },
+      data: jobUpdateData,
+      include: {
+        materials: {
+          include: { material: { select: { name: true } } },
+        },
+        user: {
+          select: { fullName: true, username: true },
+        },
+      },
+    });
+
+    // --- D. Audit Log ---
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'UPDATE',
+        entity: 'Job',
+        entityId: updated.id,
+        description: `Updated job #${updated.id}. Total Cost: ${totalCost}`,
+      },
+    });
+
+    return updated;
   });
 
   res.status(200).json({

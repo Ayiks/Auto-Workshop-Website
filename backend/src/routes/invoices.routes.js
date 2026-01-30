@@ -7,6 +7,7 @@ import {
   getOutstandingInvoices,
   updateInvoice,
   getInvoiceStats,
+  voidInvoice
 } from '../controllers/invoice.controller.js';
 import { protect, requirePermission, authorize } from '../middleware/auth.js';
 
@@ -30,5 +31,9 @@ router
   .route('/:id')
   .get(getInvoice)
   .put(authorize('admin'), updateInvoice);
+
+router
+  .route('/:id/void')
+  .post(requirePermission('void_invoices'), authorize('admin'), voidInvoice);
 
 export default router;

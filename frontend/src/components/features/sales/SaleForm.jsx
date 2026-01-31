@@ -28,7 +28,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   const [discount, setDiscount] = useState(0);
   const [showDiscountInput, setShowDiscountInput] = useState(false);
   
-  // NEW: Amount Paid (For partial payments)
+  // Amount Paid (For partial payments)
   const [partialAmount, setPartialAmount] = useState(""); 
 
   // Booth
@@ -85,7 +85,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
           itemType: "material",
           materialId: material.id,
           materialName: material.name,
-          quantity: 1,
+          quantity: 1, // Default to 1 instead of 0 for better UX
           maxQuantity: material.quantity,
           unitPrice: Number(material.sellingPrice),
           subtotal: Number(material.sellingPrice),
@@ -95,17 +95,52 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
     });
   };
 
+  // 1. Handle Button Clicks (+/-)
   const updateQuantity = (itemId, change) => {
     setItems((prevItems) =>
       prevItems.map((item) => {
         if (item.id === itemId) {
-          const newQty = item.quantity + change;
+          // Fix JavaScript float precision issues (e.g. 0.1 + 0.2 = 0.3000004)
+          const newQty = parseFloat((item.quantity + change).toFixed(2));
+          
           if (newQty <= 0) return item; 
           if (newQty > item.maxQuantity) {
             alert("Stock limit reached");
             return item;
           }
           return { ...item, quantity: newQty, subtotal: newQty * item.unitPrice };
+        }
+        return item;
+      })
+    );
+  };
+
+  // 2. NEW: Handle Direct Input (Typing)
+  const handleQuantityInput = (itemId, value) => {
+    // If empty string (user deleting), allow it temporarily or set to 0
+    if (value === "") {
+        setItems(prev => prev.map(item => item.id === itemId ? { ...item, quantity: "" } : item));
+        return;
+    }
+
+    const newQty = parseFloat(value);
+    
+    setItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.id === itemId) {
+           if (newQty > item.maxQuantity) {
+               // Optional: Clamp to max or alert
+               // alert(`Max stock is ${item.maxQuantity}`);
+               return { ...item, quantity: item.maxQuantity, subtotal: item.maxQuantity * item.unitPrice };
+           }
+           if (newQty < 0) return item; // No negative numbers
+
+           // Update quantity and subtotal
+           return { 
+               ...item, 
+               quantity: newQty, 
+               subtotal: newQty * item.unitPrice 
+           };
         }
         return item;
       })
@@ -139,7 +174,12 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   }, [serviceCategory, itemCategory, itemCategories]);
 
   // --- TOTALS ---
-  const itemsTotal = items.reduce((sum, item) => sum + parseFloat(item.subtotal || 0), 0);
+  // Ensure quantity is treated as 0 if empty string for calculation
+  const itemsTotal = items.reduce((sum, item) => {
+      const qty = item.quantity === "" ? 0 : parseFloat(item.quantity);
+      return sum + (qty * item.unitPrice);
+  }, 0);
+
   const subTotal = saleType === "counter" ? itemsTotal : boothPrice;
   const grandTotal = Math.max(0, subTotal - parseFloat(discount || 0));
 
@@ -148,13 +188,17 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
     e.preventDefault();
     
     if (saleType === "counter" && items.length === 0) return alert("Cart is empty");
+    // Validate empty quantities
+    if (saleType === "counter" && items.some(i => i.quantity === "" || i.quantity <= 0)) {
+        return alert("Please enter valid quantities for all items");
+    }
+
     if (saleType === "booth" && !selectedService?.id) return alert("Invalid Service");
     if (paymentStatus === "partially" && (!partialAmount || partialAmount <= 0)) return alert("Please enter the amount paid");
 
     const now = new Date();
     const formattedDateTime = new Date(`${saleDate}T${format(now, "HH:mm:ss")}`).toISOString();
 
-    // 1. Calculate Amount Paid Logic
     let finalAmountPaid = 0;
     if (paymentStatus === 'paid') {
         finalAmountPaid = grandTotal;
@@ -164,23 +208,17 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
         finalAmountPaid = parseFloat(partialAmount);
     }
 
-    // 2. Prepare Payload
     const commonData = {
         paymentMethod,
         saleDate: formattedDateTime,
-        // Send ID if registered, otherwise null
         customerId: selectedCustomer?.type === 'registered' ? selectedCustomer.id : null,
-        // Send Name explicitly (fallback to Walking Customer)
         customerName: selectedCustomer?.name || 'Walking Customer',
         customerPhone: selectedCustomer?.phone || '',
         paymentStatus, 
         discount: parseFloat(discount || 0),
-        amountPaid: finalAmountPaid, // <-- CRITICAL: Backend needs this to verify status
-        totalAmount: grandTotal      // <-- CRITICAL: Send total so backend can compare
+        amountPaid: finalAmountPaid,
+        totalAmount: grandTotal
     };
-
-    // 3. DEBUGGING: Check console to see what is sent
-    console.log("🚀 SUBMITTING SALE DATA:", commonData);
 
     if (saleType === "counter") {
       const saleItems = items.map((item) => ({
@@ -248,18 +286,17 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                           <span className="font-bold text-gray-900">₵{Number(material.sellingPrice).toFixed(2)}</span>
                       </div>
                       
-                      {/* NEW ICON BUTTON */}
                       <button 
                         type="button" 
                         onClick={() => addToCart(material)} 
                         disabled={material.quantity <= 0} 
                         className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${material.quantity > 0 ? "bg-black text-white hover:bg-gray-800 shadow-sm active:scale-95" : "bg-gray-100 text-gray-400 cursor-not-allowed"}`}
                       >
-                         {material.quantity > 0 ? (
+                          {material.quantity > 0 ? (
                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                         ) : (
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
-                         )}
+                          ) : (
+                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
+                          )}
                       </button>
                     </div>
                   </div>
@@ -268,7 +305,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
               {filteredMaterials.length === 0 && <div className="col-span-full text-center text-gray-400 py-12 text-sm">No materials found.</div>}
             </div>
           ) : (
-           
+            // BOOTH LAYOUT (Unchanged)
             <div className="flex flex-col  justify-center items-center p-6">
                 <div className="w-full max-w-md bg-white border border-gray-200 rounded-2xl shadow-sm p-8">
                    <div className="text-center mb-8">
@@ -310,16 +347,6 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                                 <svg className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none ${!serviceCategory ? 'text-gray-200' : 'text-gray-400'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                            </div>
                        </div>
-
-                       {/* Price Display */}
-                       {/* <div className="pt-4 border-t border-gray-100 mt-4">
-                           <div className="flex justify-between items-center bg-gray-50 rounded-lg p-4 border border-gray-100">
-                               <span className="text-sm font-medium text-gray-600">Estimated Cost</span>
-                               <span className={`text-xl font-bold ${boothPrice > 0 ? 'text-gray-900' : 'text-gray-300'}`}>
-                                   GH₵ {boothPrice.toFixed(2)}
-                               </span>
-                           </div>
-                       </div> */}
                    </div>
                 </div>
             </div>
@@ -349,14 +376,39 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
                       <h4 className="font-medium text-sm text-gray-900 truncate pr-2">{item.materialName}</h4>
-                      <span className="text-sm font-bold text-gray-900 whitespace-nowrap">₵{Number(item.subtotal).toFixed(2)}</span>
+                      {/* Calculate subtotal based on dynamic input */}
+                      <span className="text-sm font-bold text-gray-900 whitespace-nowrap">
+                        ₵{((item.quantity === "" ? 0 : parseFloat(item.quantity)) * item.unitPrice).toFixed(2)}
+                      </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center border border-gray-200 rounded bg-white h-7">
-                      <button onClick={() => updateQuantity(item.id, -1)} className="px-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 h-full transition-colors">-</button>
-                      <span className="px-1 text-xs font-medium w-6 text-center text-gray-900">{item.quantity}</span>
-                      <button onClick={() => updateQuantity(item.id, 1)} className="px-2 text-gray-500 hover:text-gray-900 hover:bg-gray-50 h-full transition-colors">+</button>
+                    
+                    {/* QUANTITY INPUT SECTION */}
+                    <div className="flex items-center border border-gray-200 rounded bg-white h-7 overflow-hidden">
+                      <button 
+                        onClick={() => updateQuantity(item.id, -0.1)} 
+                        className="px-2 bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 h-full transition-colors border-r border-gray-100"
+                        tabIndex={-1} // Skip tab index so user can tab through inputs easily
+                      >-</button>
+                      
+                      {/* EDITABLE INPUT */}
+                      <input 
+                        type="number"
+                        min="0"
+                        step="0.01" // Allows decimals
+                        value={item.quantity}
+                        onChange={(e) => handleQuantityInput(item.id, e.target.value)}
+                        className="w-14 text-center text-xs text-gray-900 focus:outline-none focus:bg-gray-50 h-full no-spinners appearance-none"
+                        placeholder="0"
+                      />
+
+                      <button 
+                        onClick={() => updateQuantity(item.id, 0.1)} 
+                        className="px-2 bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 h-full transition-colors border-l border-gray-100"
+                        tabIndex={-1}
+                      >+</button>
                     </div>
+
                     <button onClick={() => removeItem(item.id)} className="text-gray-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-all p-1">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                     </button>
@@ -409,7 +461,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                 ))}
              </div>
              
-             {/* NEW: PARTIAL AMOUNT INPUT */}
+             {/* PARTIAL AMOUNT INPUT */}
              {paymentStatus === 'partially' && (
                 <div className="mt-3 animate-in fade-in slide-in-from-top-1 bg-white border border-gray-200 p-2 rounded-lg">
                     <label className="text-xs text-gray-700 font-semibold mb-1 block">Amount Paid:</label>
@@ -429,7 +481,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
 
           <div className="border-t border-gray-200 pt-3 space-y-1">
              <div className="flex justify-between text-xs text-gray-600"><span>Subtotal</span><span>GH₵ {subTotal.toFixed(2)}</span></div>
-             <button type="button" onClick={() => setShowDiscountInput(!showDiscountInput)} className="text-xs text-gray-500 hover:text-gray-900 hover:underline text-left transition-colors">Add Discount?</button>
+             <button type="button" onClick={() => setShowDiscountInput(!showDiscountInput)} className="text-xs text-orange-500 hover:text-gray-900 hover:underline text-left transition-colors">Add Discount?</button>
              {showDiscountInput && (
                 <div className="flex items-center gap-2 mt-1">
                     <span className="text-xs text-gray-500">Disc:</span>

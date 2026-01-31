@@ -142,7 +142,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
       {/* --- Material Details Section --- */}
       <div className="space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-900 mb-2">Material Name</label>
+          <label className="block text-sm font-medium text-gray-900 mb-2">Product Name</label>
           <input
             type="text"
             name="name"

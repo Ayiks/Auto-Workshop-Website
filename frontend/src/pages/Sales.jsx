@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { salesApi, receiptsApi } from "@api/sales";
 import { useAuthStore } from "@stores/authStore";
-import { format } from "date-fns";
+import { format, startOfMonth, endOfMonth } from "date-fns";
 import Card from "@components/common/Card";
 import Button from "@components/common/Button";
 import Table from "@components/common/Table";
@@ -29,8 +29,13 @@ export default function Sales() {
   const [selectedSale, setSelectedSale] = useState(null);
   const [selectedReceipt, setSelectedReceipt] = useState(null);
 
-  // Filters
-  const [dateFilter, setDateFilter] = useState("");
+  // --- FILTERS STATE ---
+  // Default to current month
+  const [dateRange, setDateRange] = useState({
+    from: format(startOfMonth(new Date()), "yyyy-MM-dd"),
+    to: format(endOfMonth(new Date()), "yyyy-MM-dd"),
+  });
+  
   const [paymentMethodFilter, setPaymentMethodFilter] = useState("");
   const [paymentStatusFilter, setPaymentStatusFilter] = useState("");
   
@@ -44,7 +49,8 @@ export default function Sales() {
       {
         page,
         limit,
-        startDate: dateFilter,
+        startDate: dateRange.from,
+        endDate: dateRange.to,
         paymentMethod: paymentMethodFilter,
         paymentStatus: paymentStatusFilter,
       },
@@ -53,7 +59,8 @@ export default function Sales() {
       salesApi.getSales({
         page,
         limit,
-        startDate: dateFilter || undefined,
+        startDate: dateRange.from || undefined,
+        endDate: dateRange.to || undefined,
         paymentMethod: paymentMethodFilter || undefined,
         paymentStatus: paymentStatusFilter || undefined,
       }),
@@ -216,9 +223,18 @@ export default function Sales() {
     setShowCreateModal(false);
   };
 
+  const handleResetFilters = () => {
+    setDateRange({
+        from: "",
+        to: ""
+    });
+    setPaymentMethodFilter("");
+    setPaymentStatusFilter("");
+  };
+
   useEffect(() => {
     setPage(1);
-  }, [dateFilter, paymentMethodFilter, paymentStatusFilter]);
+  }, [dateRange, paymentMethodFilter, paymentStatusFilter]);
 
   // Table columns
   const columns = useMemo(() => [
@@ -478,49 +494,59 @@ export default function Sales() {
           <div className="p-5 border-b border-gray-100">
             {/* Filters */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                <div className="relative w-full sm:w-auto">
-                  <input
-                    type="date"
-                    value={dateFilter}
-                    onChange={(e) => setDateFilter(e.target.value)}
-                    className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white transition-all w-full"
-                  />
-                  <svg className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-3 w-full">
+                
+                {/* Date Range Inputs */}
+                <div className="flex items-center gap-2 w-full md:w-auto">
+                    <div className="relative w-full md:w-auto">
+                        <label className="text-[10px] uppercase text-gray-400 font-semibold absolute -top-1.5 left-2 bg-white px-1">From</label>
+                        <input
+                        type="date"
+                        value={dateRange.from}
+                        onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))}
+                        className="pl-3 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white transition-all w-full"
+                        />
+                    </div>
+                    <span className="text-gray-400">-</span>
+                    <div className="relative w-full md:w-auto">
+                        <label className="text-[10px] uppercase text-gray-400 font-semibold absolute -top-1.5 left-2 bg-white px-1">To</label>
+                        <input
+                        type="date"
+                        value={dateRange.to}
+                        onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))}
+                        className="pl-3 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white transition-all w-full"
+                        />
+                    </div>
                 </div>
 
-                <select
-                  value={paymentStatusFilter}
-                  onChange={(e) => setPaymentStatusFilter(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white w-full sm:w-auto"
-                >
-                  <option value="">All Status</option>
-                  <option value="paid">Paid</option>
-                  <option value="partially">Partial</option>
-                </select>
+                <div className="flex w-full md:w-auto gap-3">
+                    <select
+                    value={paymentStatusFilter}
+                    onChange={(e) => setPaymentStatusFilter(e.target.value)}
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white w-full sm:w-auto"
+                    >
+                    <option value="">All Status</option>
+                    <option value="paid">Paid</option>
+                    <option value="partially">Partial</option>
+                    </select>
 
-                <select
-                  value={paymentMethodFilter}
-                  onChange={(e) => setPaymentMethodFilter(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white w-full sm:w-auto"
-                >
-                  <option value="">All Methods</option>
-                  <option value="cash">Cash</option>
-                  <option value="momo">Mobile Money</option>
-                  <option value="cheque">Cheque</option>
-                </select>
+                    <select
+                    value={paymentMethodFilter}
+                    onChange={(e) => setPaymentMethodFilter(e.target.value)}
+                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white w-full sm:w-auto"
+                    >
+                    <option value="">All Methods</option>
+                    <option value="cash">Cash</option>
+                    <option value="momo">Mobile Money</option>
+                    <option value="cheque">Cheque</option>
+                    </select>
+                </div>
 
-                {(dateFilter || paymentMethodFilter || paymentStatusFilter) && (
+                {(dateRange.from || dateRange.to || paymentMethodFilter || paymentStatusFilter) && (
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => {
-                      setDateFilter("");
-                      setPaymentMethodFilter("");
-                      setPaymentStatusFilter("");
-                    }}
+                    onClick={handleResetFilters}
                     className="text-gray-500 hover:text-gray-900"
                   >
                     Clear Filters

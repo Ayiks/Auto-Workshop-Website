@@ -48,14 +48,11 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
     }
   };
 
-  // --- FIX START ---
-  // We use Number() on both values to force math addition instead of string concatenation
   const currentStock = Number(material?.quantity || 0);
   const quantityToAdd = Number(formData.quantityOrdered || 0);
   const newStockLevel = Number(currentStock + quantityToAdd);
   
   const totalCost = quantityToAdd * Number(formData.unitCost || 0);
-  // --- FIX END ---
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -117,21 +114,33 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
         )}
       </div>
 
-      {/* Total Cost Display */}
+      {/* Total Cost Display (Modified) */}
       {totalCost > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-sm font-medium text-gray-900">Total Cost</p>
+              <p className="text-sm font-medium text-gray-900">Estimated Cost</p>
               <p className="text-2xl font-bold text-blue-700">GH₵{totalCost.toFixed(2)}</p>
             </div>
             <div className="text-right">
-              <p className="text-xs text-gray-600">Cost of Goods</p>
-              <p className="text-sm text-gray-700">Will be recorded as COGS</p>
+              <p className="text-xs text-gray-600">Stock Value</p>
+              <p className="text-xs text-blue-600 font-medium">
+                Not recorded as expense
+              </p>
             </div>
           </div>
         </div>
       )}
+
+      {/* Manual Expense Warning (New) */}
+      <div className="flex gap-2 items-start text-xs text-gray-500 bg-gray-50 p-3 rounded-lg">
+        <svg className="w-4 h-4 mt-0.5 flex-shrink-0 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <p>
+          This action only updates inventory counts. To record the payment for this purchase, please create a new record in the <strong>Expenses</strong> section.
+        </p>
+      </div>
 
       {/* New Stock Preview */}
       {formData.quantityOrdered > 0 && (

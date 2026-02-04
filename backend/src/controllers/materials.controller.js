@@ -415,24 +415,24 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
     });
 
     // 3. Create COGS expense (system-generated, read-only)
-    const expense = await tx.expense.create({
-      data: {
-        type: 'cog',
-        category: 'material_reorder',
-        description: `Material reorder: ${material.name} (${qtyToAdd} units)`,
-        amount: totalCost,
-        source: 'system',
-        isReadOnly: true,
-        recordedBy: req.user.id,
-        notes: `Auto-generated from reorder #${reorder.id}`,
-      },
-    });
+    // const expense = await tx.expense.create({
+    //   data: {
+    //     type: 'cog',
+    //     category: 'material_reorder',
+    //     description: `Material reorder: ${material.name} (${qtyToAdd} units)`,
+    //     amount: totalCost,
+    //     source: 'system',
+    //     isReadOnly: true,
+    //     recordedBy: req.user.id,
+    //     notes: `Auto-generated from reorder #${reorder.id}`,
+    //   },
+    // });
 
     // 4. Link expense to reorder
-    await tx.materialReorder.update({
-      where: { id: reorder.id },
-      data: { expenseId: expense.id },
-    });
+    // await tx.materialReorder.update({
+    //   where: { id: reorder.id },
+    //   data: { expenseId: expense.id },
+    // });
 
     // 5. Log audit
     await tx.auditLog.create({
@@ -445,7 +445,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
       },
     });
 
-    return { reorder, updatedMaterial, expense };
+    return { reorder, updatedMaterial /*, expense*/ };
   });
 
   res.status(201).json({
@@ -521,24 +521,24 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
       });
 
       // C. Create COGS expense
-      const expense = await tx.expense.create({
-        data: {
-          type: 'cog',
-          category: 'material_reorder',
-          description: `Bulk Reorder: ${material.name} (${qtyToAdd} units)`,
-          amount: totalCost,
-          source: 'system',
-          isReadOnly: true,
-          recordedBy: req.user.id,
-          notes: `Auto-generated from bulk reorder item #${reorder.id}`,
-        },
-      });
+      // const expense = await tx.expense.create({
+      //   data: {
+      //     type: 'cog',
+      //     category: 'material_reorder',
+      //     description: `Bulk Reorder: ${material.name} (${qtyToAdd} units)`,
+      //     amount: totalCost,
+      //     source: 'system',
+      //     isReadOnly: true,
+      //     recordedBy: req.user.id,
+      //     notes: `Auto-generated from bulk reorder item #${reorder.id}`,
+      //   },
+      // });
 
-      // D. Link expense to reorder
-      await tx.materialReorder.update({
-        where: { id: reorder.id },
-        data: { expenseId: expense.id },
-      });
+      // // D. Link expense to reorder
+      // await tx.materialReorder.update({
+      //   where: { id: reorder.id },
+      //   data: { expenseId: expense.id },
+      // });
 
       processedItems.push({ materialName: material.name, totalCost });
     }

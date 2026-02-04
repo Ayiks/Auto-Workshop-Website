@@ -386,7 +386,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                     {/* QUANTITY INPUT SECTION */}
                     <div className="flex items-center border border-gray-200 rounded bg-white h-7 overflow-hidden">
                       <button 
-                        onClick={() => updateQuantity(item.id, -0.1)} 
+                        onClick={() => updateQuantity(item.id, -1)} 
                         className="px-2 bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 h-full transition-colors border-r border-gray-100"
                         tabIndex={-1} // Skip tab index so user can tab through inputs easily
                       >-</button>
@@ -403,7 +403,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                       />
 
                       <button 
-                        onClick={() => updateQuantity(item.id, 0.1)} 
+                        onClick={() => updateQuantity(item.id, 1)} 
                         className="px-2 bg-gray-50 text-gray-500 hover:text-gray-900 hover:bg-gray-100 h-full transition-colors border-l border-gray-100"
                         tabIndex={-1}
                       >+</button>

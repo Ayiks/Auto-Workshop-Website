@@ -16,6 +16,9 @@ export const getMaterials = asyncHandler(async (req, res) => {
   const materials = await prisma.material.findMany({
     where,
     orderBy: { name: 'asc' },
+    include: {
+      alternateUnits: true
+    }
   });
 
   // Filter low stock items if requested
@@ -40,6 +43,7 @@ export const getMaterial = asyncHandler(async (req, res) => {
   const material = await prisma.material.findUnique({
     where: { id: parseInt(id) },
     include: {
+      alternateUnits: true,
       reorders: {
         orderBy: { reorderDate: 'desc' },
         take: 5, // Last 5 reorders
@@ -47,7 +51,7 @@ export const getMaterial = asyncHandler(async (req, res) => {
           user: {
             select: { fullName: true, username: true },
           },
-        },
+          materialUnit: true        },
       },
     },
   });
@@ -79,6 +83,9 @@ export const createMaterial = asyncHandler(async (req, res) => {
     sellingPrice,
     lowStockThreshold = 3,
     imageUrl,
+    baseUnit,
+    materialUnitId,
+    alternateUnits = [], // Expecting array of { name, conversionFactor }
   } = req.body;
 
   // Validation
@@ -120,6 +127,14 @@ export const createMaterial = asyncHandler(async (req, res) => {
     );
   }
 
+  // Prepare alternate units data if provided
+  const unitCreateData = alternateUnits.map(unit => ({
+    name: unit.name,
+    factor: parseFloat(unit.factor),
+    price: parseFloat(unit.price),
+    unitId: parseInt(unit.unitId)
+  }))
+
   const material = await prisma.material.create({
     data: {
       name: name.trim(),
@@ -128,6 +143,13 @@ export const createMaterial = asyncHandler(async (req, res) => {
       sellingPrice: parseFloat(sellingPrice),
       lowStockThreshold: parseFloat(lowStockThreshold),
       imageUrl: imageUrl || null,
+      baseUnit: baseUnit,
+      alternateUnits: {
+        create: unitCreateData,
+      },
+    },
+    include: {
+      alternateUnits: true,
     },
   });
 
@@ -162,10 +184,13 @@ export const updateMaterial = asyncHandler(async (req, res) => {
     quantity,
     isActive,
     imageUrl,
+    baseUnit,
+    alternateUnits,
   } = req.body;
 
   const material = await prisma.material.findUnique({
     where: { id: parseInt(id) },
+    include: { alternateUnits: true }
   });
 
   if (!material) {
@@ -204,6 +229,7 @@ export const updateMaterial = asyncHandler(async (req, res) => {
 
   const updateData = {};
   if (name) updateData.name = name.trim();
+  if (baseUnit) updateData.baseUnit = baseUnit;
   if (unitCost !== undefined) updateData.unitCost = parseFloat(unitCost);
   if (sellingPrice !== undefined) updateData.sellingPrice = parseFloat(sellingPrice);
   if (lowStockThreshold !== undefined) updateData.lowStockThreshold = parseFloat(lowStockThreshold);
@@ -221,10 +247,65 @@ export const updateMaterial = asyncHandler(async (req, res) => {
       updateData.isActive = newStatus;
     }
   }
-  const updatedMaterial = await prisma.material.update({
-    where: { id: parseInt(id) },
-    data: updateData,
+  // --- UNIT SYNCHRONIZATION LOGIC ---
+  // We use a transaction to ensure units and material details are updated safely
+  const result = await prisma.$transaction(async (tx) => {
+    // 1. Update Base Material
+    const updatedMat = await tx.material.update({
+      where: { id: parseInt(id) },
+      data: updateData,
+    });
+
+    // 2. Handle Alternate Units if provided
+    if (alternateUnits && Array.isArray(alternateUnits)) {
+      // IDs from the frontend payload
+      const incomingIds = alternateUnits
+        .filter(u => u.id)
+        .map(u => parseInt(u.id));
+
+      // IDs currently in database
+      const existingIds = material.alternateUnits.map(u => u.id);
+
+      // A. Delete units that are in DB but missing from payload
+      const idsToDelete = existingIds.filter(id => !incomingIds.includes(id));
+      if (idsToDelete.length > 0) {
+        await tx.materialUnit.deleteMany({
+          where: { id: { in: idsToDelete } }
+        });
+      }
+
+      // B. Upsert (Update existing / Create new)
+      for (const unit of alternateUnits) {
+        if (unit.id) {
+          // Update existing
+          await tx.materialUnit.update({
+            where: { id: parseInt(unit.id) },
+            data: {
+              name: unit.name,
+              factor: parseFloat(unit.factor),
+              price: parseFloat(unit.price)
+            }
+          });
+        } else {
+          // Create new
+          await tx.materialUnit.create({
+            data: {
+              materialId: parseInt(id),
+              name: unit.name,
+              factor: parseFloat(unit.factor),
+              price: parseFloat(unit.price)
+            }
+          });
+        }
+      }
+    }
+
+    return updatedMat;
   });
+  // const updatedMaterial = await prisma.material.update({
+  //   where: { id: parseInt(id) },
+  //   data: updateData,
+  // });
 
   // Log audit
   await prisma.auditLog.create({
@@ -232,15 +313,21 @@ export const updateMaterial = asyncHandler(async (req, res) => {
       userId: req.user.id,
       action: 'UPDATE',
       entity: 'Material',
-      entityId: updatedMaterial.id,
-      description: `Updated material: ${updatedMaterial.name}`,
+      entityId: result.id,
+      description: `Updated material: ${result.name}`,
     },
+  });
+
+  // Fetch fresh data including units to return
+  const finalMaterial = await prisma.material.findUnique({
+    where: { id: parseInt(id) },
+    include: { alternateUnits: true }
   });
 
   res.status(200).json({
     success: true,
     message: 'Material updated successfully',
-    data: updatedMaterial,
+    data: finalMaterial,
   });
 });
 
@@ -339,6 +426,7 @@ export const getLowStockMaterials = asyncHandler(async (req, res) => {
   const materials = await prisma.material.findMany({
     where: { isActive: true },
     orderBy: { quantity: 'asc' },
+    include: { alternateUnits: true }
   });
 
   // FIX: Convert to Number() before comparing
@@ -358,7 +446,7 @@ export const getLowStockMaterials = asyncHandler(async (req, res) => {
 // @access  Private (requires 'materials:reorder' permission)
 export const reorderMaterial = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { quantityOrdered, unitCost, notes } = req.body;
+  const { quantityOrdered, unitCost, notes, unitId } = req.body;
 
   // Validation
   if (!quantityOrdered || quantityOrdered <= 0) {
@@ -369,9 +457,9 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
     );
   }
 
-  const qtyToAdd = parseFloat(quantityOrdered);
   const material = await prisma.material.findUnique({
     where: { id: parseInt(id) },
+    include: { alternateUnits: true },
   });
 
   if (!material) {
@@ -386,10 +474,28 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
     );
   }
 
+  // --- UNIT CONVERSION LOGIC ---
+  let qtyToAdd = parseFloat(quantityOrdered);
+  let finalUnitId = null;
+  let conversionFactor = 1;
+
+  if (unitId) {
+    const selectedUnit = material.alternateUnits.find(u => u.id === parseInt(unitId));
+    if (!selectedUnit) {
+      throw new AppError('Selected unit not found for this material', 400);
+    }
+    
+    finalUnitId = selectedUnit.id;
+    conversionFactor = parseFloat(selectedUnit.factor);
+    
+    // Calculate total base units to add to stock
+    // e.g., 5 Drums * 200 Liters/Drum = 1000 Liters
+    qtyToAdd = parseFloat(quantityOrdered) * conversionFactor;
+  }
+
   // Use provided unit cost or material's current unit cost
   const reorderUnitCost = unitCost ? parseFloat(unitCost) : Number(material.unitCost);
-  const totalCost = reorderUnitCost * qtyToAdd;
-
+  const totalCost = parseFloat(quantityOrdered) * reorderUnitCost;
   // Start transaction
   const result = await prisma.$transaction(async (tx) => {
     // 1. Create reorder record
@@ -397,6 +503,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
       data: {
         materialId: material.id,
         materialName: material.name,
+        materialUnitId: finalUnitId,
         quantityOrdered: parseFloat(quantityOrdered),
         unitCost: reorderUnitCost,
         totalCost,
@@ -441,8 +548,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
         action: 'REORDER',
         entity: 'Material',
         entityId: material.id,
-        description: `Reordered ${quantityOrdered} units of ${material.name}. Total cost: GH₵${totalCost}`,
-      },
+        description: `Reordered ${quantityOrdered} ${finalUnitId ? 'Units' : 'Base Units'} of ${material.name}. Added ${qtyToAdd} to stock.`,      },
     });
 
     return { reorder, updatedMaterial /*, expense*/ };
@@ -454,7 +560,6 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
     data: {
       reorder: result.reorder,
       material: result.updatedMaterial,
-      expense: result.expense,
     },
   });
 });
@@ -472,7 +577,8 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
   // 1. Extract IDs and fetch all materials in one query for efficiency
   const itemIds = items.map(item => parseInt(item.id));
   const materials = await prisma.material.findMany({
-    where: { id: { in: itemIds } }
+    where: { id: { in: itemIds } },
+    include: { alternateUnits: true },
   });
 
   // 2. Map materials for quick access
@@ -490,7 +596,21 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
       if (!material) throw new AppError(`Material ID ${materialId} not found`, 404);
       if (!material.isActive) throw new AppError(`Material ${material.name} is inactive`, 400);
       
-      const qtyToAdd = parseFloat(item.quantityOrdered);
+      // --- UNIT CONVERSION LOGIC ---
+      let qtyOrdered = parseFloat(item.quantityOrdered);
+      let qtyToAdd = qtyOrdered;
+      let finalUnitId = null;
+      let conversionFactor = 1;
+
+      if (item.unitId) {
+        const selectedUnit = material.alternateUnits.find(u => u.id === parseInt(item.unitId));
+        if (selectedUnit) {
+          finalUnitId = selectedUnit.id;
+          conversionFactor = parseFloat(selectedUnit.factor);
+          qtyToAdd = qtyOrdered * conversionFactor;
+        }
+      }
+
       if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
         throw new AppError(`Invalid quantity for ${material.name}`, 400);
       }
@@ -503,6 +623,7 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
         data: {
           materialId: material.id,
           materialName: material.name,
+          materialUnitId: finalUnitId,
           quantityOrdered: qtyToAdd,
           unitCost: reorderUnitCost,
           totalCost,
@@ -585,6 +706,9 @@ export const getMaterialReorders = asyncHandler(async (req, res) => {
           fullName: true,
           username: true,
         },
+      },
+      materialUnit: {
+        select: { name: true, factor: true },
       },
       expense: {
         select: {

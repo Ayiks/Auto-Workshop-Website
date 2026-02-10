@@ -96,6 +96,9 @@ export const getReceipt = asyncHandler(async (req, res) => {
           items: {
             include: {
               material: {
+                select: { name: true, baseUnit: true },
+              },
+              materialUnit: {
                 select: { name: true },
               },
               service: {
@@ -155,9 +158,22 @@ export const getReceiptByNumber = asyncHandler(async (req, res) => {
       },
       sale: {
         include: {
-          items: true,
+          items: {
+            include: {
+              material: {
+                select: { name: true, baseUnit: true },
+              },
+            }
+          }
         },
       },
+      materialUnit: {
+          select: {
+            name: true, // e.g., "Pcs", "Kg", "Box"
+            
+          }
+        },
+        
       payment: {
         include: {
           invoice: {
@@ -206,7 +222,10 @@ export const getSaleReceipt = asyncHandler(async (req, res) => {
           items: {
             include: {
               material: {
-                select: { name: true },
+                select: { name: true, baseUnit: true },
+              },
+              materialUnit: {
+                select: { name: true, },
               },
               service: {
                 select: { type: true },

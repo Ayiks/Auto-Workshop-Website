@@ -2,11 +2,12 @@ import jwt from 'jsonwebtoken';
 import prisma from '../config/database.js';
 import { AppError, asyncHandler } from './errorHandler.js';
 
-// Protect routes - Verify JWT token
+// ==========================================================================
+// 1. CORE PROTECTION (Verifies Token & Fetches User)
+// ==========================================================================
 export const protect = asyncHandler(async (req, res, next) => {
   let token;
 
-  // Check for token in Authorization header
   if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
     token = req.headers.authorization.split(' ')[1];
   }
@@ -16,10 +17,8 @@ export const protect = asyncHandler(async (req, res, next) => {
   }
 
   try {
-    // Verify token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-    // Get user from database
     const user = await prisma.user.findUnique({
       where: { id: decoded.id },
       select: {
@@ -28,7 +27,7 @@ export const protect = asyncHandler(async (req, res, next) => {
         fullName: true,
         email: true,
         role: true,
-        permissions: true,
+        permissions: true, // Crucial: Fetch permissions JSON
         isActive: true,
       },
     });
@@ -41,7 +40,6 @@ export const protect = asyncHandler(async (req, res, next) => {
       throw new AppError('User account is deactivated', 401, 'ACCOUNT_DEACTIVATED');
     }
 
-    // Attach user to request
     req.user = user;
     next();
   } catch (error) {
@@ -55,12 +53,19 @@ export const protect = asyncHandler(async (req, res, next) => {
   }
 });
 
-// Check if user has specific role
+// ==========================================================================
+// 2. ROLE AUTHORIZATION (Strict Role Check)
+// Use this ONLY when a route is strictly for a specific role (e.g. Mechanic)
+// ==========================================================================
 export const authorize = (...roles) => {
   return (req, res, next) => {
     if (!req.user) {
       throw new AppError('User not authenticated', 401, 'AUTH_REQUIRED');
     }
+
+    // Admin always has access? 
+    // Uncomment next line if Admin should pass ANY 'authorize' check:
+    if (req.user.role === 'admin') return next();
 
     if (!roles.includes(req.user.role)) {
       throw new AppError(
@@ -74,81 +79,87 @@ export const authorize = (...roles) => {
   };
 };
 
-// Check if user has specific permission
-export const requirePermission = (module, action) => {
+// ==========================================================================
+// 3. GRANULAR PERMISSIONS (The one you need)
+// Checks if user has specific permission OR is Admin
+// ==========================================================================
+export const requirePermission = (resource, action) => {
   return (req, res, next) => {
     if (!req.user) {
       throw new AppError('User not authenticated', 401, 'AUTH_REQUIRED');
     }
 
-    // Admin has all permissions
+    // 1. SUPER USER OVERRIDE
+    // If user is Admin, they pass automatically.
     if (req.user.role === 'admin') {
       return next();
     }
 
-    // Check permissions
+    // 2. GRANULAR CHECK
+    // Expected structure: { "products": ["create", "edit"], "sales": ["view"] }
     const userPermissions = req.user.permissions || {};
-    const modulePermissions = userPermissions[module] || [];
+    const resourcePermissions = userPermissions[resource] || [];
 
-    if (!modulePermissions.includes(action)) {
-      throw new AppError(
-        `You do not have permission to ${action} ${module}`,
-        403,
-        'PERMISSION_DENIED'
-      );
-    }
-
-    next();
-  };
-};
-
-// Check if user can access resource (ownership or full permission)
-export const canAccessResource = (module, action) => {
-  return async (req, res, next) => {
-    if (!req.user) {
-      throw new AppError('User not authenticated', 401, 'AUTH_REQUIRED');
-    }
-
-    // Admin has all access
-    if (req.user.role === 'admin') {
+    // We check if the array includes the action OR if they have a wildcard '*'
+    if (resourcePermissions.includes(action) || resourcePermissions.includes('*')) {
       return next();
     }
 
-    const userPermissions = req.user.permissions || {};
-    const modulePermissions = userPermissions[module] || [];
-
-    // Check full permission
-    if (modulePermissions.includes(action)) {
-      return next();
-    }
-
-    // Check "own" permission
-    const ownAction = `${action}Own`;
-    if (modulePermissions.includes(ownAction)) {
-      req.isOwnResource = true; // Flag to filter by user in controller
-      return next();
-    }
-
+    // 3. DENY ACCESS
     throw new AppError(
-      `You do not have permission to ${action} ${module}`,
+      `Access Denied: You do not have permission to ${action} ${resource}`,
       403,
       'PERMISSION_DENIED'
     );
   };
 };
 
-// Check job type access (for mechanic, sprayer, bodyworks)
+// ==========================================================================
+// 4. RESOURCE OWNERSHIP (Own vs Any)
+// Checks "view" (all) vs "viewOwn" (only their own records)
+// ==========================================================================
+export const canAccessResource = (resource, action) => {
+  return async (req, res, next) => {
+    if (!req.user) {
+      throw new AppError('User not authenticated', 401, 'AUTH_REQUIRED');
+    }
+
+    // Admin passes
+    if (req.user.role === 'admin') {
+      return next();
+    }
+
+    const userPermissions = req.user.permissions || {};
+    const resourcePermissions = userPermissions[resource] || [];
+
+    // 1. Check for Full Permission (e.g. "view")
+    if (resourcePermissions.includes(action) || resourcePermissions.includes('*')) {
+      return next();
+    }
+
+    // 2. Check for "Own" Permission (e.g. "viewOwn")
+    const ownAction = `${action}Own`;
+    if (resourcePermissions.includes(ownAction)) {
+      req.isOwnResource = true; // Controller must use this flag to filter DB query
+      return next();
+    }
+
+    throw new AppError(
+      `You do not have permission to ${action} ${resource}`,
+      403,
+      'PERMISSION_DENIED'
+    );
+  };
+};
+
+// ==========================================================================
+// 5. JOB TYPE ACCESS (Specific to your workshop logic)
+// ==========================================================================
 export const requireJobTypeAccess = (req, res, next) => {
-  if (!req.user) {
-    throw new AppError('User not authenticated', 401, 'AUTH_REQUIRED');
-  }
+  if (!req.user) return next(new AppError('Not authenticated', 401));
 
-  // Admin can access all job types
-  if (req.user.role === 'admin') {
-    return next();
-  }
+  if (req.user.role === 'admin') return next();
 
-  // Map role to job type
   const roleToJobType = {
     mechanic: 'mechanic',
     sprayer: 'sprayer',
@@ -158,14 +169,9 @@ export const requireJobTypeAccess = (req, res, next) => {
   const allowedJobType = roleToJobType[req.user.role];
   
   if (!allowedJobType) {
-    throw new AppError(
-      'Your role does not have access to jobs',
-      403,
-      'PERMISSION_DENIED'
-    );
+    throw new AppError('Role not authorized for jobs', 403, 'PERMISSION_DENIED');
   }
 
-  // Attach allowed job type to request
   req.allowedJobType = allowedJobType;
   next();
 };

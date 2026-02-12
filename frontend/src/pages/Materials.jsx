@@ -87,7 +87,7 @@ export default function Materials() {
     if (selectedIds.length === filteredMaterials.length && filteredMaterials.length > 0) {
       setSelectedIds([]); 
     } else {
-      setSelectedIds(filteredMaterials.map(m => m.id));
+      setSelectedIds(filteredMaterials.map(m => m.id && m.isActive ? m.id : null).filter(id => id !== null));
     }
   };
 

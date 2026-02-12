@@ -114,12 +114,12 @@ export default function Finance() {
 
   const expenses = {
     totalExpenses: expensesData?.data?.summary?.totalExpenses || 0,
-    cogTotal: expensesData?.data?.summary?.cogTotal || 0,
+    cogTotal: expensesData?.data?.summary?.cogTotal || 0, // Purchases
     operationalTotal: expensesData?.data?.summary?.operationalTotal || 0,
     materialReorderCount:
       expensesData?.data?.summary?.materialReorderCount || 0,
     operationalCount: expensesData?.data?.summary?.operationalCount || 0,
-    breakdown: expensesData?.data?.breakdown || { byCategory: [] }, // Contains new Material Purchases logic
+    breakdown: expensesData?.data?.breakdown || { byCategory: [] },
     monthlyTrend: expensesData?.data?.monthlyTrend || [],
     recentExpenses: expensesData?.data?.recentExpenses || [],
     allExpenses: expensesData?.data?.allExpenses || [],
@@ -127,7 +127,7 @@ export default function Finance() {
 
   const pl = {
     grossRevenue: Number(plData?.data?.summary?.grossRevenue || 0),
-    cogs: Number(plData?.data?.summary?.cogs || 0),
+    cogs: Number(plData?.data?.summary?.cogs || 0), // Usage
     grossProfit: Number(plData?.data?.summary?.grossProfit || 0),
     operationalExpenses: Number(
       plData?.data?.summary?.operationalExpenses || 0
@@ -241,9 +241,9 @@ export default function Finance() {
               expenses={expenses}
             />
           )}
-          {/* {activeTab === "sales" && (
+          {activeTab === "sales" && (
             <SalesTab sales={sales} dateRange={dateRange} />
-          )} */}
+          )}
           {activeTab === "jobs" && (
             <JobsTab jobs={jobs} dateRange={dateRange} />
           )}
@@ -263,22 +263,41 @@ export default function Finance() {
   );
 }
 
-// --- OVERVIEW TAB (UPDATED TO MATCH IMAGE) ---
+// --- OVERVIEW TAB (FIXED) ---
 function OverviewTab({ pl, revenue, expenses }) {
-  // Revenue Breakdown Chart Data
+  const [showPurchases, setShowPurchases] = useState(false);
+
+  // 1. COGS (Usage) - From P&L
+  const totalCOGS = Number(pl.cogs || 0);
+  // 2. Purchases (Restock) - From Expense Report
+  const totalMaterialPurchases = Number(expenses.cogTotal || 0);
+
+  const cogsCardData = showPurchases
+    ? {
+        title: "Material Purchases",
+        value: totalMaterialPurchases,
+        label: "Inventory restock (Cash Flow)",
+        tag: "EXPENSES",
+        colorClass: "blue",
+      }
+    : {
+        title: "Cost of Goods Sold",
+        value: totalCOGS,
+        label: "Direct material usage (P&L)",
+        tag: "USAGE",
+        colorClass: "amber",
+      };
+
+  // --- CHART DATA ---
   const revenueChartData = [
     { name: "Materials (Sales)", value: Number(revenue.materialsSales), color: COLORS[0] },
     { name: "Booth Services", value: Number(revenue.boothSales), color: COLORS[1] },
     { name: "Service Jobs", value: Number(revenue.jobsRevenue), color: COLORS[2] },
   ].filter((i) => i.value > 0);
 
-  // --- Profitability Breakdown Logic ---
-  // Calculate Profit for each source based on P&L data
-  // 1. Booth Profit = Booth Revenue (No direct COGS recorded in P&L for booth)
+  // Profitability Logic
   const boothProfit = Number(pl.boothSales || 0);
-  // 2. Material Sales Profit = Material Sales Revenue - Material Sales COGS
   const materialSalesProfit = Number(pl.revenue?.counterSalesBreakdown?.materials?.grossProfit || 0);
-  // 3. Job Profit = Job Revenue - Job Material COGS (Labour is usually an OpEx, not COGS)
   const jobProfit = Number(pl.revenue?.jobProfitAnalysis?.grossProfit || 0);
 
   const profitabilityChartData = [
@@ -304,16 +323,33 @@ function OverviewTab({ pl, revenue, expenses }) {
           <div className="text-xs text-gray-400 font-medium mt-1">Total Income</div>
         </div>
 
-        {/* Cost of Goods Sold (COGS) */}
-        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:border-gray-300 transition-colors">
-          <div className="flex items-center justify-between mb-3">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">COGS</span>
-            <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-400">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
-            </div>
-          </div>
-          <div className="text-2xl font-bold text-gray-900 tracking-tight">GH₵{pl.cogs.toLocaleString()}</div>
-          <div className="text-xs text-gray-400 font-medium mt-1">Material Usage</div>
+        {/* --- DYNAMIC COGS/PURCHASE CARD --- */}
+        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm hover:border-gray-300 transition-colors relative group">
+           <div className="flex items-center justify-between mb-3">
+             <div className="flex items-center gap-2">
+               <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+                 {cogsCardData.title}
+               </span>
+               {/* THE SWITCH BUTTON */}
+               <button 
+                 onClick={() => setShowPurchases(!showPurchases)}
+                 className="p-1 rounded-full hover:bg-gray-100 text-gray-400 hover:text-indigo-600 transition-all"
+                 title="Switch between Usage (COGS) and Purchases"
+               >
+                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+               </button>
+             </div>
+             <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wide ${showPurchases ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
+                 {cogsCardData.tag}
+             </span>
+           </div>
+           
+           <div className="text-2xl font-bold text-gray-900 tracking-tight">
+            GH₵{cogsCardData.value.toLocaleString()}
+           </div>
+           <div className="text-xs text-gray-400 font-medium mt-1">
+             {cogsCardData.label}
+           </div>
         </div>
 
         {/* Gross Profit */}
@@ -438,7 +474,7 @@ function OverviewTab({ pl, revenue, expenses }) {
             </div>
           </div>
           
-          {/* Optional: Small Visual Bar (for quick comparison) */}
+          {/* Visual Bar */}
           <div className="h-6 flex rounded-full overflow-hidden">
             {profitabilityChartData.map((item, index) => {
               const percentage = (item.value / pl.grossProfit) * 100;
@@ -458,10 +494,7 @@ function OverviewTab({ pl, revenue, expenses }) {
   );
 }
 
-// --- OTHER TABS (PRESERVED EXACTLY AS IS) ---
-
 function ExpensesTab({ expenses }) {
-  // breakdown.byCategory includes "Material Purchases" and other manual categories
   const data = expenses?.breakdown?.byCategory || [];
   const totalExpenses = expenses?.summary?.totalExpenses || 0;
 

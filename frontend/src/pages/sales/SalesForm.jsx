@@ -28,6 +28,7 @@ export default function SaleForm({ onCancel, isLoading }) {
   const [searchTerm, setSearchTerm] = useState("");
   const [saleType, setSaleType] = useState("counter"); 
   const [items, setItems] = useState([]); 
+  const [selectedMaterialId, setSelectedMaterialId] = useState(null);
   
   // Payment Details
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -138,6 +139,8 @@ export default function SaleForm({ onCancel, isLoading }) {
   };
 
   const addToCart = (material) => {
+
+    setSelectedMaterialId(material.id);
     // Check Global Stock Availability
     const currentReserved = getReservedStock(material.id, items);
     
@@ -381,16 +384,32 @@ export default function SaleForm({ onCancel, isLoading }) {
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">Loading inventory...</div>
              ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-                  {filteredMaterials.map((material) => (
+                  {filteredMaterials.map((material) => 
+                  {
+
+                    const isSelected = selectedMaterialId === material.id;
+                    const availableQty = Number(material.quantity) % 1 !== 0 ? Number(material.quantity).toFixed(1) : Math.floor(Number(material.quantity));
+                    return (
                     <button 
                       key={material.id} 
                       onClick={() => addToCart(material)}
                       disabled={material.quantity <= 0}
-                      className="group bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col h-full shadow-sm hover:border-black transition-all text-left"
+                      className={`group bg-white rounded-lg border border-gray-200 overflow-hidden flex flex-col h-full shadow-sm hover:border-black transition-all text-left
+                        ${isSelected ? "border-2 border-black ring-1 ring-black scale-[1.02] shadow-md z-10"
+                            : "border border-gray-200 hover:border-black"
+                        }
+                        `}
                     >
                       <div className={`h-32 w-full flex items-center justify-center text-white font-bold text-xl relative overflow-hidden ${material.imageUrl ? "" : getItemColor(material.id)}`}>
                         {material.imageUrl ? <img src={material.imageUrl} alt="" className="w-full h-full object-cover" /> : <span>{material.name.substring(0, 2).toUpperCase()}</span>}
                         {material.quantity <= 0 && <div className="absolute inset-0 bg-white/80 flex items-center justify-center"><span className="bg-gray-100 border border-gray-200 text-gray-500 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide">Out of Stock</span></div>}
+                      
+                        {/* NEW: Optional Checkmark for Selected State */}
+                          {isSelected && (
+                            <div className="absolute top-2 right-2 bg-black text-white rounded-full p-1 shadow-sm">
+                              <CheckCircle size={14} />
+                            </div>
+                          )}
                       </div>
                       
                       <div className="p-3 flex flex-col flex-1">
@@ -399,11 +418,14 @@ export default function SaleForm({ onCancel, isLoading }) {
                         </div>
                         <div className="mt-auto pt-2 border-t border-gray-50 flex items-center justify-between">
                              <span className="font-bold text-gray-900 text-base">₵{Number(material.sellingPrice).toFixed(2)}</span>
-                             <span className="text-[10px] text-gray-400 font-medium">{Number(material.quantity).toFixed(0)} avail</span>
+                            <span className="text-[10px] text-gray-400 font-medium">{availableQty} avail</span>
                         </div>
                       </div>
                     </button>
-                  ))}
+                  )
+                  }
+                )
+                  }
                   {filteredMaterials.length === 0 && <div className="col-span-full text-center text-gray-400 py-10 text-sm">No items found</div>}
                 </div>
              )

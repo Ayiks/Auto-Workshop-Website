@@ -448,143 +448,127 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { quantityOrdered, unitCost, notes, unitId } = req.body;
 
-  // Validation
+  // 1. Basic Validation
   if (!quantityOrdered || quantityOrdered <= 0) {
-    throw new AppError(
-      'Quantity ordered must be greater than 0',
-      400,
-      'VALIDATION_ERROR'
-    );
+    throw new AppError('Quantity ordered must be greater than 0', 400);
   }
 
+  // 2. Fetch Material & Units
   const material = await prisma.material.findUnique({
     where: { id: parseInt(id) },
     include: { alternateUnits: true },
   });
 
-  if (!material) {
-    throw new AppError('Material not found', 404, 'NOT_FOUND');
-  }
+  if (!material) throw new AppError('Material not found', 404);
+  if (!material.isActive) throw new AppError('Cannot reorder inactive material', 400);
 
-  if (!material.isActive) {
-    throw new AppError(
-      'Cannot reorder inactive material',
-      400,
-      'INVALID_OPERATION'
-    );
-  }
-
-  // --- UNIT CONVERSION LOGIC ---
-  let qtyToAdd = parseFloat(quantityOrdered);
-  let finalUnitId = null;
+  // 3. --- UNIT & COST LOGIC ---
+  let purchaseQty = parseFloat(quantityOrdered); // e.g., 5 (Drums)
   let conversionFactor = 1;
+  let finalUnitId = null; // Default to Base Unit (null)
 
+  // Handle Alternate Unit Selection
   if (unitId) {
-    const selectedUnit = material.alternateUnits.find(u => u.id === parseInt(unitId));
-    if (!selectedUnit) {
-      throw new AppError('Selected unit not found for this material', 400);
+    // If unitId is provided, check if it's an alternate unit
+    // Note: If unitId matches the material's main unit ID (from GlobalUnits), 
+    // we treat it as base unit (factor 1). 
+    // But usually, alternateUnits array contains the specific conversion rules.
+    
+    const selectedUnit = material.alternateUnits.find(u => u.unitId === parseInt(unitId));
+    
+    if (selectedUnit) {
+      finalUnitId = selectedUnit.unitId;
+      conversionFactor = parseFloat(selectedUnit.factor); // e.g., 200
     }
-    
-    finalUnitId = selectedUnit.id;
-    conversionFactor = parseFloat(selectedUnit.factor);
-    
-    // Calculate total base units to add to stock
-    // e.g., 5 Drums * 200 Liters/Drum = 1000 Liters
-    qtyToAdd = parseFloat(quantityOrdered) * conversionFactor;
+    // If not found in alternateUnits, we assume it's the Base Unit (if IDs match) or throw error
   }
 
-  // Use provided unit cost or material's current unit cost
-  const reorderUnitCost = unitCost ? parseFloat(unitCost) : Number(material.unitCost);
-  const totalCost = parseFloat(quantityOrdered) * reorderUnitCost;
-  // Start transaction
+  // Calculate STOCK to add (Base Units)
+  // e.g., 5 Drums * 200 = 1000 Liters
+  const stockToAdd = purchaseQty * conversionFactor;
+
+  // Calculate COSTS
+  // purchaseUnitCost: What did we pay for ONE Drum? ($500)
+  // If user didn't provide cost, estimate it: BaseCost ($2.50) * Factor (200) = $500
+  let purchaseUnitCost;
+  if (unitCost) {
+    purchaseUnitCost = parseFloat(unitCost);
+  } else {
+    purchaseUnitCost = parseFloat(material.unitCost) * conversionFactor;
+  }
+
+  const totalCost = purchaseQty * purchaseUnitCost;
+
+  // Calculate New Base Cost (Weighted Average is better, but here we update to latest price)
+  // e.g., $500 / 200 = $2.50 per Liter
+  const newBaseUnitCost = purchaseUnitCost / conversionFactor;
+
+  // 4. Transaction
   const result = await prisma.$transaction(async (tx) => {
-    // 1. Create reorder record
+    // A. Create Reorder Record (Log exactly what the User typed)
     const reorder = await tx.materialReorder.create({
       data: {
         materialId: material.id,
         materialName: material.name,
-        materialUnitId: finalUnitId,
-        quantityOrdered: parseFloat(quantityOrdered),
-        unitCost: reorderUnitCost,
-        totalCost,
+        materialUnitId: finalUnitId, // Link to "Drum"
+        quantityOrdered: purchaseQty, // Record "5"
+        unitCost: purchaseUnitCost,   // Record "$500"
+        totalCost: totalCost,
         reorderedBy: req.user.id,
         notes,
       },
     });
 
-    // 2. Update material quantity and unit cost
+    // B. Update Material Stock (Convert to Base Units)
     const updatedMaterial = await tx.material.update({
       where: { id: material.id },
       data: {
-        quantity: { increment: qtyToAdd },
-        unitCost: reorderUnitCost, // Update to new cost
+        quantity: { increment: stockToAdd }, // Add 1000 Liters
+        unitCost: newBaseUnitCost,           // Update Base Cost to $2.50
       },
     });
 
-    // 3. Create COGS expense (system-generated, read-only)
-    // const expense = await tx.expense.create({
-    //   data: {
-    //     type: 'cog',
-    //     category: 'material_reorder',
-    //     description: `Material reorder: ${material.name} (${qtyToAdd} units)`,
-    //     amount: totalCost,
-    //     source: 'system',
-    //     isReadOnly: true,
-    //     recordedBy: req.user.id,
-    //     notes: `Auto-generated from reorder #${reorder.id}`,
-    //   },
-    // });
-
-    // 4. Link expense to reorder
-    // await tx.materialReorder.update({
-    //   where: { id: reorder.id },
-    //   data: { expenseId: expense.id },
-    // });
-
-    // 5. Log audit
+    // C. Audit Log
     await tx.auditLog.create({
       data: {
         userId: req.user.id,
         action: 'REORDER',
         entity: 'Material',
         entityId: material.id,
-        description: `Reordered ${quantityOrdered} ${finalUnitId ? 'Units' : 'Base Units'} of ${material.name}. Added ${qtyToAdd} to stock.`,      },
+        description: `Reordered ${purchaseQty} ${finalUnitId ? 'Alt Units' : 'Base Units'} of ${material.name}. Added ${stockToAdd} base units to stock.`,
+      },
     });
 
-    return { reorder, updatedMaterial /*, expense*/ };
+    return { reorder, updatedMaterial };
   });
 
   res.status(201).json({
     success: true,
     message: 'Material reordered successfully',
-    data: {
-      reorder: result.reorder,
-      material: result.updatedMaterial,
-    },
+    data: result,
   });
 });
 
 // @desc    Bulk Reorder materials
 // @route   POST /api/materials/bulk-reorder
-// @access  Private (requires 'materials:reorder' permission)
+// @access  Private
 export const bulkReorderMaterials = asyncHandler(async (req, res) => {
   const { items } = req.body;
 
   if (!Array.isArray(items) || items.length === 0) {
-    throw new AppError('No items provided for reorder', 400, 'VALIDATION_ERROR');
+    throw new AppError('No items provided for reorder', 400);
   }
 
-  // 1. Extract IDs and fetch all materials in one query for efficiency
+  // 1. Fetch all materials upfront
   const itemIds = items.map(item => parseInt(item.id));
   const materials = await prisma.material.findMany({
     where: { id: { in: itemIds } },
     include: { alternateUnits: true },
   });
 
-  // 2. Map materials for quick access
   const materialMap = new Map(materials.map(m => [m.id, m]));
 
-  // 3. Start Transaction
+  // 2. Transaction
   const results = await prisma.$transaction(async (tx) => {
     const processedItems = [];
 
@@ -592,85 +576,78 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
       const materialId = parseInt(item.id);
       const material = materialMap.get(materialId);
 
-      // Validation within transaction
       if (!material) throw new AppError(`Material ID ${materialId} not found`, 404);
       if (!material.isActive) throw new AppError(`Material ${material.name} is inactive`, 400);
-      
-      // --- UNIT CONVERSION LOGIC ---
-      let qtyOrdered = parseFloat(item.quantityOrdered);
-      let qtyToAdd = qtyOrdered;
-      let finalUnitId = null;
-      let conversionFactor = 1;
 
+      // --- LOGIC START ---
+      let purchaseQty = parseFloat(item.quantityOrdered);
+      let conversionFactor = 1;
+      let finalUnitId = null;
+
+      // Find Unit Factor
       if (item.unitId) {
-        const selectedUnit = material.alternateUnits.find(u => u.id === parseInt(item.unitId));
+        const selectedUnit = material.alternateUnits.find(u => u.unitId === parseInt(item.unitId));
         if (selectedUnit) {
-          finalUnitId = selectedUnit.id;
+          finalUnitId = selectedUnit.unitId;
           conversionFactor = parseFloat(selectedUnit.factor);
-          qtyToAdd = qtyOrdered * conversionFactor;
         }
       }
 
-      if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
+      // Calculate Stock to Add
+      const stockToAdd = purchaseQty * conversionFactor;
+
+      if (isNaN(stockToAdd) || stockToAdd <= 0) {
         throw new AppError(`Invalid quantity for ${material.name}`, 400);
       }
 
-      const reorderUnitCost = item.unitCost ? parseFloat(item.unitCost) : Number(material.unitCost);
-      const totalCost = reorderUnitCost * qtyToAdd;
+      // Calculate Costs
+      let purchaseUnitCost;
+      if (item.unitCost) {
+        purchaseUnitCost = parseFloat(item.unitCost);
+      } else {
+        purchaseUnitCost = parseFloat(material.unitCost) * conversionFactor;
+      }
+      
+      const totalCost = purchaseUnitCost * purchaseQty;
+      const newBaseUnitCost = purchaseUnitCost / conversionFactor;
 
-      // A. Create reorder record
-      const reorder = await tx.materialReorder.create({
+      // A. Create Log
+      await tx.materialReorder.create({
         data: {
           materialId: material.id,
           materialName: material.name,
           materialUnitId: finalUnitId,
-          quantityOrdered: qtyToAdd,
-          unitCost: reorderUnitCost,
-          totalCost,
+          quantityOrdered: purchaseQty, // Store "5"
+          unitCost: purchaseUnitCost,   // Store "$500"
+          totalCost: totalCost,
           reorderedBy: req.user.id,
           notes: item.notes || 'Bulk Reorder',
         },
       });
 
-      // B. Update material quantity and unit cost
-      const updatedMaterial = await tx.material.update({
+      // B. Update Stock
+      await tx.material.update({
         where: { id: material.id },
         data: {
-          quantity: { increment: qtyToAdd },
-          unitCost: reorderUnitCost,
+          quantity: { increment: stockToAdd }, // Add 1000
+          unitCost: newBaseUnitCost,           // Update to $2.50
         },
       });
 
-      // C. Create COGS expense
-      // const expense = await tx.expense.create({
-      //   data: {
-      //     type: 'cog',
-      //     category: 'material_reorder',
-      //     description: `Bulk Reorder: ${material.name} (${qtyToAdd} units)`,
-      //     amount: totalCost,
-      //     source: 'system',
-      //     isReadOnly: true,
-      //     recordedBy: req.user.id,
-      //     notes: `Auto-generated from bulk reorder item #${reorder.id}`,
-      //   },
-      // });
-
-      // // D. Link expense to reorder
-      // await tx.materialReorder.update({
-      //   where: { id: reorder.id },
-      //   data: { expenseId: expense.id },
-      // });
-
-      processedItems.push({ materialName: material.name, totalCost });
+      processedItems.push({ 
+        materialName: material.name, 
+        addedStock: stockToAdd,
+        totalCost 
+      });
     }
 
-    // 4. Single Bulk Audit Log
+    // Single Audit Log for Bulk Action
     await tx.auditLog.create({
       data: {
         userId: req.user.id,
         action: 'BULK_REORDER',
         entity: 'Material',
-        description: `Bulk reordered ${processedItems.length} items. Total materials updated.`,
+        description: `Bulk reordered ${processedItems.length} items.`,
       },
     });
 
@@ -683,6 +660,7 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
     data: results,
   });
 });
+
 
 // @desc    Get material reorder history
 // @route   GET /api/materials/:id/reorders
@@ -727,3 +705,248 @@ export const getMaterialReorders = asyncHandler(async (req, res) => {
     data: reorders,
   });
 });
+
+
+
+// @desc    Reorder material
+// // @route   POST /api/materials/:id/reorder
+// // @access  Private (requires 'materials:reorder' permission)
+// export const reorderMaterial = asyncHandler(async (req, res) => {
+//   const { id } = req.params;
+//   const { quantityOrdered, unitCost, notes, unitId } = req.body;
+
+//   // Validation
+//   if (!quantityOrdered || quantityOrdered <= 0) {
+//     throw new AppError(
+//       'Quantity ordered must be greater than 0',
+//       400,
+//       'VALIDATION_ERROR'
+//     );
+//   }
+
+//   const material = await prisma.material.findUnique({
+//     where: { id: parseInt(id) },
+//     include: { alternateUnits: true },
+//   });
+
+//   if (!material) {
+//     throw new AppError('Material not found', 404, 'NOT_FOUND');
+//   }
+
+//   if (!material.isActive) {
+//     throw new AppError(
+//       'Cannot reorder inactive material',
+//       400,
+//       'INVALID_OPERATION'
+//     );
+//   }
+
+//   // --- UNIT CONVERSION LOGIC ---
+//   let qtyToAdd = parseFloat(quantityOrdered);
+//   let finalUnitId = null;
+//   let conversionFactor = 1;
+
+//   if (unitId) {
+//     const selectedUnit = material.alternateUnits.find(u => u.id === parseInt(unitId));
+//     if (!selectedUnit) {
+//       throw new AppError('Selected unit not found for this material', 400);
+//     }
+    
+//     finalUnitId = selectedUnit.id;
+//     conversionFactor = parseFloat(selectedUnit.factor);
+    
+//     // Calculate total base units to add to stock
+//     // e.g., 5 Drums * 200 Liters/Drum = 1000 Liters
+//     qtyToAdd = parseFloat(quantityOrdered) * conversionFactor;
+//   }
+
+//   // Use provided unit cost or material's current unit cost
+//   const reorderUnitCost = unitCost ? parseFloat(unitCost) : Number(material.unitCost);
+//   const totalCost = parseFloat(quantityOrdered) * reorderUnitCost;
+//   // Start transaction
+//   const result = await prisma.$transaction(async (tx) => {
+//     // 1. Create reorder record
+//     const reorder = await tx.materialReorder.create({
+//       data: {
+//         materialId: material.id,
+//         materialName: material.name,
+//         materialUnitId: finalUnitId,
+//         quantityOrdered: parseFloat(quantityOrdered),
+//         unitCost: reorderUnitCost,
+//         totalCost,
+//         reorderedBy: req.user.id,
+//         notes,
+//       },
+//     });
+
+//     // 2. Update material quantity and unit cost
+//     const updatedMaterial = await tx.material.update({
+//       where: { id: material.id },
+//       data: {
+//         quantity: { increment: qtyToAdd },
+//         unitCost: reorderUnitCost, // Update to new cost
+//       },
+//     });
+
+//     // 3. Create COGS expense (system-generated, read-only)
+//     // const expense = await tx.expense.create({
+//     //   data: {
+//     //     type: 'cog',
+//     //     category: 'material_reorder',
+//     //     description: `Material reorder: ${material.name} (${qtyToAdd} units)`,
+//     //     amount: totalCost,
+//     //     source: 'system',
+//     //     isReadOnly: true,
+//     //     recordedBy: req.user.id,
+//     //     notes: `Auto-generated from reorder #${reorder.id}`,
+//     //   },
+//     // });
+
+//     // 4. Link expense to reorder
+//     // await tx.materialReorder.update({
+//     //   where: { id: reorder.id },
+//     //   data: { expenseId: expense.id },
+//     // });
+
+//     // 5. Log audit
+//     await tx.auditLog.create({
+//       data: {
+//         userId: req.user.id,
+//         action: 'REORDER',
+//         entity: 'Material',
+//         entityId: material.id,
+//         description: `Reordered ${quantityOrdered} ${finalUnitId ? 'Units' : 'Base Units'} of ${material.name}. Added ${qtyToAdd} to stock.`,      },
+//     });
+
+//     return { reorder, updatedMaterial /*, expense*/ };
+//   });
+
+//   res.status(201).json({
+//     success: true,
+//     message: 'Material reordered successfully',
+//     data: {
+//       reorder: result.reorder,
+//       material: result.updatedMaterial,
+//     },
+//   });
+// });
+
+// // @desc    Bulk Reorder materials
+// // @route   POST /api/materials/bulk-reorder
+// // @access  Private (requires 'materials:reorder' permission)
+// export const bulkReorderMaterials = asyncHandler(async (req, res) => {
+//   const { items } = req.body;
+
+//   if (!Array.isArray(items) || items.length === 0) {
+//     throw new AppError('No items provided for reorder', 400, 'VALIDATION_ERROR');
+//   }
+
+//   // 1. Extract IDs and fetch all materials in one query for efficiency
+//   const itemIds = items.map(item => parseInt(item.id));
+//   const materials = await prisma.material.findMany({
+//     where: { id: { in: itemIds } },
+//     include: { alternateUnits: true },
+//   });
+
+//   // 2. Map materials for quick access
+//   const materialMap = new Map(materials.map(m => [m.id, m]));
+
+//   // 3. Start Transaction
+//   const results = await prisma.$transaction(async (tx) => {
+//     const processedItems = [];
+
+//     for (const item of items) {
+//       const materialId = parseInt(item.id);
+//       const material = materialMap.get(materialId);
+
+//       // Validation within transaction
+//       if (!material) throw new AppError(`Material ID ${materialId} not found`, 404);
+//       if (!material.isActive) throw new AppError(`Material ${material.name} is inactive`, 400);
+      
+//       // --- UNIT CONVERSION LOGIC ---
+//       let qtyOrdered = parseFloat(item.quantityOrdered);
+//       let qtyToAdd = qtyOrdered;
+//       let finalUnitId = null;
+//       let conversionFactor = 1;
+
+//       if (item.unitId) {
+//         const selectedUnit = material.alternateUnits.find(u => u.id === parseInt(item.unitId));
+//         if (selectedUnit) {
+//           finalUnitId = selectedUnit.id;
+//           conversionFactor = parseFloat(selectedUnit.factor);
+//           qtyToAdd = qtyOrdered * conversionFactor;
+//         }
+//       }
+
+//       if (isNaN(qtyToAdd) || qtyToAdd <= 0) {
+//         throw new AppError(`Invalid quantity for ${material.name}`, 400);
+//       }
+
+//       const reorderUnitCost = item.unitCost ? parseFloat(item.unitCost) : Number(material.unitCost);
+//       const totalCost = reorderUnitCost * qtyToAdd;
+
+//       // A. Create reorder record
+//       const reorder = await tx.materialReorder.create({
+//         data: {
+//           materialId: material.id,
+//           materialName: material.name,
+//           materialUnitId: finalUnitId,
+//           quantityOrdered: qtyToAdd,
+//           unitCost: reorderUnitCost,
+//           totalCost,
+//           reorderedBy: req.user.id,
+//           notes: item.notes || 'Bulk Reorder',
+//         },
+//       });
+
+//       // B. Update material quantity and unit cost
+//       const updatedMaterial = await tx.material.update({
+//         where: { id: material.id },
+//         data: {
+//           quantity: { increment: qtyToAdd },
+//           unitCost: reorderUnitCost,
+//         },
+//       });
+
+//       // C. Create COGS expense
+//       // const expense = await tx.expense.create({
+//       //   data: {
+//       //     type: 'cog',
+//       //     category: 'material_reorder',
+//       //     description: `Bulk Reorder: ${material.name} (${qtyToAdd} units)`,
+//       //     amount: totalCost,
+//       //     source: 'system',
+//       //     isReadOnly: true,
+//       //     recordedBy: req.user.id,
+//       //     notes: `Auto-generated from bulk reorder item #${reorder.id}`,
+//       //   },
+//       // });
+
+//       // // D. Link expense to reorder
+//       // await tx.materialReorder.update({
+//       //   where: { id: reorder.id },
+//       //   data: { expenseId: expense.id },
+//       // });
+
+//       processedItems.push({ materialName: material.name, totalCost });
+//     }
+
+//     // 4. Single Bulk Audit Log
+//     await tx.auditLog.create({
+//       data: {
+//         userId: req.user.id,
+//         action: 'BULK_REORDER',
+//         entity: 'Material',
+//         description: `Bulk reordered ${processedItems.length} items. Total materials updated.`,
+//       },
+//     });
+
+//     return processedItems;
+//   });
+
+//   res.status(201).json({
+//     success: true,
+//     message: `Successfully restocked ${results.length} materials`,
+//     data: results,
+//   });
+// });

@@ -162,6 +162,7 @@ import Login from '@pages/Login';
 import Dashboard from '@pages/Dashboard';
 import Materials from '@pages/Materials';
 import Sales from '@pages/Sales';
+import SalesForm from '@pages/sales/SalesForm';
 import Jobs from '@pages/Jobs';
 import Invoices from '@pages/Invoices';
 import Finance from '@/pages/Finance';
@@ -222,6 +223,7 @@ function App() {
             <Route path="dashboard" element={<Dashboard />} />
             <Route path="materials" element={<Materials />} />
             <Route path="sales" element={<Sales />} />
+            <Route path="sales/new" element={<SalesForm />} />
             <Route path="jobs" element={<Jobs />} />
             <Route path='invoices' element={<Invoices />} />
             <Route path='finance' element={<Finance />} />

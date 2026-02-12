@@ -105,6 +105,33 @@ export const settingsApi = {
     });
     return response;
   },
-};
 
+  // ========================
+  // Unit of Measurement API
+  // ========================
+  // Get all units
+  getUnits: async () => {
+    const response = await apiClient.get('/settings/units');
+    return response;
+  },
+
+  // add unit
+  addUnit: async (data) => {
+    const response = await apiClient.post('/settings/units', data);
+    return response;  
+},
+
+ // update unit
+updateUnit: async (id, data) => {
+  const response = await apiClient.put(`/settings/units/${id}`, data);
+  return response;    
+
+},
+
+// delete unit
+deleteUnit: async (id) => {
+  const response = await apiClient.delete(`/settings/units/${id}`);
+  return response;
+}
+}
 export default settingsApi;

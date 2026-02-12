@@ -83,8 +83,13 @@ model Material {
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
   imageUrl          String?  @map("image_url") @db.VarChar(255)
+  baseUnit          String   @default("piece")
+
+  materialUnitId    Int?     @map("material_unit_id") // Foreign Key
+  unit              GlobalUnit? @relation("BaseUnitRelation", fields: [materialUnitId], references: [id])
 
   // Relations
+  alternateUnits MaterialUnit[]
   saleItems      SaleItem[]
   jobMaterials   JobMaterial[]
   reorders       MaterialReorder[]
@@ -92,10 +97,28 @@ model Material {
   @@map("materials")
 }
 
+model MaterialUnit {
+  id          Int      @id @default(autoincrement())
+  name        String   // e.g. "Drum", "Carton", "Pack of 6"
+  factor      Decimal  @db.Decimal(10, 2) // Conversion: How many Base Units? (e.g. 200 for a Drum)
+  price       Decimal  @db.Decimal(10, 2) // Specific Selling Price for this unit
+  materialId  Int
+  material    Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+
+  unitId      Int?     @map("unit_id") // Foreign Key
+  unit        GlobalUnit? @relation("AltUnitRelation", fields: [unitId], references: [id])
+  // Relations
+  saleItems   SaleItem[]
+  reorders    MaterialReorder[]
+
+  @@map("material_units")
+}
+
 model MaterialReorder {
   id              Int      @id @default(autoincrement())
   materialId      Int      @map("material_id")
   materialName    String   @db.VarChar(100)
+  materialUnitId  Int?     @map("material_unit_id")
   quantityOrdered Decimal  @map("quantity_ordered") @db.Decimal(10, 2)
   unitCost        Decimal  @map("unit_cost") @db.Decimal(10, 2)
   totalCost       Decimal  @map("total_cost") @db.Decimal(10, 2)
@@ -108,10 +131,24 @@ model MaterialReorder {
 
   // Relations
   material   Material  @relation(fields: [materialId], references: [id])
+  materialUnit  MaterialUnit? @relation(fields: [materialUnitId], references: [id])
   user       User      @relation(fields: [reorderedBy], references: [id])
   expense    Expense?  @relation(fields: [expenseId], references: [id])
 
   @@map("material_reorders")
+}
+
+model GlobalUnit {
+  id           Int      @id @default(autoincrement())
+  name         String   @unique // e.g., "Liter", "Kilogram", "Piece"
+  abbreviation String   // e.g., "L", "kg", "pcs"
+  isActive     Boolean  @default(true)
+
+  // Relations
+  materials      Material[]     @relation("BaseUnitRelation")
+  alternateUnits MaterialUnit[] @relation("AltUnitRelation")
+
+  @@map("global_units")
 }
 
 // ============================================
@@ -159,6 +196,7 @@ model Sale {
   soldBy        Int      @map("sold_by")
   status        String   @default("completed") @db.VarChar(20)
   createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
   // Relations
   user      User       @relation(fields: [soldBy], references: [id])
@@ -178,6 +216,10 @@ model SaleItem {
   materialId   Int?    @map("material_id")
   materialName String? @db.VarChar(100)
   quantity     Decimal? @db.Decimal(10, 2)
+
+  // Link to specific unit (optional, null means Base Unit was sold)
+  materialUnitId Int?
+  materialUnit   MaterialUnit? @relation(fields: [materialUnitId], references: [id])
   
   // Service fields (null if material)
   serviceId    Int?    @map("service_id")

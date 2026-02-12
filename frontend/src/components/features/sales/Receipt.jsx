@@ -89,16 +89,21 @@ export default function Receipt({ receipt, sale }) {
                 </tr>
               </thead>
               <tbody>
-                {sale?.items?.map((item, index) => (
+                {sale?.items?.map((item, index) => {
+                const unitLabel = item.materialUnit;
+                console.log('Rendering item:', item, 'with unit label:', unitLabel);
+                return (
                   <tr key={index} className="border-b border-gray-50 last:border-b-0">
                     <td className="py-2 text-gray-900">
                       {item.itemType === 'material' ? item.materialName : 'Booth Service'}
                     </td>
-                    <td className="text-center py-2 text-gray-600">{Number(item.quantity)}</td>
+                    <td className="text-center py-2 text-gray-600">{Number(item.quantity)} <span className="text-xs font-medium">{item.materialUnit?.name || 'Unit'}</span></td>
                     <td className="text-right py-2 text-gray-600">{val(item.unitPrice).toFixed(2)}</td>
                     <td className="text-right py-2 font-medium text-gray-900">{val(item.subtotal).toFixed(2)}</td>
                   </tr>
-                ))}
+                )
+              
+              })}
               </tbody>
             </table>
           </div>

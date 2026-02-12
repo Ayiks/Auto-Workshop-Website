@@ -84,6 +84,9 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
     };
 
     if (!user) submitData.password = formData.password;
+
+    // console.log('Submitting user data:', submitData);
+
     onSubmit(submitData);
   };
 

@@ -1,14 +1,13 @@
-// src/components/features/users/PermissionsModal.jsx
 import { useState, useEffect } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '@api/users';
 import Modal from '@components/common/Modal';
 import Button from '@components/common/Button';
 
-// ... (PERMISSION_MODULES and ACTION_LABELS arrays remain exactly the same as your code) ...
+// 1. DEFINE YOUR MODULES
 const PERMISSION_MODULES = [
   { module: 'materials', label: 'Materials', actions: ['view', 'create', 'update', 'delete', 'reorder'] },
-  { module: 'sales', label: 'Sales', actions: ['view', 'create'] },
+  { module: 'sales', label: 'Sales', actions: ['view', 'create', 'update'] },
   { module: 'jobs', label: 'Jobs', actions: ['view', 'create', 'update', 'delete', 'complete'] },
   { module: 'invoices', label: 'Invoices', actions: ['view', 'create'] },
   { module: 'payments', label: 'Payments', actions: ['view', 'create'] },
@@ -18,6 +17,8 @@ const PERMISSION_MODULES = [
   { module: 'bookings', label: 'Bookings', actions: ['view', 'update', 'delete'] },
   { module: 'settings', label: 'Settings', actions: ['view', 'update'] },
   { module: 'customers', label: 'Customers', actions: ['view', 'create', 'update', 'delete'] },
+  { module: 'units', label: 'Units of Measure', actions: ['create', 'update', 'delete'] },
+  { module: 'booth', label: 'Booth Services', actions: ['view', 'create', 'update', 'delete'] },
 ];
 
 const ACTION_LABELS = {
@@ -25,13 +26,37 @@ const ACTION_LABELS = {
   reorder: 'Reorder', complete: 'Complete', managePermissions: 'Permissions',
 };
 
+// 2. DEFINE DEPENDENCIES (The Rules)
+// Syntax: 'module.action': ['targetModule.targetAction', 'targetModule2.targetAction']
+const PERMISSION_DEPENDENCIES = {
+  // If you Create Sales, you need to View Materials and View Sales
+  'sales.create': ['materials.view', 'sales.view', 'customers.view', 'booth.view'],
+  
+  // If you Create Jobs, you need to View Materials, Bookings, and Customers
+  'jobs.create': ['materials.view', 'bookings.view', 'customers.view', 'jobs.view', 'booth.view'],
+  
+  // If you Reorder Materials, you must be able to View them
+  'materials.reorder': ['materials.view'],
+  
+  // General rule: specific actions usually require 'view' access to that module
+  'materials.create': ['materials.view'],
+  'materials.update': ['materials.view'],
+  'invoices.create': ['sales.view', 'invoices.view'],
+  'payments.create': ['invoices.view', 'payments.view'],
+  'bookings.update': ['bookings.view'],
+  'booth.create': ['booth.view', 'booth.update'],
+};
+
 export default function PermissionsModal({ isOpen, onClose, user }) {
   const queryClient = useQueryClient();
   const [permissions, setPermissions] = useState({});
 
+  // Initialize State safely
   useEffect(() => {
-    if (user?.permissions) setPermissions(user.permissions);
-  }, [user]);
+    if (isOpen && user) {
+        setPermissions(user.permissions ? JSON.parse(JSON.stringify(user.permissions)) : {});
+    }
+  }, [user?.id, isOpen]); 
 
   const updatePermissionsMutation = useMutation({
     mutationFn: ({ id, permissions }) => usersApi.updateUserPermissions(id, permissions),
@@ -42,28 +67,81 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
     onError: (error) => alert(error.response?.data?.error || 'Failed update'),
   });
 
-  // ... (Keep handleToggleAction, handleToggleModule, handleSelectAll, handleClearAll logic exactly as is) ...
+  // --- LOGIC: Recursive Permission Adder ---
+  // This ensures that if A needs B, and B needs C, selecting A automatically selects B and C.
+  const addPermissionWithDependencies = (prevPermissions, module, action) => {
+    let newPermissions = { ...prevPermissions };
+    
+    // 1. Ensure the module array exists
+    if (!newPermissions[module]) newPermissions[module] = [];
+    
+    // 2. Add the action if not present
+    if (!newPermissions[module].includes(action)) {
+        newPermissions[module] = [...newPermissions[module], action];
+    }
+
+    // 3. Check for dependencies
+    const ruleKey = `${module}.${action}`;
+    const dependencies = PERMISSION_DEPENDENCIES[ruleKey];
+
+    if (dependencies) {
+        dependencies.forEach(dep => {
+            const [depModule, depAction] = dep.split('.');
+            // Recursively add dependencies
+            newPermissions = addPermissionWithDependencies(newPermissions, depModule, depAction);
+        });
+    }
+
+    return newPermissions;
+  };
+
   const handleToggleAction = (module, action) => {
     setPermissions(prev => {
-      const newPermissions = { ...prev };
-      if (!newPermissions[module]) newPermissions[module] = [];
-      const idx = newPermissions[module].indexOf(action);
-      if (idx > -1) newPermissions[module].splice(idx, 1);
-      else newPermissions[module].push(action);
-      return newPermissions;
+      const currentActions = prev[module] ? [...prev[module]] : [];
+      
+      // CASE 1: Deselecting
+      if (currentActions.includes(action)) {
+        return { 
+            ...prev, 
+            [module]: currentActions.filter(a => a !== action) 
+        };
+      } 
+      
+      // CASE 2: Selecting (Trigger Dependencies)
+      else {
+        return addPermissionWithDependencies(prev, module, action);
+      }
     });
   };
 
   const handleToggleModule = (module, actions) => {
     setPermissions(prev => {
       const currentLen = prev[module]?.length || 0;
-      return { ...prev, [module]: currentLen === actions.length ? [] : [...actions] };
+      const isSelectingAll = currentLen !== actions.length;
+
+      if (isSelectingAll) {
+          // If selecting all, we must run each action through the dependency checker
+          let newState = { ...prev };
+          actions.forEach(act => {
+              newState = addPermissionWithDependencies(newState, module, act);
+          });
+          return newState;
+      } else {
+          // If deselecting all, just clear this module
+          // (We usually don't auto-deselect dependencies in other modules to avoid data loss)
+          return { ...prev, [module]: [] };
+      }
     });
   };
 
+  // ... (Rest of the component remains exactly the same) ...
   const handleSelectAll = () => {
-    const all = {};
-    PERMISSION_MODULES.forEach(m => all[m.module] = [...m.actions]);
+    let all = {};
+    // We iterate through every module and action and use the dependency logic 
+    // to ensure consistency, though strictly just adding everything works too.
+    PERMISSION_MODULES.forEach(m => {
+        all[m.module] = [...m.actions];
+    });
     setPermissions(all);
   };
 
@@ -79,7 +157,6 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
   const hasAction = (m, a) => permissions[m]?.includes(a);
   const hasAll = (m, acts) => acts.every(a => permissions[m]?.includes(a));
 
-  // Calculate stats for the footer
   const activeModules = Object.keys(permissions).filter(k => permissions[k]?.length > 0).length;
   const totalActions = Object.values(permissions).reduce((acc, curr) => acc + curr.length, 0);
 
@@ -88,11 +165,11 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
       isOpen={isOpen}
       onClose={onClose}
       title="Manage Permissions"
-      size="xl" // Made slightly wider
+      size="xl"
     >
       <div className="flex flex-col h-full max-h-[80vh]">
         
-        {/* Header Section */}
+        {/* Header */}
         <div className="mb-4 space-y-3">
           <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
             <div>
@@ -114,7 +191,7 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
                <div>
                  <p className="font-medium text-yellow-800">Admin Privileges Override</p>
                  <p className="text-sm text-yellow-700 mt-1">
-                   Admins have full access to all modules by default. These settings will be saved but will not restrict this user until their role is changed.
+                   Admins have full access.
                  </p>
                </div>
             </div>
@@ -126,7 +203,7 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
           )}
         </div>
 
-        {/* Scrollable Permissions Grid */}
+        {/* Grid */}
         <div className="flex-1 overflow-y-auto pr-2 -mr-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2">
             {PERMISSION_MODULES.map(({ module, label, actions }) => (
@@ -177,10 +254,10 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
           </div>
         </div>
 
-        {/* Footer Summary & Actions */}
+        {/* Footer */}
         <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
           <div className="text-sm text-gray-500 hidden sm:block">
-            <span className="font-medium text-indigo-600">{totalActions}</span> permissions active in <span className="font-medium text-indigo-600">{activeModules}</span> modules
+            <span className="font-medium text-indigo-600">{totalActions}</span> permissions active
           </div>
           <div className="flex gap-3 w-full sm:w-auto justify-end">
             <Button variant="secondary" onClick={onClose}>Cancel</Button>

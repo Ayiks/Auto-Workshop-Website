@@ -78,7 +78,7 @@ export default function SaleForm({ onCancel, isLoading }) {
         
         // 3. Navigate away or reset
         if (onCancel) onCancel(); 
-        else navigate("sales"); 
+        else navigate("/app/sales"); 
     },
     onError: (error) => {
         console.error("Sale Error:", error);

@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Outlet, Link, useLocation, useNavigate } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 import { useAuthStore } from "@stores/authStore";
+import { settingsApi } from "@api/settings";
 
 export default function DashboardLayout() {
   const location = useLocation();
@@ -8,6 +10,18 @@ export default function DashboardLayout() {
   const { user, logout, hasPermission } = useAuthStore();
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
+
+  // Fetch business settings
+  const { data: settingsData } = useQuery({
+    queryKey: ["business-settings"],
+    queryFn: settingsApi.getBusinessSettings,
+    staleTime: 10 * 60 * 1000, // Cache for 10 minutes
+  });
+
+  const businessName = settingsData?.data?.name || "Gray Manager";
+
+  const businessLogo = settingsData?.data?.logo;
+  const businessInitials = businessName.split(" ").map(word => word.charAt(0)).join("").toUpperCase().slice(0, 2);
 
   const handleLogout = async () => {
     await logout();
@@ -113,15 +127,15 @@ export default function DashboardLayout() {
           {isSidebarOpen ? (
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-sm">AW</span>
+                <span className="text-white font-bold text-sm">{businessLogo ?? businessInitials}</span>
               </div>
               <h1 className="text-sm font-bold text-gray-900 tracking-tight">
-                Auto Workshop
+                {businessName.toUpperCase()}
               </h1>
             </div>
           ) : (
-            <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center mx-auto shadow-sm">
-              <span className="text-white font-bold text-sm">AW</span>
+            <div className="w-8 h-8 p-2 bg-black rounded-lg flex items-center justify-center mx-auto shadow-sm">
+              <span className="text-white font-bold text-sm">{businessLogo ?? businessInitials}</span>
             </div>
           )}
           <button

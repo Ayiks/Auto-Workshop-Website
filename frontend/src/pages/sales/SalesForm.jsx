@@ -249,7 +249,7 @@ export default function SaleForm({ onCancel, isLoading }) {
         if (itemIndex === -1) return prevItems;
         
         // Remove on 0 or negative
-        if (newQty <= 0) return prevItems.filter(i => i.id !== itemId);
+        if (newQty < 0) return prevItems.filter(i => i.id !== itemId);
 
         const item = prevItems[itemIndex];
         

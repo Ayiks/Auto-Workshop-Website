@@ -26,7 +26,6 @@ export default function TopUpModal({
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    console.log("1. Modal Submit Clicked", { amount, paymentMethod }); // DEBUG LOG
     // Send the data back to Sales.jsx
     onSubmit({
       amount: parseFloat(amount),

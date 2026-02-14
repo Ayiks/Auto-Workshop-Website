@@ -1,4 +1,4 @@
-// Prisma Schema v2.2 - Auto Workshop Management System
+// Prisma Schema v2.3 - SaaS Multi-Tenant Architecture
 // Based on PRD v2.2 & EDD v1.0
 
 generator client {
@@ -11,51 +11,84 @@ datasource db {
 }
 
 // ============================================
+// SAAS TENANT (BUSINESS)
+// ============================================
+
+model Business {
+  id        String   @id @default(uuid())
+  name      String   @db.VarChar(100)
+  plan      String   @default("free") @db.VarChar(50)
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  // Relations (Everything belongs to a Business)
+  users             User[]
+  customers         Customer[]
+  materials         Material[]
+  materialUnits     MaterialUnit[]
+  materialReorders  MaterialReorder[]
+  services          Service[]
+  sales             Sale[]
+  saleItems         SaleItem[]
+  jobs              Job[]
+  jobMaterials      JobMaterial[]
+  invoices          Invoice[]
+  payments          Payment[]
+  receipts          Receipt[]
+  expenses          Expense[]
+  bookings          Booking[]
+  settings          BusinessSettings[]
+  auditLogs         AuditLog[]
+
+  @@map("businesses")
+}
+
+// ============================================
 // USERS & AUTHENTICATION
 // ============================================
 
 model User {
   id           Int       @id @default(autoincrement())
+  businessId   String?   @map("business_id") // NEW
   username     String    @unique @db.VarChar(50)
   passwordHash String    @map("password_hash") @db.VarChar(255)
   fullName     String?   @map("full_name") @db.VarChar(100)
   email        String?   @db.VarChar(100)
   phone        String?   @db.VarChar(20)
   role         Role
-  permissions  Json      @default("{}") // Nested object: {materials: ['view', 'create'], ...}
+  permissions  Json      @default("{}")
   isActive     Boolean   @default(true) @map("is_active")
   createdAt    DateTime  @default(now()) @map("created_at")
   lastLogin    DateTime? @map("last_login")
 
   // Relations
-  salesMade         Sale[]
-  jobsAssigned      Job[]
-  expensesRecorded  Expense[]
-  reordersCreated   MaterialReorder[]
-  paymentsReceived  Payment[]
-  receiptsIssued    Receipt[]
+  business         Business? @relation(fields: [businessId], references: [id])
+  salesMade        Sale[]
+  jobsAssigned     Job[]
+  expensesRecorded Expense[]
+  reordersCreated  MaterialReorder[]
+  paymentsReceived Payment[]
+  receiptsIssued   Receipt[]
 
   @@map("users")
 }
 
 model Customer {
-  id          Int      @id @default(autoincrement())
-  firstName   String
-  lastName    String?
-  email       String?  // Optional, not everyone provides email
-  phone       String   @unique // Essential for workshops to avoid duplicates
-  address     String?  @db.Text
-  notes       String?  @db.Text
-  isActive    Boolean  @default(true) // For soft delete
+  id         Int      @id @default(autoincrement())
+  businessId String?  @map("business_id") // NEW
+  firstName  String
+  lastName   String?
+  email      String?  
+  phone      String   @unique 
+  address    String?  @db.Text
+  notes      String?  @db.Text
+  isActive   Boolean  @default(true)
   
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  sales       Sale[]
-
-  // Future relations:
-  // vehicles    Vehicle[]
-  // invoices    Invoice[]
+  business   Business? @relation(fields: [businessId], references: [id])
+  sales      Sale[]
 
   @@map("customers")
 }
@@ -73,22 +106,24 @@ enum Role {
 // ============================================
 
 model Material {
-  id                Int      @id @default(autoincrement())
-  name              String   @db.VarChar(100)
-  quantity          Decimal  @default(0) @db.Decimal(10, 2)
-  unitCost          Decimal  @map("unit_cost") @db.Decimal(10, 2)
-  sellingPrice      Decimal  @map("selling_price") @db.Decimal(10, 2)
-  lowStockThreshold Decimal  @map("low_stock_threshold") @db.Decimal(10, 2)
-  isActive          Boolean  @default(true) @map("is_active")
-  createdAt         DateTime @default(now()) @map("created_at")
-  updatedAt         DateTime @updatedAt @map("updated_at")
-  imageUrl          String?  @map("image_url") @db.VarChar(255)
-  baseUnit          String   @default("piece")
+  id                  Int      @id @default(autoincrement())
+  businessId          String?  @map("business_id") // NEW
+  name                String   @db.VarChar(100)
+  quantity            Decimal  @default(0) @db.Decimal(10, 2)
+  unitCost            Decimal  @map("unit_cost") @db.Decimal(10, 2)
+  sellingPrice        Decimal  @map("selling_price") @db.Decimal(10, 2)
+  lowStockThreshold   Decimal  @map("low_stock_threshold") @db.Decimal(10, 2)
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+  imageUrl            String?  @map("image_url") @db.VarChar(255)
+  baseUnit            String   @default("piece")
 
-  materialUnitId    Int?     @map("material_unit_id") // Foreign Key
-  unit              GlobalUnit? @relation("BaseUnitRelation", fields: [materialUnitId], references: [id])
+  materialUnitId      Int?     @map("material_unit_id")
+  unit                GlobalUnit? @relation("BaseUnitRelation", fields: [materialUnitId], references: [id])
 
   // Relations
+  business       Business? @relation(fields: [businessId], references: [id])
   alternateUnits MaterialUnit[]
   saleItems      SaleItem[]
   jobMaterials   JobMaterial[]
@@ -98,24 +133,28 @@ model Material {
 }
 
 model MaterialUnit {
-  id          Int      @id @default(autoincrement())
-  name        String   // e.g. "Drum", "Carton", "Pack of 6"
-  factor      Decimal  @db.Decimal(10, 2) // Conversion: How many Base Units? (e.g. 200 for a Drum)
-  price       Decimal  @db.Decimal(10, 2) // Specific Selling Price for this unit
-  materialId  Int
-  material    Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
+  id         Int      @id @default(autoincrement())
+  businessId String?  @map("business_id") // NEW
+  name       String   
+  factor     Decimal  @db.Decimal(10, 2)
+  price      Decimal  @db.Decimal(10, 2)
+  materialId Int
+  material   Material @relation(fields: [materialId], references: [id], onDelete: Cascade)
 
-  unitId      Int?     @map("unit_id") // Foreign Key
-  unit        GlobalUnit? @relation("AltUnitRelation", fields: [unitId], references: [id])
+  unitId     Int?     @map("unit_id") 
+  unit       GlobalUnit? @relation("AltUnitRelation", fields: [unitId], references: [id])
+  
   // Relations
-  saleItems   SaleItem[]
-  reorders    MaterialReorder[]
+  business   Business? @relation(fields: [businessId], references: [id])
+  saleItems  SaleItem[]
+  reorders   MaterialReorder[]
 
   @@map("material_units")
 }
 
 model MaterialReorder {
   id              Int      @id @default(autoincrement())
+  businessId      String?  @map("business_id") // NEW
   materialId      Int      @map("material_id")
   materialName    String   @db.VarChar(100)
   materialUnitId  Int?     @map("material_unit_id")
@@ -126,25 +165,26 @@ model MaterialReorder {
   reorderDate     DateTime @default(now()) @map("reorder_date")
   notes           String?  @db.Text
   
-  // Automatically links to generated expense
   expenseId       Int?     @unique @map("expense_id")
 
   // Relations
-  material   Material  @relation(fields: [materialId], references: [id])
-  materialUnit  MaterialUnit? @relation(fields: [materialUnitId], references: [id])
-  user       User      @relation(fields: [reorderedBy], references: [id])
-  expense    Expense?  @relation(fields: [expenseId], references: [id])
+  business     Business? @relation(fields: [businessId], references: [id])
+  material     Material  @relation(fields: [materialId], references: [id])
+  materialUnit MaterialUnit? @relation(fields: [materialUnitId], references: [id])
+  user         User      @relation(fields: [reorderedBy], references: [id])
+  expense      Expense?  @relation(fields: [expenseId], references: [id])
 
   @@map("material_reorders")
 }
 
+// Note: Global units are often shared across all tenants, so we can omit businessId here 
+// unless you want tenants to define their own custom units. 
 model GlobalUnit {
   id           Int      @id @default(autoincrement())
-  name         String   @unique // e.g., "Liter", "Kilogram", "Piece"
-  abbreviation String   // e.g., "L", "kg", "pcs"
+  name         String   @unique 
+  abbreviation String   
   isActive     Boolean  @default(true)
 
-  // Relations
   materials      Material[]     @relation("BaseUnitRelation")
   alternateUnits MaterialUnit[] @relation("AltUnitRelation")
 
@@ -156,21 +196,21 @@ model GlobalUnit {
 // ============================================
 
 model Service {
-  id        Int      @id @default(autoincrement())
-  type      String   @default("booth") @db.VarChar(20)
-  name      String   @db.VarChar(100)  // NEW - e.g. "Salon", "4x4"
-  category  String   @db.VarChar(50)   // NEW - e.g. "Small Vehicle", "Large Vehicle"
-  price     Decimal  @db.Decimal(10, 2)
-  isActive  Boolean  @default(true) @map("is_active")
-  createdAt DateTime @default(now()) @map("created_at")
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         Int      @id @default(autoincrement())
+  businessId String?  @map("business_id") // NEW
+  type       String   @default("booth") @db.VarChar(20)
+  name       String   @db.VarChar(100)  
+  category   String   @db.VarChar(50)   
+  price      Decimal  @db.Decimal(10, 2)
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
 
-  // Relations
-  saleItems SaleItem[]
+  business   Business? @relation(fields: [businessId], references: [id])
+  saleItems  SaleItem[]
 
   @@map("services")
 }
-
 
 // ============================================
 // SALES (COUNTER SALES)
@@ -178,29 +218,28 @@ model Service {
 
 model Sale {
   id            Int      @id @default(autoincrement())
+  businessId    String?  @map("business_id") // NEW
   saleDate      DateTime @default(now()) @map("sale_date")
   totalAmount   Decimal  @map("total_amount") @db.Decimal(10, 2)
   
-  // Payment Tracking
   amountPaid    Decimal   @default(0) @map("amount_paid") @db.Decimal(10, 2)
   balance       Decimal   @default(0) @map("balance") @db.Decimal(10, 2)
   paymentMethod String    @default("cash") @map("payment_method") @db.VarChar(20)
   paymentStatus String    @default("paid") @map("payment_status") @db.VarChar(20) 
   discount      Decimal   @default(0) @map("discount") @db.Decimal(10, 2)
 
-  // Customer Details (This was missing!)
   customerId    Int?      @map("customer_id")        
   customerName  String?   @map("customer_name") @db.VarChar(100)
   customerPhone String?   @map("customer_phone") @db.VarChar(20)
-  // Workflow
+  
   soldBy        Int      @map("sold_by")
   status        String   @default("completed") @db.VarChar(20)
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
 
-  // Relations
-  user      User       @relation(fields: [soldBy], references: [id])
-  customer  Customer?  @relation(fields: [customerId], references: [id])
+  business  Business? @relation(fields: [businessId], references: [id])
+  user      User      @relation(fields: [soldBy], references: [id])
+  customer  Customer? @relation(fields: [customerId], references: [id])
   items     SaleItem[]
   receipt   Receipt?
 
@@ -208,31 +247,28 @@ model Sale {
 }
 
 model SaleItem {
-  id         Int     @id @default(autoincrement())
-  saleId     Int     @map("sale_id")
-  itemType   String  @map("item_type") @db.VarChar(20) // 'material' | 'booth'
+  id             Int     @id @default(autoincrement())
+  businessId     String? @map("business_id") // NEW
+  saleId         Int     @map("sale_id")
+  itemType       String  @map("item_type") @db.VarChar(20) 
   
-  // Material fields (null if booth)
-  materialId   Int?    @map("material_id")
-  materialName String? @db.VarChar(100)
-  quantity     Decimal? @db.Decimal(10, 2)
+  materialId     Int?    @map("material_id")
+  materialName   String? @db.VarChar(100)
+  quantity       Decimal? @db.Decimal(10, 2)
 
-  // Link to specific unit (optional, null means Base Unit was sold)
   materialUnitId Int?
   materialUnit   MaterialUnit? @relation(fields: [materialUnitId], references: [id])
   
-  // Service fields (null if material)
-  serviceId    Int?    @map("service_id")
+  serviceId      Int?    @map("service_id")
   
-  // Common fields
-  unitCost   Decimal @default(0) @map("unit_cost") @db.Decimal(10, 2)
-  unitPrice  Decimal @map("unit_price") @db.Decimal(10, 2)
-  subtotal   Decimal @db.Decimal(10, 2)
+  unitCost       Decimal @default(0) @map("unit_cost") @db.Decimal(10, 2)
+  unitPrice      Decimal @map("unit_price") @db.Decimal(10, 2)
+  subtotal       Decimal @db.Decimal(10, 2)
 
-  // Relations
-  sale     Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
-  material Material? @relation(fields: [materialId], references: [id])
-  service  Service?  @relation(fields: [serviceId], references: [id])
+  business   Business? @relation(fields: [businessId], references: [id])
+  sale       Sale      @relation(fields: [saleId], references: [id], onDelete: Cascade)
+  material   Material? @relation(fields: [materialId], references: [id])
+  service    Service?  @relation(fields: [serviceId], references: [id])
 
   @@map("sale_items")
 }
@@ -243,7 +279,8 @@ model SaleItem {
 
 model Job {
   id                 Int      @id @default(autoincrement())
-  jobType            String   @map("job_type") @db.VarChar(20) // mechanic, sprayer, bodyworks
+  businessId         String?  @map("business_id") // NEW
+  jobType            String   @map("job_type") @db.VarChar(20) 
   clientName         String   @map("client_name") @db.VarChar(100)
   clientPhone        String?  @map("client_phone") @db.VarChar(20)
   clientEmail        String?  @map("client_email") @db.VarChar(100)
@@ -253,14 +290,14 @@ model Job {
   problemType        String   @map("problem_type") @db.VarChar(100)
   problemDescription String   @map("problem_description") @db.Text
   labourCost         Decimal  @map("labour_cost") @db.Decimal(10, 2)
-  totalCost          Decimal  @map("total_cost") @db.Decimal(10, 2) // materials + labour
+  totalCost          Decimal  @map("total_cost") @db.Decimal(10, 2) 
   assignedTo         Int      @map("assigned_to")
-  status             String   @default("pending") @db.VarChar(20) // pending, in_progress, completed, invoiced
+  status             String   @default("pending") @db.VarChar(20) 
   createdAt          DateTime @default(now()) @map("created_at")
   updatedAt          DateTime @updatedAt @map("updated_at")
 
-  // Relations
-  user      User          @relation(fields: [assignedTo], references: [id])
+  business  Business? @relation(fields: [businessId], references: [id])
+  user      User      @relation(fields: [assignedTo], references: [id])
   materials JobMaterial[]
   invoice   Invoice?
 
@@ -269,78 +306,78 @@ model Job {
 
 model JobMaterial {
   id           Int     @id @default(autoincrement())
+  businessId   String? @map("business_id") // NEW
   jobId        Int     @map("job_id")
-  
-  // For inventory materials
   materialId   Int?    @map("material_id")
   
-  // Common fields (for both inventory and external)
   materialName String  @map("material_name") @db.VarChar(100)
   quantity     Decimal @db.Decimal(10, 2)
   unitPrice    Decimal @map("unit_price") @db.Decimal(10, 2)
   subtotal     Decimal @db.Decimal(10, 2)
-  isExternal   Boolean @default(false) @map("is_external") // true = external, false = from inventory
+  isExternal   Boolean @default(false) @map("is_external") 
 
-  // Relations
-  job      Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  material Material? @relation(fields: [materialId], references: [id])
+  business   Business? @relation(fields: [businessId], references: [id])
+  job        Job       @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  material   Material? @relation(fields: [materialId], references: [id])
 
   @@map("job_materials")
 }
 
 model Invoice {
   id             Int      @id @default(autoincrement())
+  businessId     String?  @map("business_id") // NEW
   jobId          Int      @unique @map("job_id")
   invoiceNumber  String   @unique @map("invoice_number") @db.VarChar(50)
   materialsCost  Decimal  @default(0) @map("materials_cost") @db.Decimal(10, 2)
   labourCost     Decimal  @default(0) @map("labour_cost") @db.Decimal(10, 2)
   totalAmount    Decimal  @map("total_amount") @db.Decimal(10, 2)
-  amountPaid     Decimal  @default(0) @map("amount_paid") @db.Decimal(10, 2) // Sum of all payments
-  amountDue      Decimal  @map("amount_due") @db.Decimal(10, 2) // totalAmount - amountPaid
-  paymentStatus  String   @default("unpaid") @map("payment_status") @db.VarChar(20) // unpaid, partial, paid
+  amountPaid     Decimal  @default(0) @map("amount_paid") @db.Decimal(10, 2) 
+  amountDue      Decimal  @map("amount_due") @db.Decimal(10, 2) 
+  paymentStatus  String   @default("unpaid") @map("payment_status") @db.VarChar(20) 
   invoiceDate    DateTime @default(now()) @map("invoice_date")
   fullyPaidDate  DateTime? @map("fully_paid_date")
   notes          String?  @db.Text
 
-  // Relations
-  job      Job       @relation(fields: [jobId], references: [id])
-  payments Payment[]
+  business  Business? @relation(fields: [businessId], references: [id])
+  job       Job       @relation(fields: [jobId], references: [id])
+  payments  Payment[]
 
   @@map("invoices")
 }
 
 // ============================================
-// PAYMENTS (NEW - For Partial Payments)
+// PAYMENTS
 // ============================================
 
 model Payment {
   id            Int      @id @default(autoincrement())
+  businessId    String?  @map("business_id") // NEW
   invoiceId     Int      @map("invoice_id")
   amount        Decimal  @db.Decimal(10, 2)
-  paymentMethod String   @map("payment_method") @db.VarChar(20) // cash, momo, cheque
+  paymentMethod String   @map("payment_method") @db.VarChar(20) 
   paymentDate   DateTime @default(now()) @map("payment_date")
   receivedBy    Int      @map("received_by")
   notes         String?  @db.Text
 
-  // Relations
-  invoice Invoice  @relation(fields: [invoiceId], references: [id])
-  user    User     @relation(fields: [receivedBy], references: [id])
-  receipt Receipt?
+  business Business? @relation(fields: [businessId], references: [id])
+  invoice  Invoice   @relation(fields: [invoiceId], references: [id])
+  user     User      @relation(fields: [receivedBy], references: [id])
+  receipt  Receipt?
 
   @@map("payments")
 }
 
 // ============================================
-// RECEIPTS (NEW - Auto-generated)
+// RECEIPTS 
 // ============================================
 
 model Receipt {
   id            Int      @id @default(autoincrement())
+  businessId    String?  @map("business_id") // NEW
   seqId         BigInt?  @unique @map("seq_id") @default(autoincrement())
   receiptNumber String   @unique @map("receipt_number") @db.VarChar(50)
-  receiptType   String   @map("receipt_type") @db.VarChar(20) // 'sale' | 'payment'
+  receiptType   String   @map("receipt_type") @db.VarChar(20) 
   
-  // Link to sale OR payment (one will be null)
   saleId        Int?     @unique @map("sale_id")
   paymentId     Int?     @unique @map("payment_id")
   
@@ -349,16 +386,15 @@ model Receipt {
   issuedBy      Int      @map("issued_by")
   issuedDate    DateTime @default(now()) @map("issued_date")
   
-  // Branding info (snapshot at time of receipt)
-  businessName  String   @map("business_name") @db.VarChar(100)
-  businessLogo  String?  @map("business_logo") @db.Text // Logo URL or base64
+  businessName   String  @map("business_name") @db.VarChar(100)
+  businessLogo   String? @map("business_logo") @db.Text 
   businessAddress String @map("business_address") @db.Text
   businessContact String @map("business_contact") @db.VarChar(100)
 
-  // Relations
-  sale    Sale?    @relation(fields: [saleId], references: [id])
-  payment Payment? @relation(fields: [paymentId], references: [id])
-  user    User     @relation(fields: [issuedBy], references: [id])
+  business Business? @relation(fields: [businessId], references: [id])
+  sale     Sale?     @relation(fields: [saleId], references: [id])
+  payment  Payment?  @relation(fields: [paymentId], references: [id])
+  user     User      @relation(fields: [issuedBy], references: [id])
 
   @@map("receipts")
 }
@@ -368,113 +404,87 @@ model Receipt {
 // ============================================
 
 model Expense {
-  id                  Int      @id @default(autoincrement())
-  type                String   @db.VarChar(20) // 'cog' (Cost of Goods) | 'operational'
-  category            String   @db.VarChar(50) // For operational: rent, utilities, salaries, etc. For COG: 'material_reorder'
-  description         String   @db.VarChar(200)
-  amount              Decimal  @db.Decimal(10, 2)
-  expenseDate         DateTime @default(now()) @map("expense_date")
-  source              String   @default("manual") @db.VarChar(20) // 'manual' | 'system'
-  isReadOnly          Boolean  @default(false) @map("is_read_only") // true for system-generated expenses
-  recordedBy          Int      @map("recorded_by")
-  notes               String?  @db.Text
-  createdAt           DateTime @default(now()) @map("created_at")
+  id               Int      @id @default(autoincrement())
+  businessId       String?  @map("business_id") // NEW
+  type             String   @db.VarChar(20) 
+  category         String   @db.VarChar(50) 
+  description      String   @db.VarChar(200)
+  amount           Decimal  @db.Decimal(10, 2)
+  expenseDate      DateTime @default(now()) @map("expense_date")
+  source           String   @default("manual") @db.VarChar(20) 
+  isReadOnly       Boolean  @default(false) @map("is_read_only") 
+  recordedBy       Int      @map("recorded_by")
+  notes            String?  @db.Text
+  createdAt        DateTime @default(now()) @map("created_at")
 
-  // Relations
-  user            User              @relation(fields: [recordedBy], references: [id])
+  business        Business? @relation(fields: [businessId], references: [id])
+  user            User      @relation(fields: [recordedBy], references: [id])
   materialReorder MaterialReorder?
 
   @@map("expenses")
 }
 
 // ============================================
-// BOOKINGS (From Public Website)
+// BOOKINGS
 // ============================================
 
 model Booking {
   id            Int      @id @default(autoincrement())
-  bookingType   String   @map("booking_type") @db.VarChar(50) // 'booth' | 'service_inquiry'
+  businessId    String?  @map("business_id") // NEW
+  bookingType   String   @map("booking_type") @db.VarChar(50) 
   clientName    String   @map("client_name") @db.VarChar(100)
   clientEmail   String?  @map("client_email") @db.VarChar(100)
   clientPhone   String   @map("client_phone") @db.VarChar(20)
-  serviceType   String?  @map("service_type") @db.VarChar(100) // For service inquiries
+  serviceType   String?  @map("service_type") @db.VarChar(100) 
   preferredDate DateTime? @map("preferred_date") @db.Date
   preferredTime String?  @map("preferred_time") @db.VarChar(20)
   message       String?  @db.Text
-  status        String   @default("new") @db.VarChar(20) // new, contacted, scheduled, completed, cancelled
+  status        String   @default("new") @db.VarChar(20) 
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
+
+  business  Business? @relation(fields: [businessId], references: [id])
 
   @@map("bookings")
 }
 
 // ============================================
-// BUSINESS SETTINGS (NEW - For Branding)
+// BUSINESS SETTINGS
 // ============================================
 
 model BusinessSettings {
-  id        Int      @id @default(autoincrement())
-  name      String   @db.VarChar(100)
-  logo      String?  @db.Text // Logo URL or base64
-  address   String   @db.Text
-  phone     String   @db.VarChar(50)
-  email     String   @db.VarChar(100)
-  website   String?  @db.VarChar(200)
-  updatedAt DateTime @updatedAt @map("updated_at")
+  id         Int      @id @default(autoincrement())
+  businessId String?  @map("business_id") // NEW
+  name       String   @db.VarChar(100)
+  logo       String?  @db.Text 
+  address    String   @db.Text
+  phone      String   @db.VarChar(50)
+  email      String   @db.VarChar(100)
+  website    String?  @db.VarChar(200)
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  business   Business? @relation(fields: [businessId], references: [id])
 
   @@map("business_settings")
 }
 
 // ============================================
-// AUDIT LOG (For Tracking Changes)
+// AUDIT LOG
 // ============================================
 
 model AuditLog {
   id          Int      @id @default(autoincrement())
+  businessId  String?  @map("business_id") // NEW
   userId      Int      @map("user_id")
-  action      String   @db.VarChar(50) // CREATE, UPDATE, DELETE, LOGIN, etc.
-  entity      String   @db.VarChar(50) // Sale, Job, Material, etc.
+  action      String   @db.VarChar(50) 
+  entity      String   @db.VarChar(50) 
   entityId    Int?     @map("entity_id")
   description String   @db.Text
   ipAddress   String?  @map("ip_address") @db.VarChar(50)
   userAgent   String?  @map("user_agent") @db.Text
   createdAt   DateTime @default(now()) @map("created_at")
 
+  business    Business? @relation(fields: [businessId], references: [id])
+
   @@map("audit_logs")
 }
-
-// ============================================
-// INDEXES FOR PERFORMANCE
-// ============================================
-
-// Users
-// @@index([username])
-// @@index([role])
-
-// Materials
-// @@index([isActive])
-// @@index([quantity]) // For low stock queries
-
-// Sales
-// @@index([saleDate])
-// @@index([soldBy])
-
-// Jobs
-// @@index([jobType])
-// @@index([assignedTo])
-// @@index([status])
-
-// Invoices
-// @@index([paymentStatus])
-// @@index([invoiceDate])
-
-// Payments
-// @@index([paymentDate])
-
-// Expenses
-// @@index([type])
-// @@index([expenseDate])
-
-// Bookings
-// @@index([status])
-// @@index([preferredDate])

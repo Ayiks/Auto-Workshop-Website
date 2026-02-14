@@ -65,7 +65,7 @@ const Header = () => {
             onClick={() => navigate('/login')}
             className="bg-slate-900 text-white px-5 py-2 rounded-full font-medium hover:bg-blue-600 transition-colors"
           >
-            Get Started
+            Login
           </button>
         </div>
 
@@ -263,7 +263,7 @@ const Pricing = () => {
             className="bg-slate-800 p-8 rounded-2xl border border-slate-700 flex flex-col"
           >
             <h3 className="text-2xl font-bold mb-2">Starter</h3>
-            <p className="text-slate-400 mb-6">For small workshops just starting out.</p>
+            <p className="text-slate-400 mb-6">For solo mechanics or small neighborhood shops.</p>
             <div className="text-4xl font-bold mb-8">Free<span className="text-lg text-slate-500 font-normal"> / forever</span></div>
             
             <ul className="space-y-4 mb-8 flex-1">
@@ -345,8 +345,7 @@ const Contact = () => {
           >
             <h2 className="text-3xl md:text-4xl font-bold text-slate-900 mb-6">Get in Touch</h2>
             <p className="text-slate-600 mb-8 text-lg">
-              Ready to modernize your workshop? Have questions about features? Send us a message or request a demo.
-            </p>
+Whether you run a small spraying booth or a massive collision repair center, we're here to help you set up and scale. Let's talk.            </p>
             
             <div className="space-y-6">
               <div className="flex items-center gap-4">
@@ -409,9 +408,19 @@ const Contact = () => {
   );
 };
 const Footer = () => (
-    <footer className="bg-slate-900 text-slate-300 py-12 border-t border-slate-800">
-      <div className="container mx-auto px-6 text-center">
-        <p>&copy; {new Date().getFullYear()} Gray Manager. All rights reserved.</p>
+    <footer className="bg-black text-gray-400 py-12 border-t border-gray-900">
+      <div className="container mx-auto px-6 flex flex-col md:flex-row justify-between items-center gap-4">
+        <div className="flex items-center gap-2">
+          <div className="w-6 h-6 bg-white rounded flex items-center justify-center">
+            <span className="text-black font-bold text-xs">G</span>
+          </div>
+          <span className="text-white font-bold tracking-tight">Graymanager</span>
+        </div>
+        <p>&copy; {new Date().getFullYear()} Graymanager. All rights reserved.</p>
+        <div className="flex gap-6 text-sm">
+          <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+          <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+        </div>
       </div>
     </footer>
 );

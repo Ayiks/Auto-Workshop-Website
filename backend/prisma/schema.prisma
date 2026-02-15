@@ -25,6 +25,7 @@ model Business {
   users             User[]
   customers         Customer[]
   materials         Material[]
+  globalUnits       GlobalUnit[]
   materialUnits     MaterialUnit[]
   materialReorders  MaterialReorder[]
   services          Service[]
@@ -49,7 +50,7 @@ model Business {
 
 model User {
   id           Int       @id @default(autoincrement())
-  businessId   String?   @map("business_id") // NEW
+  businessId   String   @map("business_id") // NEW
   username     String    @unique @db.VarChar(50)
   passwordHash String    @map("password_hash") @db.VarChar(255)
   fullName     String?   @map("full_name") @db.VarChar(100)
@@ -75,7 +76,7 @@ model User {
 
 model Customer {
   id         Int      @id @default(autoincrement())
-  businessId String?  @map("business_id") // NEW
+  businessId String  @map("business_id") // NEW
   firstName  String
   lastName   String?
   email      String?  
@@ -107,7 +108,7 @@ enum Role {
 
 model Material {
   id                  Int      @id @default(autoincrement())
-  businessId          String?  @map("business_id") // NEW
+  businessId          String  @map("business_id") // NEW
   name                String   @db.VarChar(100)
   quantity            Decimal  @default(0) @db.Decimal(10, 2)
   unitCost            Decimal  @map("unit_cost") @db.Decimal(10, 2)
@@ -134,7 +135,7 @@ model Material {
 
 model MaterialUnit {
   id         Int      @id @default(autoincrement())
-  businessId String?  @map("business_id") // NEW
+  businessId String  @map("business_id") // NEW
   name       String   
   factor     Decimal  @db.Decimal(10, 2)
   price      Decimal  @db.Decimal(10, 2)
@@ -154,7 +155,7 @@ model MaterialUnit {
 
 model MaterialReorder {
   id              Int      @id @default(autoincrement())
-  businessId      String?  @map("business_id") // NEW
+  businessId      String  @map("business_id") // NEW
   materialId      Int      @map("material_id")
   materialName    String   @db.VarChar(100)
   materialUnitId  Int?     @map("material_unit_id")
@@ -181,12 +182,14 @@ model MaterialReorder {
 // unless you want tenants to define their own custom units. 
 model GlobalUnit {
   id           Int      @id @default(autoincrement())
-  name         String   @unique 
+  businessId   String?  @map("business_id") // NEW
+  name         String    
   abbreviation String   
   isActive     Boolean  @default(true)
 
   materials      Material[]     @relation("BaseUnitRelation")
   alternateUnits MaterialUnit[] @relation("AltUnitRelation")
+  business   Business? @relation(fields: [businessId], references: [id])
 
   @@map("global_units")
 }
@@ -197,7 +200,7 @@ model GlobalUnit {
 
 model Service {
   id         Int      @id @default(autoincrement())
-  businessId String?  @map("business_id") // NEW
+  businessId String  @map("business_id") // NEW
   type       String   @default("booth") @db.VarChar(20)
   name       String   @db.VarChar(100)  
   category   String   @db.VarChar(50)   
@@ -218,7 +221,7 @@ model Service {
 
 model Sale {
   id            Int      @id @default(autoincrement())
-  businessId    String?  @map("business_id") // NEW
+  businessId    String  @map("business_id") // NEW
   saleDate      DateTime @default(now()) @map("sale_date")
   totalAmount   Decimal  @map("total_amount") @db.Decimal(10, 2)
   
@@ -248,7 +251,7 @@ model Sale {
 
 model SaleItem {
   id             Int     @id @default(autoincrement())
-  businessId     String? @map("business_id") // NEW
+  businessId     String @map("business_id") // NEW
   saleId         Int     @map("sale_id")
   itemType       String  @map("item_type") @db.VarChar(20) 
   
@@ -279,7 +282,7 @@ model SaleItem {
 
 model Job {
   id                 Int      @id @default(autoincrement())
-  businessId         String?  @map("business_id") // NEW
+  businessId         String  @map("business_id") // NEW
   jobType            String   @map("job_type") @db.VarChar(20) 
   clientName         String   @map("client_name") @db.VarChar(100)
   clientPhone        String?  @map("client_phone") @db.VarChar(20)
@@ -306,7 +309,7 @@ model Job {
 
 model JobMaterial {
   id           Int     @id @default(autoincrement())
-  businessId   String? @map("business_id") // NEW
+  businessId   String @map("business_id") // NEW
   jobId        Int     @map("job_id")
   materialId   Int?    @map("material_id")
   
@@ -325,7 +328,7 @@ model JobMaterial {
 
 model Invoice {
   id             Int      @id @default(autoincrement())
-  businessId     String?  @map("business_id") // NEW
+  businessId     String  @map("business_id") // NEW
   jobId          Int      @unique @map("job_id")
   invoiceNumber  String   @unique @map("invoice_number") @db.VarChar(50)
   materialsCost  Decimal  @default(0) @map("materials_cost") @db.Decimal(10, 2)
@@ -351,7 +354,7 @@ model Invoice {
 
 model Payment {
   id            Int      @id @default(autoincrement())
-  businessId    String?  @map("business_id") // NEW
+  businessId    String  @map("business_id") // NEW
   invoiceId     Int      @map("invoice_id")
   amount        Decimal  @db.Decimal(10, 2)
   paymentMethod String   @map("payment_method") @db.VarChar(20) 
@@ -373,7 +376,7 @@ model Payment {
 
 model Receipt {
   id            Int      @id @default(autoincrement())
-  businessId    String?  @map("business_id") // NEW
+  businessId    String  @map("business_id") // NEW
   seqId         BigInt?  @unique @map("seq_id") @default(autoincrement())
   receiptNumber String   @unique @map("receipt_number") @db.VarChar(50)
   receiptType   String   @map("receipt_type") @db.VarChar(20) 
@@ -405,7 +408,7 @@ model Receipt {
 
 model Expense {
   id               Int      @id @default(autoincrement())
-  businessId       String?  @map("business_id") // NEW
+  businessId       String  @map("business_id") // NEW
   type             String   @db.VarChar(20) 
   category         String   @db.VarChar(50) 
   description      String   @db.VarChar(200)
@@ -430,7 +433,7 @@ model Expense {
 
 model Booking {
   id            Int      @id @default(autoincrement())
-  businessId    String?  @map("business_id") // NEW
+  businessId    String  @map("business_id") // NEW
   bookingType   String   @map("booking_type") @db.VarChar(50) 
   clientName    String   @map("client_name") @db.VarChar(100)
   clientEmail   String?  @map("client_email") @db.VarChar(100)
@@ -454,7 +457,7 @@ model Booking {
 
 model BusinessSettings {
   id         Int      @id @default(autoincrement())
-  businessId String?  @map("business_id") // NEW
+  businessId String  @map("business_id") // NEW
   name       String   @db.VarChar(100)
   logo       String?  @db.Text 
   address    String   @db.Text
@@ -474,7 +477,7 @@ model BusinessSettings {
 
 model AuditLog {
   id          Int      @id @default(autoincrement())
-  businessId  String?  @map("business_id") // NEW
+  businessId  String  @map("business_id") // NEW
   userId      Int      @map("user_id")
   action      String   @db.VarChar(50) 
   entity      String   @db.VarChar(50) 

@@ -45,7 +45,7 @@
 //     );
 //   }
 
-//   const expense = await prisma.expense.create({
+//   const expense = await req.db.expense.create({
 //     data: {
 //       type: 'operational',
 //       category: category.toLowerCase(),
@@ -60,7 +60,7 @@
 //   });
 
 //   // Log audit
-//   await prisma.auditLog.create({
+//   await req.db.auditLog.create({
 //     data: {
 //       userId: req.user.id,
 //       action: 'CREATE',
@@ -111,7 +111,7 @@
 //     }
 //   }
 
-//   const expenses = await prisma.expense.findMany({
+//   const expenses = await req.db.expense.findMany({
 //     where,
 //     include: {
 //       user: {
@@ -161,7 +161,7 @@
 // export const getExpense = asyncHandler(async (req, res) => {
 //   const { id } = req.params;
 
-//   const expense = await prisma.expense.findUnique({
+//   const expense = await req.db.expense.findUnique({
 //     where: { id: parseInt(id) },
 //     include: {
 //       user: {
@@ -203,7 +203,7 @@
 //   const { id } = req.params;
 //   const { category, description, amount, expenseDate, notes } = req.body;
 
-//   const expense = await prisma.expense.findUnique({
+//   const expense = await req.db.expense.findUnique({
 //     where: { id: parseInt(id) },
 //   });
 
@@ -245,7 +245,7 @@
 //   if (expenseDate) updateData.expenseDate = new Date(expenseDate);
 //   if (notes !== undefined) updateData.notes = notes?.trim();
 
-//   const updatedExpense = await prisma.expense.update({
+//   const updatedExpense = await req.db.expense.update({
 //     where: { id: parseInt(id) },
 //     data: updateData,
 //     include: {
@@ -259,7 +259,7 @@
 //   });
 
 //   // Log audit
-//   await prisma.auditLog.create({
+//   await req.db.auditLog.create({
 //     data: {
 //       userId: req.user.id,
 //       action: 'UPDATE',
@@ -282,7 +282,7 @@
 // export const deleteExpense = asyncHandler(async (req, res) => {
 //   const { id } = req.params;
 
-//   const expense = await prisma.expense.findUnique({
+//   const expense = await req.db.expense.findUnique({
 //     where: { id: parseInt(id) },
 //   });
 
@@ -308,12 +308,12 @@
 //     );
 //   }
 
-//   await prisma.expense.delete({
+//   await req.db.expense.delete({
 //     where: { id: parseInt(id) },
 //   });
 
 //   // Log audit
-//   await prisma.auditLog.create({
+//   await req.db.auditLog.create({
 //     data: {
 //       userId: req.user.id,
 //       action: 'DELETE',
@@ -350,7 +350,7 @@
 //     }
 //   }
 
-//   const expensesByCategory = await prisma.expense.groupBy({
+//   const expensesByCategory = await req.db.expense.groupBy({
 //     by: ['category'],
 //     where,
 //     _sum: { amount: true },
@@ -390,7 +390,7 @@
 //     }
 //   }
 
-//   const cogsExpenses = await prisma.expense.findMany({
+//   const cogsExpenses = await req.db.expense.findMany({
 //     where,
 //     include: {
 //       materialReorder: {
@@ -446,7 +446,7 @@
 //   }
 
 //   // Get all expenses
-//   const allExpenses = await prisma.expense.findMany({
+//   const allExpenses = await req.db.expense.findMany({
 //     where,
 //     select: {
 //       type: true,
@@ -476,7 +476,7 @@
 //   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
 //   const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-//   const thisMonthExpenses = await prisma.expense.findMany({
+//   const thisMonthExpenses = await req.db.expense.findMany({
 //     where: {
 //       expenseDate: {
 //         gte: firstDayOfMonth,
@@ -510,7 +510,7 @@
 // export const revertReorder = asyncHandler(async (req, res) => {
 //   const { id } = req.params; // This is the Expense ID
 
-//   await prisma.$transaction(async (tx) => {
+//   await req.db.$transaction(async (tx) => {
 //     // 1. Find the Reorder linked to this Expense
 //     const reorder = await tx.materialReorder.findFirst({
 //       where: { expenseId: parseInt(id) },
@@ -584,7 +584,7 @@
 //     throw new AppError('Quantity must be greater than 0', 400);
 //   }
 
-//   const result = await prisma.$transaction(async (tx) => {
+//   const result = await req.db.$transaction(async (tx) => {
 //     // 1. Find existing records
 //     const reorder = await tx.materialReorder.findFirst({
 //       where: { expenseId: parseInt(id) },
@@ -663,8 +663,6 @@
 //   res.status(200).json({ success: true, data: result });
 // });
 
-
-import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Create expense (Now handles Manual Material Costs)
@@ -712,7 +710,7 @@ export const createExpense = asyncHandler(async (req, res) => {
     );
   }
 
-  const expense = await prisma.expense.create({
+  const expense = await req.db.expense.create({
     data: {
       type: 'operational', // We keep it operational as it is manually entered
       category: category.toLowerCase(),
@@ -727,7 +725,7 @@ export const createExpense = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'CREATE',
@@ -767,7 +765,7 @@ export const getExpenses = asyncHandler(async (req, res) => {
     }
   }
 
-  const expenses = await prisma.expense.findMany({
+  const expenses = await req.db.expense.findMany({
     where,
     include: {
       user: {
@@ -821,7 +819,7 @@ export const getExpenses = asyncHandler(async (req, res) => {
 export const getExpense = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const expense = await prisma.expense.findUnique({
+  const expense = await req.db.expense.findUnique({
     where: { id: parseInt(id) },
     include: {
       user: {
@@ -863,7 +861,7 @@ export const updateExpense = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { category, description, amount, expenseDate, notes } = req.body;
 
-  const expense = await prisma.expense.findUnique({
+  const expense = await req.db.expense.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -896,7 +894,7 @@ export const updateExpense = asyncHandler(async (req, res) => {
   if (expenseDate) updateData.expenseDate = new Date(expenseDate);
   if (notes !== undefined) updateData.notes = notes?.trim();
 
-  const updatedExpense = await prisma.expense.update({
+  const updatedExpense = await req.db.expense.update({
     where: { id: parseInt(id) },
     data: updateData,
     include: {
@@ -910,7 +908,7 @@ export const updateExpense = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -933,7 +931,7 @@ export const updateExpense = asyncHandler(async (req, res) => {
 export const deleteExpense = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const expense = await prisma.expense.findUnique({
+  const expense = await req.db.expense.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -950,12 +948,12 @@ export const deleteExpense = asyncHandler(async (req, res) => {
     );
   }
 
-  await prisma.expense.delete({
+  await req.db.expense.delete({
     where: { id: parseInt(id) },
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'DELETE',
@@ -992,7 +990,7 @@ export const getExpensesByCategory = asyncHandler(async (req, res) => {
     }
   }
 
-  const expensesByCategory = await prisma.expense.groupBy({
+  const expensesByCategory = await req.db.expense.groupBy({
     by: ['category'],
     where,
     _sum: { amount: true },
@@ -1040,7 +1038,7 @@ export const getCOGSExpenses = asyncHandler(async (req, res) => {
     where.expenseDate = dateFilter;
   }
 
-  const cogsExpenses = await prisma.expense.findMany({
+  const cogsExpenses = await req.db.expense.findMany({
     where,
     include: {
       // Manual entries won't have this, but old ones will
@@ -1094,7 +1092,7 @@ export const getExpenseStats = asyncHandler(async (req, res) => {
     }
   }
 
-  const allExpenses = await prisma.expense.findMany({
+  const allExpenses = await req.db.expense.findMany({
     where,
     select: {
       type: true,
@@ -1127,7 +1125,7 @@ export const getExpenseStats = asyncHandler(async (req, res) => {
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59, 999);
 
-  const thisMonthExpenses = await prisma.expense.findMany({
+  const thisMonthExpenses = await req.db.expense.findMany({
     where: {
       expenseDate: {
         gte: firstDayOfMonth,

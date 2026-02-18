@@ -14,7 +14,7 @@
 //     where.isActive = isActive === 'true';
 //   }
 
-//   const services = await prisma.service.findMany({
+//   const services = await req.db.service.findMany({
 //     where,
 //     orderBy: { name: 'asc' },
 //   });
@@ -32,7 +32,7 @@
 // export const getBoothService = asyncHandler(async (req, res) => {
 //   const { id } = req.params;
 
-//   const service = await prisma.service.findUnique({
+//   const service = await req.db.service.findUnique({
 //     where: { id: parseInt(id) },
 //   });
 
@@ -70,7 +70,7 @@
 //   }
 
 //   // Check if service with same name exists
-//   const existingService = await prisma.service.findFirst({
+//   const existingService = await req.db.service.findFirst({
 //     where: {
 //       type: 'booth',
 //       name: name.trim(),
@@ -86,7 +86,7 @@
 //   }
 
 //   // Create service
-//   const service = await prisma.service.create({
+//   const service = await req.db.service.create({
 //     data: {
 //       type: 'booth',
 //       name: name.trim(),
@@ -96,7 +96,7 @@
 //   });
 
 //   // Log audit
-//   await prisma.auditLog.create({
+//   await req.db.auditLog.create({
 //     data: {
 //       userId: req.user.id,
 //       action: 'CREATE',
@@ -120,7 +120,7 @@
 //   const { id } = req.params;
 //   const { name, category, price, isActive } = req.body;
 
-//   const service = await prisma.service.findUnique({
+//   const service = await req.db.service.findUnique({
 //     where: { id: parseInt(id) },
 //   });
 
@@ -142,7 +142,7 @@
 
 //   // Check for duplicate name if name is being changed
 //   if (name && name.trim() !== service.name) {
-//     const existingService = await prisma.service.findFirst({
+//     const existingService = await req.db.service.findFirst({
 //       where: {
 //         type: 'booth',
 //         name: name.trim(),
@@ -160,13 +160,13 @@
 //   }
 
 //   // Update service
-//   const updatedService = await prisma.service.update({
+//   const updatedService = await req.db.service.update({
 //     where: { id: parseInt(id) },
 //     data: updateData,
 //   });
 
 //   // Log audit
-//   await prisma.auditLog.create({
+//   await req.db.auditLog.create({
 //     data: {
 //       userId: req.user.id,
 //       action: 'UPDATE',
@@ -189,7 +189,7 @@
 // export const deleteBoothService = asyncHandler(async (req, res) => {
 //   const { id } = req.params;
 
-//   const service = await prisma.service.findUnique({
+//   const service = await req.db.service.findUnique({
 //     where: { id: parseInt(id) },
 //     include: {
 //       _count: {
@@ -207,12 +207,12 @@
 //   // Check if service has been used in sales
 //   if (service._count.saleItems > 0) {
 //     // Soft delete - deactivate instead
-//     const deactivatedService = await prisma.service.update({
+//     const deactivatedService = await req.db.service.update({
 //       where: { id: parseInt(id) },
 //       data: { isActive: false },
 //     });
 
-//     await prisma.auditLog.create({
+//     await req.db.auditLog.create({
 //       data: {
 //         userId: req.user.id,
 //         action: 'DEACTIVATE',
@@ -230,11 +230,11 @@
 //   }
 
 //   // Hard delete if no sales history
-//   await prisma.service.delete({
+//   await req.db.service.delete({
 //     where: { id: parseInt(id) },
 //   });
 
-//   await prisma.auditLog.create({
+//   await req.db.auditLog.create({
 //     data: {
 //       userId: req.user.id,
 //       action: 'DELETE',
@@ -256,7 +256,7 @@
 // export const toggleBoothService = asyncHandler(async (req, res) => {
 //   const { id } = req.params;
 
-//   const service = await prisma.service.findUnique({
+//   const service = await req.db.service.findUnique({
 //     where: { id: parseInt(id) },
 //   });
 
@@ -264,12 +264,12 @@
 //     throw new AppError('Booth service not found', 404, 'NOT_FOUND');
 //   }
 
-//   const updatedService = await prisma.service.update({
+//   const updatedService = await req.db.service.update({
 //     where: { id: parseInt(id) },
 //     data: { isActive: !service.isActive },
 //   });
 
-//   await prisma.auditLog.create({
+//   await req.db.auditLog.create({
 //     data: {
 //       userId: req.user.id,
 //       action: 'UPDATE',
@@ -292,17 +292,17 @@
 // export const getBoothServiceStats = asyncHandler(async (req, res) => {
 //   const [totalServices, activeServices, servicesByCategory] = await Promise.all([
 //     // Total services
-//     prisma.service.count({
+//     req.db.service.count({
 //       where: { type: 'booth' },
 //     }),
 
 //     // Active services
-//     prisma.service.count({
+//     req.db.service.count({
 //       where: { type: 'booth', isActive: true },
 //     }),
 
 //     // Services by category
-//     prisma.service.groupBy({
+//     req.db.service.groupBy({
 //       by: ['category'],
 //       where: { type: 'booth' },
 //       _count: true,
@@ -321,8 +321,6 @@
 // });
 
 
-// backend/src/controllers/serviceController.js - Updated for booth service concept
-import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Get all booth services
@@ -337,7 +335,7 @@ export const getBoothServices = asyncHandler(async (req, res) => {
     where.isActive = isActive === 'true';
   }
 
-  const services = await prisma.service.findMany({
+  const services = await req.db.service.findMany({
     where,
     orderBy: [
       { name: 'asc' },      // Service Category (e.g. Full Body, Touch Up)
@@ -357,7 +355,7 @@ export const getBoothServices = asyncHandler(async (req, res) => {
 // @access  Private
 export const getServiceCategories = asyncHandler(async (req, res) => {
   // Get unique service categories (using 'name' field from your schema)
-  const services = await prisma.service.findMany({
+  const services = await req.db.service.findMany({
     where: {
       type: 'booth',
       isActive: true,
@@ -382,7 +380,7 @@ export const getServiceCategories = asyncHandler(async (req, res) => {
 export const getItemCategories = asyncHandler(async (req, res) => {
   const { serviceCategory } = req.params;
 
-  const services = await prisma.service.findMany({
+  const services = await req.db.service.findMany({
     where: {
       type: 'booth',
       name: serviceCategory,  // Using 'name' field from your schema
@@ -422,7 +420,7 @@ export const getServicePrice = asyncHandler(async (req, res) => {
     );
   }
 
-  const service = await prisma.service.findFirst({
+  const service = await req.db.service.findFirst({
     where: {
       type: 'booth',
       name: serviceCategory,    // Using 'name' field from your schema
@@ -451,7 +449,7 @@ export const getServicePrice = asyncHandler(async (req, res) => {
 export const getBoothService = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const service = await prisma.service.findUnique({
+  const service = await req.db.service.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -489,7 +487,7 @@ export const createBoothService = asyncHandler(async (req, res) => {
   }
 
   // Check if combination exists (using your schema field names)
-  const existing = await prisma.service.findFirst({
+  const existing = await req.db.service.findFirst({
     where: {
       type: 'booth',
       name: serviceCategory.trim(),     // Using 'name' field from your schema
@@ -506,7 +504,7 @@ export const createBoothService = asyncHandler(async (req, res) => {
   }
 
   // Create service (using your schema field names)
-  const service = await prisma.service.create({
+  const service = await req.db.service.create({
     data: {
       type: 'booth',
       name: serviceCategory.trim(),     // Service Category (e.g. Full Body, Touch Up)
@@ -516,7 +514,7 @@ export const createBoothService = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'CREATE',
@@ -540,7 +538,7 @@ export const updateBoothService = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { serviceCategory, itemCategory, price, isActive } = req.body;  // Changed parameter names
 
-  const service = await prisma.service.findUnique({
+  const service = await req.db.service.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -566,7 +564,7 @@ export const updateBoothService = asyncHandler(async (req, res) => {
     const newCategory = itemCategory?.trim() || service.category;   // Item Category
 
     if (newName !== service.name || newCategory !== service.category) {  // Using your schema field names
-      const existing = await prisma.service.findFirst({
+      const existing = await req.db.service.findFirst({
         where: {
           type: 'booth',
           name: newName,          // Service Category
@@ -586,13 +584,13 @@ export const updateBoothService = asyncHandler(async (req, res) => {
   }
 
   // Update service
-  const updatedService = await prisma.service.update({
+  const updatedService = await req.db.service.update({
     where: { id: parseInt(id) },
     data: updateData,
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -615,7 +613,7 @@ export const updateBoothService = asyncHandler(async (req, res) => {
 export const deleteBoothService = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const service = await prisma.service.findUnique({
+  const service = await req.db.service.findUnique({
     where: { id: parseInt(id) },
     include: {
       _count: {
@@ -633,12 +631,12 @@ export const deleteBoothService = asyncHandler(async (req, res) => {
   // Check if service has been used in sales
   if (service._count.saleItems > 0) {
     // Soft delete - deactivate instead
-    const deactivatedService = await prisma.service.update({
+    const deactivatedService = await req.db.service.update({
       where: { id: parseInt(id) },
       data: { isActive: false },
     });
 
-    await prisma.auditLog.create({
+    await req.db.auditLog.create({
       data: {
         userId: req.user.id,
         action: 'DEACTIVATE',
@@ -656,11 +654,11 @@ export const deleteBoothService = asyncHandler(async (req, res) => {
   }
 
   // Hard delete if no sales history
-  await prisma.service.delete({
+  await req.db.service.delete({
     where: { id: parseInt(id) },
   });
 
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'DELETE',
@@ -682,7 +680,7 @@ export const deleteBoothService = asyncHandler(async (req, res) => {
 export const toggleBoothService = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const service = await prisma.service.findUnique({
+  const service = await req.db.service.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -690,12 +688,12 @@ export const toggleBoothService = asyncHandler(async (req, res) => {
     throw new AppError('Booth service not found', 404, 'NOT_FOUND');
   }
 
-  const updatedService = await prisma.service.update({
+  const updatedService = await req.db.service.update({
     where: { id: parseInt(id) },
     data: { isActive: !service.isActive },
   });
 
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -723,24 +721,24 @@ export const getBoothServiceStats = asyncHandler(async (req, res) => {
     itemsByCategory,
   ] = await Promise.all([
     // Total services
-    prisma.service.count({
+    req.db.service.count({
       where: { type: 'booth' },
     }),
 
     // Active services
-    prisma.service.count({
+    req.db.service.count({
       where: { type: 'booth', isActive: true },
     }),
 
     // Services by service category (using 'name' field from your schema)
-    prisma.service.groupBy({
+    req.db.service.groupBy({
       by: ['name'],  // Service Category
       where: { type: 'booth' },
       _count: true,
     }),
 
     // Services by item category (using 'category' field from your schema)
-    prisma.service.groupBy({
+    req.db.service.groupBy({
       by: ['category'],  // Item Category
       where: { type: 'booth' },
       _count: true,

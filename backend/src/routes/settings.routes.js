@@ -17,7 +17,7 @@ const router = express.Router();
    PUBLIC ROUTES
    ========================================================================== */
 // Accessible by anyone (e.g., for login page branding or receipts)
-router.get('/business', getSettings);
+router.get('/business', protect, getSettings);
 router.get('/booth-price', getBoothPrice);
 
 

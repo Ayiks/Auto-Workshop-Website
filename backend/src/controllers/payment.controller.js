@@ -1,4 +1,3 @@
-import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // Helper function to generate receipt number - now uses database sequence
@@ -45,7 +44,7 @@ export const recordPayment = asyncHandler(async (req, res) => {
     );
   }
 
-  const invoice = await prisma.invoice.findUnique({
+  const invoice = await req.db.invoice.findUnique({
     where: { id: parseInt(invoiceId) },
     include: {
       job: {
@@ -84,7 +83,7 @@ export const recordPayment = asyncHandler(async (req, res) => {
   }
 
   // Process payment in transaction
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await req.db.$transaction(async (tx) => {
     // 1. Create payment record
     const payment = await tx.payment.create({
       data: {
@@ -162,7 +161,7 @@ export const recordPayment = asyncHandler(async (req, res) => {
   });
 
   // Fetch complete payment with relations
-  const completePayment = await prisma.payment.findUnique({
+  const completePayment = await req.db.payment.findUnique({
     where: { id: result.payment.id },
     include: {
       invoice: {
@@ -238,7 +237,7 @@ export const getPayments = asyncHandler(async (req, res) => {
     where.paymentMethod = paymentMethod;
   }
 
-  const payments = await prisma.payment.findMany({
+  const payments = await req.db.payment.findMany({
     where,
     include: {
       invoice: {
@@ -283,7 +282,7 @@ export const getPayments = asyncHandler(async (req, res) => {
 export const getPayment = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const payment = await prisma.payment.findUnique({
+  const payment = await req.db.payment.findUnique({
     where: { id: parseInt(id) },
     include: {
       invoice: {
@@ -339,7 +338,7 @@ export const getPayment = asyncHandler(async (req, res) => {
 export const getInvoicePayments = asyncHandler(async (req, res) => {
   const { invoiceId } = req.params;
 
-  const invoice = await prisma.invoice.findUnique({
+  const invoice = await req.db.invoice.findUnique({
     where: { id: parseInt(invoiceId) },
     select: {
       id: true,
@@ -355,7 +354,7 @@ export const getInvoicePayments = asyncHandler(async (req, res) => {
     throw new AppError('Invoice not found', 404, 'NOT_FOUND');
   }
 
-  const payments = await prisma.payment.findMany({
+  const payments = await req.db.payment.findMany({
     where: { invoiceId: parseInt(invoiceId) },
     include: {
       user: {
@@ -405,14 +404,14 @@ export const getPaymentStats = asyncHandler(async (req, res) => {
 
   const [totalPayments, paymentsByMethod, recentPayments] = await Promise.all([
     // Total payments and amount
-    prisma.payment.aggregate({
+    req.db.payment.aggregate({
       where,
       _sum: { amount: true },
       _count: true,
     }),
 
     // Payments by method
-    prisma.payment.groupBy({
+    req.db.payment.groupBy({
       by: ['paymentMethod'],
       where,
       _sum: { amount: true },
@@ -420,7 +419,7 @@ export const getPaymentStats = asyncHandler(async (req, res) => {
     }),
 
     // Recent payments
-    prisma.payment.findMany({
+    req.db.payment.findMany({
       where,
       include: {
         invoice: {

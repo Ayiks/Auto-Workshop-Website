@@ -1,4 +1,3 @@
-import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // Helper function to generate invoice number
@@ -13,7 +12,7 @@ const generateInvoiceNumber = async () => {
   const startOfDay = new Date(date.setHours(0, 0, 0, 0));
   const endOfDay = new Date(date.setHours(23, 59, 59, 999));
   
-  const count = await prisma.invoice.count({
+  const count = await req.db.invoice.count({
     where: {
       invoiceDate: {
         gte: startOfDay,
@@ -36,7 +35,7 @@ export const generateInvoice = asyncHandler(async (req, res) => {
     throw new AppError('Please provide job ID', 400, 'VALIDATION_ERROR');
   }
 
-  const job = await prisma.job.findUnique({
+  const job = await req.db.job.findUnique({
     where: { id: parseInt(jobId) },
     include: {
       materials: true,
@@ -95,7 +94,7 @@ export const generateInvoice = asyncHandler(async (req, res) => {
   const totalAmount = materialsCost + labourCost;
 
   // Create invoice in transaction
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await req.db.$transaction(async (tx) => {
     // 1. Generate invoice number
     const invoiceNumber = await generateInvoiceNumber();
 
@@ -149,7 +148,7 @@ export const generateInvoice = asyncHandler(async (req, res) => {
   });
 
   // Fetch complete invoice
-  const completeInvoice = await prisma.invoice.findUnique({
+  const completeInvoice = await req.db.invoice.findUnique({
     where: { id: result.id },
     include: {
       job: {
@@ -203,7 +202,7 @@ export const getInvoices = asyncHandler(async (req, res) => {
     where.job = { jobType };
   }
 
-  const invoices = await prisma.invoice.findMany({
+  const invoices = await req.db.invoice.findMany({
     where,
     include: {
       job: {
@@ -247,7 +246,7 @@ export const getInvoices = asyncHandler(async (req, res) => {
 export const getInvoice = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const invoice = await prisma.invoice.findUnique({
+  const invoice = await req.db.invoice.findUnique({
     where: { id: parseInt(id) },
     include: {
       job: {
@@ -309,7 +308,7 @@ export const getInvoice = asyncHandler(async (req, res) => {
 export const getInvoiceByNumber = asyncHandler(async (req, res) => {
   const { invoiceNumber } = req.params;
 
-  const invoice = await prisma.invoice.findUnique({
+  const invoice = await req.db.invoice.findUnique({
     where: { invoiceNumber },
     include: {
       job: {
@@ -351,7 +350,7 @@ export const getInvoiceByNumber = asyncHandler(async (req, res) => {
 // @route   GET /api/invoices/outstanding
 // @access  Private
 export const getOutstandingInvoices = asyncHandler(async (req, res) => {
-  const invoices = await prisma.invoice.findMany({
+  const invoices = await req.db.invoice.findMany({
     where: {
       paymentStatus: {
         in: ['unpaid', 'partial'],
@@ -405,7 +404,7 @@ export const updateInvoice = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { notes } = req.body;
 
-  const invoice = await prisma.invoice.findUnique({
+  const invoice = await req.db.invoice.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -414,7 +413,7 @@ export const updateInvoice = asyncHandler(async (req, res) => {
   }
 
   // Only allow updating notes (not financial data)
-  const updatedInvoice = await prisma.invoice.update({
+  const updatedInvoice = await req.db.invoice.update({
     where: { id: parseInt(id) },
     data: {
       notes: notes?.trim(),
@@ -430,7 +429,7 @@ export const updateInvoice = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -468,7 +467,7 @@ export const getInvoiceStats = asyncHandler(async (req, res) => {
 
   const [totalInvoices, invoicesByStatus, recentInvoices] = await Promise.all([
     // Total invoices and amounts
-    prisma.invoice.aggregate({
+    req.db.invoice.aggregate({
       where,
       _sum: {
         totalAmount: true,
@@ -479,7 +478,7 @@ export const getInvoiceStats = asyncHandler(async (req, res) => {
     }),
 
     // Invoices by payment status
-    prisma.invoice.groupBy({
+    req.db.invoice.groupBy({
       by: ['paymentStatus'],
       where,
       _sum: {
@@ -490,7 +489,7 @@ export const getInvoiceStats = asyncHandler(async (req, res) => {
     }),
 
     // Recent invoices
-    prisma.invoice.findMany({
+    req.db.invoice.findMany({
       where,
       include: {
         job: {
@@ -525,7 +524,7 @@ export const voidInvoice = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { reason } = req.body;
 
-  const invoice = await prisma.invoice.findUnique({
+  const invoice = await req.db.invoice.findUnique({
     where: { id: parseInt(id) },
     include: {
       job: { include: { materials: true } },
@@ -540,7 +539,7 @@ export const voidInvoice = asyncHandler(async (req, res) => {
     throw new AppError('Cannot void invoice with existing payments. Delete payments first.', 400);
   }
 
-  await prisma.$transaction(async (tx) => {
+  await req.db.$transaction(async (tx) => {
     // 1. Restock Inventory
     for (const material of invoice.job.materials) {
       if (!material.isExternal && material.materialId) {

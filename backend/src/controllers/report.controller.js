@@ -1,4 +1,3 @@
-import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // Helper function to get date range (default: current month)
@@ -49,7 +48,7 @@ export const getSalesReport = asyncHandler(async (req, res) => {
   }
 
   // Get all sales with items
-  const sales = await prisma.sale.findMany({
+  const sales = await req.db.sale.findMany({
     where: salesWhere,
     include: {
       items: {
@@ -101,7 +100,7 @@ export const getSalesReport = asyncHandler(async (req, res) => {
   const totalSalesRevenue = materialSales + boothSales;
 
   // Sales by payment method
-  const salesByMethod = await prisma.sale.groupBy({
+  const salesByMethod = await req.db.sale.groupBy({
     by: ['paymentMethod'],
     where: salesWhere,
     _sum: { totalAmount: true },
@@ -111,13 +110,14 @@ export const getSalesReport = asyncHandler(async (req, res) => {
   // Daily sales trend
   let dailySales = [];
   try {
-    dailySales = await prisma.$queryRaw`
+    dailySales = await req.db.$queryRaw`
       SELECT 
         DATE(sale_date)::TEXT as date,
         COUNT(*)::INTEGER as count,
         SUM(total_amount)::DECIMAL as total
       FROM sales
       WHERE status = 'completed'
+        AND business_id = ${req.user.businessId}
         AND sale_date >= ${dateRange.gte}
         AND sale_date <= ${dateRange.lte}
       GROUP BY DATE(sale_date)
@@ -176,7 +176,7 @@ export const getJobReport = asyncHandler(async (req, res) => {
     invoiceWhere.job = { jobType };
   }
 
-  const invoices = await prisma.invoice.findMany({
+  const invoices = await req.db.invoice.findMany({
     where: invoiceWhere,
     include: {
       job: {
@@ -251,7 +251,7 @@ export const getJobReport = asyncHandler(async (req, res) => {
   });
 
   // Payment status breakdown with detailed counts
-  const paymentStatusRaw = await prisma.invoice.groupBy({
+  const paymentStatusRaw = await req.db.invoice.groupBy({
     by: ['paymentStatus'],
     where: invoiceWhere,
     _sum: {
@@ -314,7 +314,7 @@ export const getExpenseReport = asyncHandler(async (req, res) => {
   };
 
   // 1. Fetch ALL expenses
-  const expenses = await prisma.expense.findMany({
+  const expenses = await req.db.expense.findMany({
     where: expenseWhere,
     include: {
       materialReorder: { select: { materialName: true, quantityOrdered: true } },
@@ -353,7 +353,7 @@ export const getExpenseReport = asyncHandler(async (req, res) => {
   const totalExpenses = operationalTotal + cogTotal;
 
   // 3. Breakdown by Category (Operational Only - Excluding Materials)
-  const expensesByCategoryRaw = await prisma.expense.groupBy({
+  const expensesByCategoryRaw = await req.db.expense.groupBy({
     by: ['category'],
     where: {
       ...expenseWhere,
@@ -391,7 +391,7 @@ export const getExpenseReport = asyncHandler(async (req, res) => {
   // 5. Monthly Trend
   let monthlyExpenses = [];
   try {
-    monthlyExpenses = await prisma.$queryRaw`
+    monthlyExpenses = await req.db.$queryRaw`
       SELECT 
         DATE_TRUNC('month', expense_date)::TEXT as month,
         SUM(amount)::DECIMAL as total
@@ -437,7 +437,7 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
   const dateRange = getDateRange(startDate, endDate);
 
   // 1. Calculate Gross Revenue
-  const counterSales = await prisma.sale.aggregate({
+  const counterSales = await req.db.sale.aggregate({
     where: {
       status: 'completed',
       saleDate: dateRange,
@@ -447,7 +447,7 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
 
   const counterSalesRevenue = parseFloat(counterSales._sum.totalAmount || 0);
 
-  const jobInvoices = await prisma.invoice.aggregate({
+  const jobInvoices = await req.db.invoice.aggregate({
     where: {
       invoiceDate: dateRange,
     },
@@ -460,7 +460,7 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
   // 2. Calculate ACTUAL COGS (Based on SALES/USAGE, not purchases)
   // [Diagram of Accrual Accounting]
   // We calculate cost when items leave the shelf (Sales), not when they enter (Expenses)
-  const salesWithItems = await prisma.sale.findMany({
+  const salesWithItems = await req.db.sale.findMany({
     where: {
       status: 'completed',
       saleDate: dateRange,
@@ -480,7 +480,7 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
     });
   });
 
-  const jobsWithMaterials = await prisma.invoice.findMany({
+  const jobsWithMaterials = await req.db.invoice.findMany({
     where: {
       invoiceDate: dateRange,
     },
@@ -512,7 +512,7 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
   // We must EXCLUDE 'materials' category here. 
   // Why? Because the cost of materials is already subtracted above in 'totalCOGS' (when sold).
   // If we subtract 'materials' purchases here too, we are double-counting the cost.
-  const operationalExpenses = await prisma.expense.aggregate({
+  const operationalExpenses = await req.db.expense.aggregate({
     where: {
       type: 'operational',
       category: { not: 'materials' }, // <--- Filter out Stock Purchases
@@ -528,7 +528,7 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
   const netProfit = grossProfit - operationalTotal;
 
   // 6. Get detailed revenue breakdown (Existing logic...)
-  const sales = await prisma.sale.findMany({
+  const sales = await req.db.sale.findMany({
     where: { status: 'completed', saleDate: dateRange },
     include: { items: true },
   });
@@ -550,7 +550,7 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
   });
 
   // 7. Get job revenue breakdown (Existing logic...)
-  const invoicesWithJobs = await prisma.invoice.findMany({
+  const invoicesWithJobs = await req.db.invoice.findMany({
     where: { invoiceDate: dateRange },
     include: { job: { select: { jobType: true } } },
   });
@@ -564,7 +564,7 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
   });
 
   // 8. Get operational expenses by category (Existing logic with FIX)
-  const operationalByCategory = await prisma.expense.groupBy({
+  const operationalByCategory = await req.db.expense.groupBy({
     by: ['category'],
     where: {
       type: 'operational',
@@ -649,7 +649,7 @@ export const getRevenueReport = asyncHandler(async (req, res) => {
   const dateRange = getDateRange(startDate, endDate);
 
   // Counter sales revenue
-  const counterSales = await prisma.sale.findMany({
+  const counterSales = await req.db.sale.findMany({
     where: {
       status: 'completed',
       saleDate: dateRange,
@@ -671,7 +671,7 @@ export const getRevenueReport = asyncHandler(async (req, res) => {
   });
 
   // Job revenue by type
-  const invoices = await prisma.invoice.findMany({
+  const invoices = await req.db.invoice.findMany({
     where: {
       invoiceDate: dateRange,
     },
@@ -743,7 +743,7 @@ export const getMaterialUsageReport = asyncHandler(async (req, res) => {
   const dateRange = getDateRange(startDate, endDate);
 
   // Materials sold in counter sales
-  const sales = await prisma.sale.findMany({
+  const sales = await req.db.sale.findMany({
     where: {
       status: 'completed',
       saleDate: dateRange,
@@ -785,7 +785,7 @@ export const getMaterialUsageReport = asyncHandler(async (req, res) => {
   });
 
   // Materials used in jobs (same as before)
-  const invoices = await prisma.invoice.findMany({
+  const invoices = await req.db.invoice.findMany({
     where: {
       invoiceDate: dateRange,
     },
@@ -930,31 +930,31 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
     lowStockMaterials
   ] = await Promise.all([
     // Monthly
-    prisma.sale.count({ where: { status: 'completed', saleDate: { gte: currentMonthStart, lte: currentMonthEnd } } }),
-    prisma.invoice.count({ where: { invoiceDate: { gte: currentMonthStart, lte: currentMonthEnd } } }),
-    prisma.sale.aggregate({ where: { status: 'completed', saleDate: { gte: currentMonthStart, lte: currentMonthEnd } }, _sum: { totalAmount: true } }),
-    prisma.invoice.aggregate({ where: { invoiceDate: { gte: currentMonthStart, lte: currentMonthEnd } }, _sum: { totalAmount: true } }),
+    req.db.sale.count({ where: { status: 'completed', saleDate: { gte: currentMonthStart, lte: currentMonthEnd } } }),
+    req.db.invoice.count({ where: { invoiceDate: { gte: currentMonthStart, lte: currentMonthEnd } } }),
+    req.db.sale.aggregate({ where: { status: 'completed', saleDate: { gte: currentMonthStart, lte: currentMonthEnd } }, _sum: { totalAmount: true } }),
+    req.db.invoice.aggregate({ where: { invoiceDate: { gte: currentMonthStart, lte: currentMonthEnd } }, _sum: { totalAmount: true } }),
 
     // Last Month
-    prisma.sale.count({ where: { status: 'completed', saleDate: { gte: lastMonthStart, lte: lastMonthEnd } } }),
-    prisma.invoice.count({ where: { invoiceDate: { gte: lastMonthStart, lte: lastMonthEnd } } }),
-    prisma.sale.aggregate({ where: { status: 'completed', saleDate: { gte: lastMonthStart, lte: lastMonthEnd } }, _sum: { totalAmount: true } }),
-    prisma.invoice.aggregate({ where: { invoiceDate: { gte: lastMonthStart, lte: lastMonthEnd } }, _sum: { totalAmount: true } }),
+    req.db.sale.count({ where: { status: 'completed', saleDate: { gte: lastMonthStart, lte: lastMonthEnd } } }),
+    req.db.invoice.count({ where: { invoiceDate: { gte: lastMonthStart, lte: lastMonthEnd } } }),
+    req.db.sale.aggregate({ where: { status: 'completed', saleDate: { gte: lastMonthStart, lte: lastMonthEnd } }, _sum: { totalAmount: true } }),
+    req.db.invoice.aggregate({ where: { invoiceDate: { gte: lastMonthStart, lte: lastMonthEnd } }, _sum: { totalAmount: true } }),
 
     // Daily Revenue Sums
-    prisma.sale.aggregate({ where: { status: 'completed', saleDate: { gte: todayStart, lte: todayEnd } }, _sum: { totalAmount: true } }),
-    prisma.invoice.aggregate({ where: { invoiceDate: { gte: todayStart, lte: todayEnd } }, _sum: { totalAmount: true } }),
-    prisma.sale.aggregate({ where: { status: 'completed', saleDate: { gte: yesterdayStart, lte: yesterdayEnd } }, _sum: { totalAmount: true } }),
-    prisma.invoice.aggregate({ where: { invoiceDate: { gte: yesterdayStart, lte: yesterdayEnd } }, _sum: { totalAmount: true } }),
+    req.db.sale.aggregate({ where: { status: 'completed', saleDate: { gte: todayStart, lte: todayEnd } }, _sum: { totalAmount: true } }),
+    req.db.invoice.aggregate({ where: { invoiceDate: { gte: todayStart, lte: todayEnd } }, _sum: { totalAmount: true } }),
+    req.db.sale.aggregate({ where: { status: 'completed', saleDate: { gte: yesterdayStart, lte: yesterdayEnd } }, _sum: { totalAmount: true } }),
+    req.db.invoice.aggregate({ where: { invoiceDate: { gte: yesterdayStart, lte: yesterdayEnd } }, _sum: { totalAmount: true } }),
 
     // Daily Counts (New)
-    prisma.sale.count({ where: { status: 'completed', saleDate: { gte: todayStart, lte: todayEnd } } }),
-    prisma.invoice.count({ where: { invoiceDate: { gte: todayStart, lte: todayEnd } } }),
+    req.db.sale.count({ where: { status: 'completed', saleDate: { gte: todayStart, lte: todayEnd } } }),
+    req.db.invoice.count({ where: { invoiceDate: { gte: todayStart, lte: todayEnd } } }),
 
     // Global
-    prisma.invoice.count({ where: { paymentStatus: { in: ['unpaid', 'partial'] } } }),
-    prisma.invoice.aggregate({ where: { paymentStatus: { in: ['unpaid', 'partial'] } }, _sum: { amountDue: true } }),
-    prisma.material.count({ where: { isActive: true, quantity: { lte: prisma.material.fields.lowStockThreshold } } }),
+    req.db.invoice.count({ where: { paymentStatus: { in: ['unpaid', 'partial'] } } }),
+    req.db.invoice.aggregate({ where: { paymentStatus: { in: ['unpaid', 'partial'] } }, _sum: { amountDue: true } }),
+    req.db.material.count({ where: { isActive: true, quantity: { lte: req.db.material.fields.lowStockThreshold } } }),
   ]);
 
   // --- 3. CALCULATE ---
@@ -1052,27 +1052,27 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //     dailyJobsSum
 //   ] = await Promise.all([
 //     // Counts (using dateRange - defaults to month)
-//     prisma.sale.count({
+//     req.db.sale.count({
 //       where: { status: 'completed', saleDate: dateRange },
 //     }),
-//     prisma.invoice.count({
+//     req.db.invoice.count({
 //       where: { invoiceDate: dateRange },
 //     }),
-//     prisma.invoice.count({
+//     req.db.invoice.count({
 //       where: { paymentStatus: { in: ['unpaid', 'partial'] } },
 //     }),
-//     prisma.material.count({
-//       where: { isActive: true, quantity: { lte: prisma.material.fields.lowStockThreshold } },
+//     req.db.material.count({
+//       where: { isActive: true, quantity: { lte: req.db.material.fields.lowStockThreshold } },
 //     }),
 //     // Daily Revenue Aggregates (Strictly Today)
-//     prisma.sale.aggregate({
+//     req.db.sale.aggregate({
 //       where: { 
 //         status: 'completed', 
 //         saleDate: { gte: todayStart, lte: todayEnd } 
 //       },
 //       _sum: { totalAmount: true },
 //     }),
-//     prisma.invoice.aggregate({
+//     req.db.invoice.aggregate({
 //       where: { 
 //         invoiceDate: { gte: todayStart, lte: todayEnd } 
 //       },
@@ -1081,12 +1081,12 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   ]);
 
 //   // Revenue overview (Monthly)
-//   const salesRevenue = await prisma.sale.aggregate({
+//   const salesRevenue = await req.db.sale.aggregate({
 //     where: { status: 'completed', saleDate: dateRange },
 //     _sum: { totalAmount: true },
 //   });
 
-//   const jobRevenue = await prisma.invoice.aggregate({
+//   const jobRevenue = await req.db.invoice.aggregate({
 //     where: { invoiceDate: dateRange },
 //     _sum: { totalAmount: true },
 //   });
@@ -1100,7 +1100,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //     parseFloat(dailyJobsSum._sum.totalAmount || 0);
 
 //   // Outstanding payments
-//   const outstanding = await prisma.invoice.aggregate({
+//   const outstanding = await req.db.invoice.aggregate({
 //     where: { paymentStatus: { in: ['unpaid', 'partial'] } },
 //     _sum: { amountDue: true },
 //   });
@@ -1154,7 +1154,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //     expenseWhere.category = category;
 //   }
 
-//   const expenses = await prisma.expense.findMany({
+//   const expenses = await req.db.expense.findMany({
 //     where: expenseWhere,
 //     include: {
 //       user: {
@@ -1183,7 +1183,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   const totalExpenses = operationalTotal; // Only operational expenses
 
 //   // Expenses by category - ONLY operational
-//   const expensesByCategoryRaw = await prisma.expense.groupBy({
+//   const expensesByCategoryRaw = await req.db.expense.groupBy({
 //     by: ['category'],
 //     where: {
 //       ...expenseWhere,
@@ -1203,7 +1203,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   }));
 
 //   // Expenses by type
-//   const expensesByTypeRaw = await prisma.expense.groupBy({
+//   const expensesByTypeRaw = await req.db.expense.groupBy({
 //     by: ['type'],
 //     where: expenseWhere,
 //     _sum: { amount: true },
@@ -1219,7 +1219,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   // Monthly trend - ONLY operational
 //   let monthlyExpenses = [];
 //   try {
-//     monthlyExpenses = await prisma.$queryRaw`
+//     monthlyExpenses = await req.db.$queryRaw`
 //       SELECT 
 //         DATE_TRUNC('month', expense_date)::TEXT as month,
 //         SUM(amount)::DECIMAL as total
@@ -1236,7 +1236,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   }
 
 //   // Count operational entries only
-//   const operationalCount = await prisma.expense.count({
+//   const operationalCount = await req.db.expense.count({
 //     where: {
 //       type: 'operational',
 //       expenseDate: dateRange,
@@ -1289,7 +1289,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   };
 
 //   // 1. Fetch ALL expenses
-//   const expenses = await prisma.expense.findMany({
+//   const expenses = await req.db.expense.findMany({
 //     where: expenseWhere,
 //     include: {
 //       materialReorder: { select: { materialName: true, quantityOrdered: true } },
@@ -1328,7 +1328,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   // --- DEBUG LOG END ---
 
 //   // 3. Breakdown by Category (Operational Only)
-//   const expensesByCategoryRaw = await prisma.expense.groupBy({
+//   const expensesByCategoryRaw = await req.db.expense.groupBy({
 //     by: ['category'],
 //     where: {
 //       ...expenseWhere,
@@ -1365,7 +1365,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   // 5. Monthly Trend (FIXED TABLE NAME)
 //   let monthlyExpenses = [];
 //   try {
-//     monthlyExpenses = await prisma.$queryRaw`
+//     monthlyExpenses = await req.db.$queryRaw`
 //       SELECT 
 //         DATE_TRUNC('month', expense_date)::TEXT as month,
 //         SUM(amount)::DECIMAL as total
@@ -1411,7 +1411,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   const dateRange = getDateRange(startDate, endDate);
 
 //   // 1. Calculate Gross Revenue
-//   const counterSales = await prisma.sale.aggregate({
+//   const counterSales = await req.db.sale.aggregate({
 //     where: {
 //       status: 'completed',
 //       saleDate: dateRange,
@@ -1421,7 +1421,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 
 //   const counterSalesRevenue = parseFloat(counterSales._sum.totalAmount || 0);
 
-//   const jobInvoices = await prisma.invoice.aggregate({
+//   const jobInvoices = await req.db.invoice.aggregate({
 //     where: {
 //       invoiceDate: dateRange,
 //     },
@@ -1432,7 +1432,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   const grossRevenue = counterSalesRevenue + jobRevenue;
 
 //   // 2. Calculate ACTUAL COGS
-//   const salesWithItems = await prisma.sale.findMany({
+//   const salesWithItems = await req.db.sale.findMany({
 //     where: {
 //       status: 'completed',
 //       saleDate: dateRange,
@@ -1454,7 +1454,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //     });
 //   });
 
-//   const jobsWithMaterials = await prisma.invoice.findMany({
+//   const jobsWithMaterials = await req.db.invoice.findMany({
 //     where: {
 //       invoiceDate: dateRange,
 //     },
@@ -1484,7 +1484,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   const grossProfit = grossRevenue - totalCOGS;
 
 //   // 4. Calculate Operational Expenses
-//   const operationalExpenses = await prisma.expense.aggregate({
+//   const operationalExpenses = await req.db.expense.aggregate({
 //     where: {
 //       type: 'operational',
 //       expenseDate: dateRange,
@@ -1498,7 +1498,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   const netProfit = grossProfit - operationalTotal;
 
 //   // 6. Get detailed revenue breakdown
-//   const sales = await prisma.sale.findMany({
+//   const sales = await req.db.sale.findMany({
 //     where: {
 //       status: 'completed',
 //       saleDate: dateRange,
@@ -1523,7 +1523,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   });
 
 //   // 7. Get job revenue breakdown
-//   const invoicesWithJobs = await prisma.invoice.findMany({
+//   const invoicesWithJobs = await req.db.invoice.findMany({
 //     where: {
 //       invoiceDate: dateRange,
 //     },
@@ -1548,7 +1548,7 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 //   });
 
 //   // 8. Get operational expenses by category
-//   const operationalByCategory = await prisma.expense.groupBy({
+//   const operationalByCategory = await req.db.expense.groupBy({
 //     by: ['category'],
 //     where: {
 //       type: 'operational',

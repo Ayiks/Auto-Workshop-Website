@@ -1,10 +1,11 @@
-import prisma from '../config/database.js';
+import { getTenantDB } from '../config/database.js'; 
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Get all customers (with optional search)
 // @route   GET /api/customers
 // @access  Private
 export const getCustomers = asyncHandler(async (req, res) => {
+  const db = getTenantDB(req.user.businessId);
   const { search } = req.query;
 
   // Build search filter
@@ -20,7 +21,7 @@ export const getCustomers = asyncHandler(async (req, res) => {
     }),
   };
 
-  const customers = await prisma.customer.findMany({
+  const customers = await db.customer.findMany({
     where: whereClause,
     orderBy: { createdAt: 'desc' },
   });
@@ -38,7 +39,7 @@ export const getCustomers = asyncHandler(async (req, res) => {
 export const getCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const customer = await prisma.customer.findFirst({
+  const customer = await req.db.customer.findFirst({
     where: { 
       id: parseInt(id),
       isActive: true 
@@ -70,7 +71,7 @@ export const createCustomer = asyncHandler(async (req, res) => {
 
   // Check for duplicate phone number
   // (Prisma would catch this with P2002, but a custom message is sometimes nicer)
-  const existingCustomer = await prisma.customer.findFirst({
+  const existingCustomer = await req.db.customer.findFirst({
     where: { phone }
   });
 
@@ -80,7 +81,7 @@ export const createCustomer = asyncHandler(async (req, res) => {
     throw new AppError('Customer with this phone number already exists', 400, 'DUPLICATE_ENTRY');
   }
 
-  const customer = await prisma.customer.create({
+  const customer = await req.db.customer.create({
     data: {
       firstName,
       lastName,
@@ -92,7 +93,7 @@ export const createCustomer = asyncHandler(async (req, res) => {
   });
 
   // Optional: Audit Log
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'CREATE',
@@ -118,7 +119,7 @@ export const updateCustomer = asyncHandler(async (req, res) => {
   // We rely on Prisma's P2025 error (Record not found) which your middleware handles,
   // or P2002 (Unique constraint) if phone is duplicated.
   
-  const customer = await prisma.customer.update({
+  const customer = await req.db.customer.update({
     where: { id: parseInt(id) },
     data: {
       firstName,
@@ -131,7 +132,7 @@ export const updateCustomer = asyncHandler(async (req, res) => {
   });
 
   // Optional: Audit Log
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -154,7 +155,7 @@ export const deleteCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   // Check if customer exists first
-  const customer = await prisma.customer.findUnique({
+  const customer = await req.db.customer.findUnique({
     where: { id: parseInt(id) }
   });
 
@@ -163,13 +164,13 @@ export const deleteCustomer = asyncHandler(async (req, res) => {
   }
 
   // Perform Soft Delete
-  await prisma.customer.update({
+  await req.db.customer.update({
     where: { id: parseInt(id) },
     data: { isActive: false },
   });
 
   // Audit Log
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'DELETE',

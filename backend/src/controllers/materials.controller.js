@@ -1,4 +1,3 @@
-import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Get all materials
@@ -13,7 +12,7 @@ export const getMaterials = asyncHandler(async (req, res) => {
   if (status === 'active') where.isActive = true;
   if (status === 'inactive') where.isActive = false;
   
-  const materials = await prisma.material.findMany({
+  const materials = await req.db.material.findMany({
     where,
     orderBy: { name: 'asc' },
     include: {
@@ -40,7 +39,7 @@ export const getMaterials = asyncHandler(async (req, res) => {
 export const getMaterial = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const material = await prisma.material.findUnique({
+  const material = await req.db.material.findUnique({
     where: { id: parseInt(id) },
     include: {
       alternateUnits: true,
@@ -110,7 +109,7 @@ export const createMaterial = asyncHandler(async (req, res) => {
   }
 
   // Check for duplicate name
-  const existingMaterial = await prisma.material.findFirst({
+  const existingMaterial = await req.db.material.findFirst({
     where: {
       name: {
         equals: name,
@@ -135,7 +134,7 @@ export const createMaterial = asyncHandler(async (req, res) => {
     unitId: parseInt(unit.unitId)
   }))
 
-  const material = await prisma.material.create({
+  const material = await req.db.material.create({
     data: {
       name: name.trim(),
       quantity: parseFloat(quantity),
@@ -154,7 +153,7 @@ export const createMaterial = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'CREATE',
@@ -188,7 +187,7 @@ export const updateMaterial = asyncHandler(async (req, res) => {
     alternateUnits,
   } = req.body;
 
-  const material = await prisma.material.findUnique({
+  const material = await req.db.material.findUnique({
     where: { id: parseInt(id) },
     include: { alternateUnits: true }
   });
@@ -208,7 +207,7 @@ export const updateMaterial = asyncHandler(async (req, res) => {
 
   // Check for duplicate name (if name is being changed)
   if (name && name !== material.name) {
-    const existingMaterial = await prisma.material.findFirst({
+    const existingMaterial = await req.db.material.findFirst({
       where: {
         name: {
           equals: name,
@@ -249,7 +248,7 @@ export const updateMaterial = asyncHandler(async (req, res) => {
   }
   // --- UNIT SYNCHRONIZATION LOGIC ---
   // We use a transaction to ensure units and material details are updated safely
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await req.db.$transaction(async (tx) => {
     // 1. Update Base Material
     const updatedMat = await tx.material.update({
       where: { id: parseInt(id) },
@@ -302,13 +301,13 @@ export const updateMaterial = asyncHandler(async (req, res) => {
 
     return updatedMat;
   });
-  // const updatedMaterial = await prisma.material.update({
+  // const updatedMaterial = await req.db.material.update({
   //   where: { id: parseInt(id) },
   //   data: updateData,
   // });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -319,7 +318,7 @@ export const updateMaterial = asyncHandler(async (req, res) => {
   });
 
   // Fetch fresh data including units to return
-  const finalMaterial = await prisma.material.findUnique({
+  const finalMaterial = await req.db.material.findUnique({
     where: { id: parseInt(id) },
     include: { alternateUnits: true }
   });
@@ -338,7 +337,7 @@ export const deleteMaterial = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const materialId = parseInt(id);
 
-  const material = await prisma.material.findUnique({
+  const material = await req.db.material.findUnique({
     where: { id: materialId },
     include: {
       reorders: {
@@ -362,7 +361,7 @@ export const deleteMaterial = asyncHandler(async (req, res) => {
     .map(r => r.expenseId)
     .filter(id => id !== null);
 
-  await prisma.$transaction(async (tx) => {
+  await req.db.$transaction(async (tx) => {
     // 1. Delete associated Expenses (COGS)
     if (expenseIds.length > 0) {
       await tx.expense.deleteMany({
@@ -423,7 +422,7 @@ export const deleteMaterial = asyncHandler(async (req, res) => {
 // @route   GET /api/materials/low-stock
 // @access  Private (requires 'materials:view' permission)
 export const getLowStockMaterials = asyncHandler(async (req, res) => {
-  const materials = await prisma.material.findMany({
+  const materials = await req.db.material.findMany({
     where: { isActive: true },
     orderBy: { quantity: 'asc' },
     include: { alternateUnits: true }
@@ -454,7 +453,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
   }
 
   // 2. Fetch Material & Units
-  const material = await prisma.material.findUnique({
+  const material = await req.db.material.findUnique({
     where: { id: parseInt(id) },
     include: { alternateUnits: true },
   });
@@ -504,7 +503,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
   const newBaseUnitCost = purchaseUnitCost / conversionFactor;
 
   // 4. Transaction
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await req.db.$transaction(async (tx) => {
     // A. Create Reorder Record (Log exactly what the User typed)
     const reorder = await tx.materialReorder.create({
       data: {
@@ -561,7 +560,7 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
 
   // 1. Fetch all materials upfront
   const itemIds = items.map(item => parseInt(item.id));
-  const materials = await prisma.material.findMany({
+  const materials = await req.db.material.findMany({
     where: { id: { in: itemIds } },
     include: { alternateUnits: true },
   });
@@ -569,7 +568,7 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
   const materialMap = new Map(materials.map(m => [m.id, m]));
 
   // 2. Transaction
-  const results = await prisma.$transaction(async (tx) => {
+  const results = await req.db.$transaction(async (tx) => {
     const processedItems = [];
 
     for (const item of items) {
@@ -668,7 +667,7 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
 export const getMaterialReorders = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const material = await prisma.material.findUnique({
+  const material = await req.db.material.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -676,7 +675,7 @@ export const getMaterialReorders = asyncHandler(async (req, res) => {
     throw new AppError('Material not found', 404, 'NOT_FOUND');
   }
 
-  const reorders = await prisma.materialReorder.findMany({
+  const reorders = await req.db.materialReorder.findMany({
     where: { materialId: parseInt(id) },
     include: {
       user: {
@@ -724,7 +723,7 @@ export const getMaterialReorders = asyncHandler(async (req, res) => {
 //     );
 //   }
 
-//   const material = await prisma.material.findUnique({
+//   const material = await req.db.material.findUnique({
 //     where: { id: parseInt(id) },
 //     include: { alternateUnits: true },
 //   });
@@ -764,7 +763,7 @@ export const getMaterialReorders = asyncHandler(async (req, res) => {
 //   const reorderUnitCost = unitCost ? parseFloat(unitCost) : Number(material.unitCost);
 //   const totalCost = parseFloat(quantityOrdered) * reorderUnitCost;
 //   // Start transaction
-//   const result = await prisma.$transaction(async (tx) => {
+//   const result = await req.db.$transaction(async (tx) => {
 //     // 1. Create reorder record
 //     const reorder = await tx.materialReorder.create({
 //       data: {
@@ -843,7 +842,7 @@ export const getMaterialReorders = asyncHandler(async (req, res) => {
 
 //   // 1. Extract IDs and fetch all materials in one query for efficiency
 //   const itemIds = items.map(item => parseInt(item.id));
-//   const materials = await prisma.material.findMany({
+//   const materials = await req.db.material.findMany({
 //     where: { id: { in: itemIds } },
 //     include: { alternateUnits: true },
 //   });
@@ -852,7 +851,7 @@ export const getMaterialReorders = asyncHandler(async (req, res) => {
 //   const materialMap = new Map(materials.map(m => [m.id, m]));
 
 //   // 3. Start Transaction
-//   const results = await prisma.$transaction(async (tx) => {
+//   const results = await req.db.$transaction(async (tx) => {
 //     const processedItems = [];
 
 //     for (const item of items) {

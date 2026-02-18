@@ -1,4 +1,4 @@
-import prisma from '../config/database.js';
+import { getTenantDB } from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Create booking (from public website)
@@ -6,6 +6,7 @@ import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 // @access  Public (no authentication required)
 export const createBooking = asyncHandler(async (req, res) => {
   const {
+    businessId, // 2. EXTRACT BUSINESS ID
     bookingType,
     clientName,
     clientEmail,
@@ -15,6 +16,15 @@ export const createBooking = asyncHandler(async (req, res) => {
     preferredTime,
     message,
   } = req.body;
+
+  // 3. REQUIRE BUSINESS ID
+  if (!businessId) {
+    throw new AppError(
+      'Business ID is required to create a booking.',
+      400,
+      'VALIDATION_ERROR'
+    );
+  }
 
   // Validation
   if (!bookingType || !['booth', 'service_inquiry'].includes(bookingType)) {
@@ -55,7 +65,11 @@ export const createBooking = asyncHandler(async (req, res) => {
     }
   }
 
-  const booking = await prisma.booking.create({
+  // 4. MANUALLY GRAB THE TENANT DB ENGINE FOR THIS PUBLIC REQUEST
+  const db = getTenantDB(businessId);
+
+  // 5. USE `db` INSTEAD OF `req.db`
+  const booking = await db.booking.create({
     data: {
       bookingType,
       clientName: clientName.trim(),
@@ -105,7 +119,7 @@ export const getBookings = asyncHandler(async (req, res) => {
     }
   }
 
-  const bookings = await prisma.booking.findMany({
+  const bookings = await req.db.booking.findMany({
     where,
     orderBy: { createdAt: 'desc' },
   });
@@ -123,7 +137,7 @@ export const getBookings = asyncHandler(async (req, res) => {
 export const getBooking = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const booking = await prisma.booking.findUnique({
+  const booking = await req.db.booking.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -144,7 +158,7 @@ export const updateBooking = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { status, notes } = req.body;
 
-  const booking = await prisma.booking.findUnique({
+  const booking = await req.db.booking.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -166,14 +180,14 @@ export const updateBooking = asyncHandler(async (req, res) => {
   if (status) updateData.status = status;
   if (notes !== undefined) updateData.message = notes?.trim();
 
-  const updatedBooking = await prisma.booking.update({
+  const updatedBooking = await req.db.booking.update({
     where: { id: parseInt(id) },
     data: updateData,
   });
 
   // Log audit if user is authenticated
   if (req.user) {
-    await prisma.auditLog.create({
+    await req.db.auditLog.create({
       data: {
         userId: req.user.id,
         action: 'UPDATE',
@@ -197,7 +211,7 @@ export const updateBooking = asyncHandler(async (req, res) => {
 export const deleteBooking = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const booking = await prisma.booking.findUnique({
+  const booking = await req.db.booking.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -205,13 +219,13 @@ export const deleteBooking = asyncHandler(async (req, res) => {
     throw new AppError('Booking not found', 404, 'NOT_FOUND');
   }
 
-  await prisma.booking.delete({
+  await req.db.booking.delete({
     where: { id: parseInt(id) },
   });
 
   // Log audit if user is authenticated
   if (req.user) {
-    await prisma.auditLog.create({
+    await req.db.auditLog.create({
       data: {
         userId: req.user.id,
         action: 'DELETE',
@@ -234,22 +248,22 @@ export const deleteBooking = asyncHandler(async (req, res) => {
 export const getBookingStats = asyncHandler(async (req, res) => {
   const [totalBookings, bookingsByStatus, bookingsByType, recentBookings] = await Promise.all([
     // Total bookings
-    prisma.booking.count(),
+    req.db.booking.count(),
 
     // Bookings by status
-    prisma.booking.groupBy({
+    req.db.booking.groupBy({
       by: ['status'],
       _count: true,
     }),
 
     // Bookings by type
-    prisma.booking.groupBy({
+    req.db.booking.groupBy({
       by: ['bookingType'],
       _count: true,
     }),
 
     // Recent bookings
-    prisma.booking.findMany({
+    req.db.booking.findMany({
       orderBy: { createdAt: 'desc' },
       take: 10,
     }),
@@ -276,7 +290,7 @@ export const getBookingStats = asyncHandler(async (req, res) => {
 // @route   GET /api/bookings/pending
 // @access  Private (requires authentication)
 export const getPendingBookings = asyncHandler(async (req, res) => {
-  const bookings = await prisma.booking.findMany({
+  const bookings = await req.db.booking.findMany({
     where: {
       status: {
         in: ['new', 'contacted'],

@@ -1,4 +1,3 @@
-import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Create new job
@@ -87,7 +86,7 @@ export const createJob = asyncHandler(async (req, res) => {
         );
       }
 
-      const inventoryMaterial = await prisma.material.findUnique({
+      const inventoryMaterial = await req.db.material.findUnique({
         where: { id: parseInt(material.materialId) },
       });
 
@@ -133,7 +132,7 @@ export const createJob = asyncHandler(async (req, res) => {
   const totalCost = materialsCost + parseFloat(labourCost);
 
   // Create job with materials in transaction
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await req.db.$transaction(async (tx) => {
     // 1. Create job
     const job = await tx.job.create({
       data: {
@@ -178,7 +177,7 @@ export const createJob = asyncHandler(async (req, res) => {
   });
 
   // Fetch complete job with materials
-  const completeJob = await prisma.job.findUnique({
+  const completeJob = await req.db.job.findUnique({
     where: { id: result.id },
     include: {
       materials: {
@@ -246,7 +245,7 @@ export const getJobs = asyncHandler(async (req, res) => {
     where.assignedTo = req.user.id;
   }
 
-  const jobs = await prisma.job.findMany({
+  const jobs = await req.db.job.findMany({
     where,
     include: {
       materials: {
@@ -288,7 +287,7 @@ export const getJobs = asyncHandler(async (req, res) => {
 export const getJob = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const job = await prisma.job.findUnique({
+  const job = await req.db.job.findUnique({
     where: { id: parseInt(id) },
     include: {
       materials: {
@@ -383,7 +382,7 @@ export const updateJob = asyncHandler(async (req, res) => {
   } = req.body;
 
   // 1. Fetch existing job to check permissions and status
-  const existingJob = await prisma.job.findUnique({
+  const existingJob = await req.db.job.findUnique({
     where: { id: parseInt(id) },
     include: {
       invoice: true,
@@ -414,7 +413,7 @@ export const updateJob = asyncHandler(async (req, res) => {
   }
 
   // 4. Perform Updates inside a Transaction
-  const updatedJob = await prisma.$transaction(async (tx) => {
+  const updatedJob = await req.db.$transaction(async (tx) => {
     
     // --- A. Handle Materials Logic (If materials array is provided) ---
     let finalMaterialsCost = 0;
@@ -575,7 +574,7 @@ export const addJobMaterial = asyncHandler(async (req, res) => {
     );
   }
 
-  const job = await prisma.job.findUnique({
+  const job = await req.db.job.findUnique({
     where: { id: parseInt(id) },
     include: {
       invoice: true,
@@ -617,7 +616,7 @@ export const addJobMaterial = asyncHandler(async (req, res) => {
       );
     }
 
-    const inventoryMaterial = await prisma.material.findUnique({
+    const inventoryMaterial = await req.db.material.findUnique({
       where: { id: parseInt(materialId) },
     });
 
@@ -651,7 +650,7 @@ export const addJobMaterial = asyncHandler(async (req, res) => {
   const subtotal = parseFloat(unitPrice) * parseInt(quantity);
 
   // Add material and update job total in transaction
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await req.db.$transaction(async (tx) => {
     // 1. Add material
     const jobMaterial = await tx.jobMaterial.create({
       data: {
@@ -704,7 +703,7 @@ export const addJobMaterial = asyncHandler(async (req, res) => {
 export const removeJobMaterial = asyncHandler(async (req, res) => {
   const { id, materialId } = req.params;
 
-  const job = await prisma.job.findUnique({
+  const job = await req.db.job.findUnique({
     where: { id: parseInt(id) },
     include: {
       invoice: true,
@@ -734,7 +733,7 @@ export const removeJobMaterial = asyncHandler(async (req, res) => {
     );
   }
 
-  const jobMaterial = await prisma.jobMaterial.findUnique({
+  const jobMaterial = await req.db.jobMaterial.findUnique({
     where: { id: parseInt(materialId) },
   });
 
@@ -743,7 +742,7 @@ export const removeJobMaterial = asyncHandler(async (req, res) => {
   }
 
   // Remove material and update job total in transaction
-  await prisma.$transaction(async (tx) => {
+  await req.db.$transaction(async (tx) => {
     // 1. Delete material
     await tx.jobMaterial.delete({
       where: { id: parseInt(materialId) },
@@ -788,7 +787,7 @@ export const removeJobMaterial = asyncHandler(async (req, res) => {
 export const completeJob = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const job = await prisma.job.findUnique({
+  const job = await req.db.job.findUnique({
     where: { id: parseInt(id) },
     include: {
       invoice: true,
@@ -816,7 +815,7 @@ export const completeJob = asyncHandler(async (req, res) => {
     throw new AppError('Job is already invoiced', 400, 'INVALID_OPERATION');
   }
 
-  const updatedJob = await prisma.job.update({
+  const updatedJob = await req.db.job.update({
     where: { id: parseInt(id) },
     data: { status: 'completed' },
     include: {
@@ -831,7 +830,7 @@ export const completeJob = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -854,7 +853,7 @@ export const completeJob = asyncHandler(async (req, res) => {
 export const deleteJob = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const job = await prisma.job.findUnique({
+  const job = await req.db.job.findUnique({
     where: { id: parseInt(id) },
     include: {
       invoice: true,
@@ -874,7 +873,7 @@ export const deleteJob = asyncHandler(async (req, res) => {
     );
   }
 
-  await prisma.$transaction(async (tx) => {
+  await req.db.$transaction(async (tx) => {
     // Delete job materials first (cascade should handle this, but explicit is safer)
     await tx.jobMaterial.deleteMany({
       where: { jobId: parseInt(id) },
@@ -936,14 +935,14 @@ export const getJobStats = asyncHandler(async (req, res) => {
 
   const [totalJobs, jobsByType, jobsByStatus, recentJobs] = await Promise.all([
     // Total jobs and revenue
-    prisma.job.aggregate({
+    req.db.job.aggregate({
       where,
       _sum: { totalCost: true },
       _count: true,
     }),
 
     // Jobs by type
-    prisma.job.groupBy({
+    req.db.job.groupBy({
       by: ['jobType'],
       where,
       _sum: { totalCost: true },
@@ -951,14 +950,14 @@ export const getJobStats = asyncHandler(async (req, res) => {
     }),
 
     // Jobs by status
-    prisma.job.groupBy({
+    req.db.job.groupBy({
       by: ['status'],
       where,
       _count: true,
     }),
 
     // Recent jobs
-    prisma.job.findMany({
+    req.db.job.findMany({
       where,
       include: {
         user: {

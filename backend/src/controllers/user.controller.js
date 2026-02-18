@@ -1,5 +1,4 @@
 import bcrypt from 'bcryptjs';
-import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Get all users
@@ -29,7 +28,7 @@ export const getUsers = asyncHandler(async (req, res) => {
     ];
   }
 
-  const users = await prisma.user.findMany({
+  const users = await req.db.user.findMany({
     where,
     select: {
       id: true,
@@ -66,7 +65,7 @@ export const getUsers = asyncHandler(async (req, res) => {
 export const getUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const user = await prisma.user.findUnique({
+  const user = await req.db.user.findUnique({
     where: { id: parseInt(id) },
     select: {
       id: true,
@@ -144,7 +143,7 @@ export const createUser = asyncHandler(async (req, res) => {
   }
 
   // Check if username already exists
-  const existingUser = await prisma.user.findUnique({
+  const existingUser = await req.db.user.findUnique({
     where: { username },
   });
 
@@ -160,7 +159,7 @@ export const createUser = asyncHandler(async (req, res) => {
   const passwordHash = await bcrypt.hash(password, 12);
 
   // Create user
-  const user = await prisma.user.create({
+  const user = await req.db.user.create({
     data: {
       username: username.trim().toLowerCase(),
       passwordHash,
@@ -184,7 +183,7 @@ export const createUser = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'CREATE',
@@ -208,7 +207,7 @@ export const updateUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { fullName, email, phone, role, isActive } = req.body;
 
-  const user = await prisma.user.findUnique({
+  const user = await req.db.user.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -244,7 +243,7 @@ export const updateUser = asyncHandler(async (req, res) => {
   if (role) updateData.role = role;
   if (isActive !== undefined) updateData.isActive = Boolean(isActive);
 
-  const updatedUser = await prisma.user.update({
+  const updatedUser = await req.db.user.update({
     where: { id: parseInt(id) },
     data: updateData,
     select: {
@@ -262,7 +261,7 @@ export const updateUser = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -294,7 +293,7 @@ export const updateUserPermissions = asyncHandler(async (req, res) => {
     );
   }
 
-  const user = await prisma.user.findUnique({
+  const user = await req.db.user.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -311,7 +310,7 @@ export const updateUserPermissions = asyncHandler(async (req, res) => {
     );
   }
 
-  const updatedUser = await prisma.user.update({
+  const updatedUser = await req.db.user.update({
     where: { id: parseInt(id) },
     data: { permissions },
     select: {
@@ -324,7 +323,7 @@ export const updateUserPermissions = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -356,7 +355,7 @@ export const changeUserPassword = asyncHandler(async (req, res) => {
     );
   }
 
-  const user = await prisma.user.findUnique({
+  const user = await req.db.user.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -367,13 +366,13 @@ export const changeUserPassword = asyncHandler(async (req, res) => {
   // Hash new password
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
-  await prisma.user.update({
+  await req.db.user.update({
     where: { id: parseInt(id) },
     data: { passwordHash },
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -395,7 +394,7 @@ export const changeUserPassword = asyncHandler(async (req, res) => {
 export const deactivateUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const user = await prisma.user.findUnique({
+  const user = await req.db.user.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -416,7 +415,7 @@ export const deactivateUser = asyncHandler(async (req, res) => {
     throw new AppError('User is already deactivated', 400, 'INVALID_OPERATION');
   }
 
-  const updatedUser = await prisma.user.update({
+  const updatedUser = await req.db.user.update({
     where: { id: parseInt(id) },
     data: { isActive: false },
     select: {
@@ -428,7 +427,7 @@ export const deactivateUser = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'DEACTIVATE',
@@ -451,7 +450,7 @@ export const deactivateUser = asyncHandler(async (req, res) => {
 export const activateUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const user = await prisma.user.findUnique({
+  const user = await req.db.user.findUnique({
     where: { id: parseInt(id) },
   });
 
@@ -463,7 +462,7 @@ export const activateUser = asyncHandler(async (req, res) => {
     throw new AppError('User is already active', 400, 'INVALID_OPERATION');
   }
 
-  const updatedUser = await prisma.user.update({
+  const updatedUser = await req.db.user.update({
     where: { id: parseInt(id) },
     data: { isActive: true },
     select: {
@@ -475,7 +474,7 @@ export const activateUser = asyncHandler(async (req, res) => {
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'ACTIVATE',
@@ -498,7 +497,7 @@ export const activateUser = asyncHandler(async (req, res) => {
 export const deleteUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const user = await prisma.user.findUnique({
+  const user = await req.db.user.findUnique({
     where: { id: parseInt(id) },
     include: {
       _count: {
@@ -532,12 +531,12 @@ export const deleteUser = asyncHandler(async (req, res) => {
 
   if (hasTransactions) {
     // Soft delete - deactivate instead
-    const deactivatedUser = await prisma.user.update({
+    const deactivatedUser = await req.db.user.update({
       where: { id: parseInt(id) },
       data: { isActive: false },
     });
 
-    await prisma.auditLog.create({
+    await req.db.auditLog.create({
       data: {
         userId: req.user.id,
         action: 'DEACTIVATE',
@@ -555,11 +554,11 @@ export const deleteUser = asyncHandler(async (req, res) => {
   }
 
   // Hard delete if no transaction history
-  await prisma.user.delete({
+  await req.db.user.delete({
     where: { id: parseInt(id) },
   });
 
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'DELETE',
@@ -581,21 +580,21 @@ export const deleteUser = asyncHandler(async (req, res) => {
 export const getUserStats = asyncHandler(async (req, res) => {
   const [totalUsers, usersByRole, activeUsers, recentUsers] = await Promise.all([
     // Total users
-    prisma.user.count(),
+    req.db.user.count(),
 
     // Users by role
-    prisma.user.groupBy({
+    req.db.user.groupBy({
       by: ['role'],
       _count: true,
     }),
 
     // Active users
-    prisma.user.count({
+    req.db.user.count({
       where: { isActive: true },
     }),
 
     // Recent users
-    prisma.user.findMany({
+    req.db.user.findMany({
       select: {
         id: true,
         username: true,

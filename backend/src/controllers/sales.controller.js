@@ -1,4 +1,3 @@
-import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // Helper function to generate receipt number
@@ -52,7 +51,7 @@ export const createSale = asyncHandler(async (req, res) => {
     }
 
     if (item.itemType === 'material') {
-      const material = await prisma.material.findUnique({
+      const material = await req.db.material.findUnique({
         where: { id: parseInt(item.materialId) },
         include: { alternateUnits: true },
       });
@@ -109,7 +108,7 @@ export const createSale = asyncHandler(async (req, res) => {
 
     } else if (item.itemType === 'booth') {
        // ... (Booth logic remains the same) ...
-       const service = await prisma.service.findUnique({
+       const service = await req.db.service.findUnique({
         where: { type: 'booth', isActive: true, id: parseInt(item.serviceId) },
       });
 
@@ -134,7 +133,7 @@ export const createSale = asyncHandler(async (req, res) => {
   const finalAmountPaid = parseFloat(amountPaid || 0);
   const balance = Math.max(0, finalTotalAmount - finalAmountPaid);
 
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await req.db.$transaction(async (tx) => {
     const sale = await tx.sale.create({
       data: {
         totalAmount: finalTotalAmount,
@@ -201,7 +200,7 @@ export const createSale = asyncHandler(async (req, res) => {
     return { sale, receipt };
   });
 
-  const completeSale = await prisma.sale.findUnique({
+  const completeSale = await req.db.sale.findUnique({
     where: { id: result.sale.id },
     include: {
       items: true,
@@ -227,7 +226,7 @@ export const updateSale = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { items, paymentMethod, saleDate, reverseInventory = true } = req.body;
 
-  const existingSale = await prisma.sale.findUnique({
+  const existingSale = await req.db.sale.findUnique({
     where: { id: parseInt(id) },
     include: { items: true, receipt: true },
   });
@@ -246,7 +245,7 @@ export const updateSale = asyncHandler(async (req, res) => {
   // Validate Items Loop
   for (const item of items) {
     if (item.itemType === 'material') {
-      const material = await prisma.material.findUnique({
+      const material = await req.db.material.findUnique({
         where: { id: parseInt(item.materialId) },
         include: { alternateUnits: true }
       });
@@ -284,7 +283,7 @@ export const updateSale = asyncHandler(async (req, res) => {
         
         // If the OLD item had a unit, look up that unit's factor
         if (existingMaterialItem.materialUnitId) {
-           const oldUnit = await prisma.materialUnit.findUnique({ where: { id: existingMaterialItem.materialUnitId }});
+           const oldUnit = await req.db.materialUnit.findUnique({ where: { id: existingMaterialItem.materialUnitId }});
            // If unit still exists, use its factor. If deleted, assume factor 1 (safeguard)
            if (oldUnit) oldDeduction = oldDeduction * parseFloat(oldUnit.factor);
         }
@@ -317,7 +316,7 @@ export const updateSale = asyncHandler(async (req, res) => {
       totalAmount += subtotal;
 
     } else if (item.itemType === 'booth') {
-      const service = await prisma.service.findUnique({ where: { id: parseInt(item.serviceId) } });
+      const service = await req.db.service.findUnique({ where: { id: parseInt(item.serviceId) } });
       if (!service) throw new AppError('Service not found', 404);
       
       validatedItems.push({
@@ -331,7 +330,7 @@ export const updateSale = asyncHandler(async (req, res) => {
   }
 
   // Update Transaction
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await req.db.$transaction(async (tx) => {
     // 1. Reverse OLD inventory
     if (reverseInventory) {
       for (const item of existingSale.items) {
@@ -409,7 +408,7 @@ export const updateSale = asyncHandler(async (req, res) => {
     return updatedSale;
   });
 
-  const completeSale = await prisma.sale.findUnique({
+  const completeSale = await req.db.sale.findUnique({
     where: { id: parseInt(id) },
     include: { items: true, receipt: true },
   });
@@ -430,7 +429,7 @@ export const addPayment = asyncHandler(async (req, res) => {
   }
 
   // 2. Find the Sale
-  const sale = await prisma.sale.findUnique({
+  const sale = await req.db.sale.findUnique({
     where: { id: parseInt(id) },
     include: { receipt: true }
   });
@@ -457,7 +456,7 @@ export const addPayment = asyncHandler(async (req, res) => {
   }
 
   // 4. Update Database Transaction
-  const result = await prisma.$transaction(async (tx) => {
+  const result = await req.db.$transaction(async (tx) => {
     // A. Update Sale Record
     const updatedSale = await tx.sale.update({
       where: { id: parseInt(id) },
@@ -501,7 +500,7 @@ export const addPayment = asyncHandler(async (req, res) => {
 
   // 5. Return Result
   // Fetch fresh data including items for the receipt view
-  const finalSale = await prisma.sale.findUnique({
+  const finalSale = await req.db.sale.findUnique({
     where: { id: parseInt(id) },
     include: { 
       items: true, 
@@ -558,9 +557,9 @@ export const getSales = asyncHandler(async (req, res) => {
  
 
   // 3. UPDATE TRANSACTION (Added 'statusStats' as the 5th item)
-  const [sales, totalCount, revenueAgg, paymentStats, statusStats] = await prisma.$transaction([
+  const [sales, totalCount, revenueAgg, paymentStats, statusStats] = await req.db.$transaction([
     // Query 1: Get Sales
-    prisma.sale.findMany({
+    req.db.sale.findMany({
       where,
       skip: skip,
       take: limitNumber,
@@ -587,23 +586,23 @@ export const getSales = asyncHandler(async (req, res) => {
     }),
 
     // Query 2: Total Count
-    prisma.sale.count({ where }),
+    req.db.sale.count({ where }),
 
     // Query 3: Revenue
-    prisma.sale.aggregate({
+    req.db.sale.aggregate({
       _sum: { totalAmount: true },
       where,
     }),
 
     // Query 4: Group by Payment Method
-    prisma.sale.groupBy({
+    req.db.sale.groupBy({
       by: ['paymentMethod'],
       _count: { paymentMethod: true },
       where,
     }),
 
     // Query 5: Group by Payment Status (NEW)
-    prisma.sale.groupBy({
+    req.db.sale.groupBy({
       by: ['paymentStatus'],
       _count: { paymentStatus: true },
       where,
@@ -652,7 +651,7 @@ export const getSales = asyncHandler(async (req, res) => {
 export const getSale = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const sale = await prisma.sale.findUnique({
+  const sale = await req.db.sale.findUnique({
     where: { id: parseInt(id) },
     include: {
       items: {
@@ -702,7 +701,7 @@ export const deleteSale = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { reverseInventory = true, reason } = req.body;
 
-  const sale = await prisma.sale.findUnique({
+  const sale = await req.db.sale.findUnique({
     where: { id: parseInt(id) },
     include: {
       items: {
@@ -730,7 +729,7 @@ export const deleteSale = asyncHandler(async (req, res) => {
   }
 
   // Start transaction to delete sale and optionally restore inventory
-  await prisma.$transaction(async (tx) => {
+  await req.db.$transaction(async (tx) => {
     // Restore inventory if requested
     if (reverseInventory) {
       for (const item of sale.items) {
@@ -807,14 +806,14 @@ export const getSalesStats = asyncHandler(async (req, res) => {
 
   const [totalSales, salesByMethod, recentSales] = await Promise.all([
     // Total sales and amount
-    prisma.sale.aggregate({
+    req.db.sale.aggregate({
       where,
       _sum: { totalAmount: true },
       _count: true,
     }),
 
     // Sales by payment method
-    prisma.sale.groupBy({
+    req.db.sale.groupBy({
       by: ['paymentMethod'],
       where,
       _sum: { totalAmount: true },
@@ -822,7 +821,7 @@ export const getSalesStats = asyncHandler(async (req, res) => {
     }),
 
     // Recent sales
-    prisma.sale.findMany({
+    req.db.sale.findMany({
       where,
       include: {
         user: {

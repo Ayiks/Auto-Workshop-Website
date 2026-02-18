@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import { getTenantDB } from '../config/database.js';
 import prisma from '../config/database.js';
 import { AppError, asyncHandler } from './errorHandler.js';
 
@@ -23,6 +24,7 @@ export const protect = asyncHandler(async (req, res, next) => {
       where: { id: decoded.id },
       select: {
         id: true,
+        businessId: true,
         username: true,
         fullName: true,
         email: true,
@@ -41,6 +43,9 @@ export const protect = asyncHandler(async (req, res, next) => {
     }
 
     req.user = user;
+
+    req.db = getTenantDB(user.businessId); // Attach tenant-specific Prisma client to request
+    
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
@@ -183,6 +188,7 @@ export const generateToken = (user) => {
       id: user.id,
       username: user.username,
       role: user.role,
+      businessId: user.businessId,
     },
     process.env.JWT_SECRET,
     {

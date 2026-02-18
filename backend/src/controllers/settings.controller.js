@@ -1,15 +1,23 @@
-import prisma from '../config/database.js';
+import { getTenantDB } from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Get business settings
 // @route   GET /api/settings
 // @access  Public (no authentication for public website to display info)
 export const getSettings = asyncHandler(async (req, res) => {
-  let settings = await prisma.businessSettings.findFirst();
+  // SMART CHECK: Use logged-in user's ID, OR grab it from the public query URL
+  const businessId = req.user?.businessId || req.query.businessId;
+
+  if (!businessId) {
+    throw new AppError('Business ID is required to fetch settings.', 400, 'VALIDATION_ERROR');
+  }
+
+  const db = getTenantDB(businessId);
+  let settings = await db.businessSettings.findFirst();
 
   // If no settings exist, create default
   if (!settings) {
-    settings = await prisma.businessSettings.create({
+    settings = await db.businessSettings.create({
       data: {
         name: 'Gray Manager',
         address: 'Accra, Greater Accra, Ghana',
@@ -66,7 +74,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
   }
 
   // Get existing settings or create new
-  let settings = await prisma.businessSettings.findFirst();
+  let settings = await req.db.businessSettings.findFirst();
 
   const updateData = {};
   if (name !== undefined) updateData.name = name.trim();
@@ -78,13 +86,13 @@ export const updateSettings = asyncHandler(async (req, res) => {
 
   if (settings) {
     // Update existing settings
-    settings = await prisma.businessSettings.update({
+    settings = await req.db.businessSettings.update({
       where: { id: settings.id },
       data: updateData,
     });
   } else {
     // Create new settings if none exist
-    settings = await prisma.businessSettings.create({
+    settings = await req.db.businessSettings.create({
       data: {
         name: name || 'Auto Workshop',
         logo,
@@ -97,7 +105,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
   }
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -125,7 +133,7 @@ export const updateLogo = asyncHandler(async (req, res) => {
   }
 
   // Get existing settings
-  let settings = await prisma.businessSettings.findFirst();
+  let settings = await req.db.businessSettings.findFirst();
 
   if (!settings) {
     throw new AppError(
@@ -135,13 +143,13 @@ export const updateLogo = asyncHandler(async (req, res) => {
     );
   }
 
-  settings = await prisma.businessSettings.update({
+  settings = await req.db.businessSettings.update({
     where: { id: settings.id },
     data: { logo: logo.trim() },
   });
 
   // Log audit
-  await prisma.auditLog.create({
+  await req.db.auditLog.create({
     data: {
       userId: req.user.id,
       action: 'UPDATE',
@@ -162,7 +170,7 @@ export const updateLogo = asyncHandler(async (req, res) => {
 // @route   GET /api/settings/booth-price
 // @access  Public
 export const getBoothPrice = asyncHandler(async (req, res) => {
-  const service = await prisma.service.findFirst({
+  const service = await req.db.service.findFirst({
     where: { type: 'booth', isActive: true },
   });
 
@@ -193,7 +201,7 @@ export const getBoothPrice = asyncHandler(async (req, res) => {
 // @route   GET /api/settings/units
 // @access  Private
 export const getGlobalUnits = asyncHandler(async (req, res) => {
-  const units = await prisma.globalUnit.findMany({
+  const units = await req.db.globalUnit.findMany({
     where: { isActive: true },
     orderBy: { name: 'asc' },
   });
@@ -215,8 +223,8 @@ export const addGlobalUnit = asyncHandler(async (req, res) => {
     throw new AppError('Name and Abbreviation are required', 400, 'VALIDATION_ERROR');
   }
 
-  // Check duplicate
-  const existing = await prisma.globalUnit.findUnique({
+  // FIXED: Changed findUnique to findFirst
+  const existing = await req.db.globalUnit.findFirst({
     where: { name: name.trim() }
   });
 
@@ -224,7 +232,7 @@ export const addGlobalUnit = asyncHandler(async (req, res) => {
     throw new AppError(`Unit '${name}' already exists`, 400, 'DUPLICATE_ENTRY');
   }
 
-  const unit = await prisma.globalUnit.create({
+  const unit = await req.db.globalUnit.create({
     data: {
       name: name.trim(),
       abbreviation: abbreviation.trim(),
@@ -237,7 +245,6 @@ export const addGlobalUnit = asyncHandler(async (req, res) => {
     data: unit,
   });
 });
-
 // @desc    Delete a global unit
 // @route   DELETE /api/settings/units/:id
 // @access  Private (Admin)
@@ -248,7 +255,7 @@ export const deleteGlobalUnit = asyncHandler(async (req, res) => {
   // For now, we allow deletion as it's just a string reference in Material model, 
   // but soft delete (isActive=false) is safer.
 
-  await prisma.globalUnit.update({
+  await req.db.globalUnit.update({
     where: { id: parseInt(id) },
     data: { isActive: false } // Soft delete
   });
@@ -267,7 +274,7 @@ export const updateGlobalUnit = asyncHandler(async (req, res) => {
   const { name, abbreviation } = req.body;
 
   // Check if unit exists
-  const unit = await prisma.globalUnit.findUnique({
+  const unit = await req.db.globalUnit.findUnique({
     where: { id: parseInt(id) }
   });
 
@@ -277,7 +284,7 @@ export const updateGlobalUnit = asyncHandler(async (req, res) => {
 
   // Check for duplicate name (excluding current unit)
   if (name) {
-    const duplicate = await prisma.globalUnit.findFirst({
+    const duplicate = await req.db.globalUnit.findFirst({
       where: {
         name: name.trim(),
         id: { not: parseInt(id) }, // Exclude self
@@ -289,7 +296,7 @@ export const updateGlobalUnit = asyncHandler(async (req, res) => {
     }
   }
 
-  const updatedUnit = await prisma.globalUnit.update({
+  const updatedUnit = await req.db.globalUnit.update({
     where: { id: parseInt(id) },
     data: {
       name: name ? name.trim() : undefined,

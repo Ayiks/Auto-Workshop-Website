@@ -1,4 +1,3 @@
-import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Get all receipts
@@ -30,7 +29,7 @@ export const getReceipts = asyncHandler(async (req, res) => {
     }
   }
 
-  const receipts = await prisma.receipt.findMany({
+  const receipts = await req.db.receipt.findMany({
     where,
     include: {
       user: {
@@ -79,7 +78,7 @@ export const getReceipts = asyncHandler(async (req, res) => {
 export const getReceipt = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const receipt = await prisma.receipt.findUnique({
+  const receipt = await req.db.receipt.findUnique({
     where: { id: parseInt(id) },
     include: {
       user: {
@@ -147,7 +146,7 @@ export const getReceipt = asyncHandler(async (req, res) => {
 export const getReceiptByNumber = asyncHandler(async (req, res) => {
   const { receiptNumber } = req.params;
 
-  const receipt = await prisma.receipt.findUnique({
+  const receipt = await req.db.receipt.findUnique({
     where: { receiptNumber },
     include: {
       user: {
@@ -208,7 +207,7 @@ export const getReceiptByNumber = asyncHandler(async (req, res) => {
 export const getSaleReceipt = asyncHandler(async (req, res) => {
   const { saleId } = req.params;
 
-  const receipt = await prisma.receipt.findUnique({
+  const receipt = await req.db.receipt.findUnique({
     where: { saleId: parseInt(saleId) },
     include: {
       user: {
@@ -253,7 +252,7 @@ export const getSaleReceipt = asyncHandler(async (req, res) => {
 export const getPaymentReceipt = asyncHandler(async (req, res) => {
   const { paymentId } = req.params;
 
-  const receipt = await prisma.receipt.findUnique({
+  const receipt = await req.db.receipt.findUnique({
     where: { paymentId: parseInt(paymentId) },
     include: {
       user: {
@@ -311,14 +310,14 @@ export const getReceiptStats = asyncHandler(async (req, res) => {
 
   const [totalReceipts, receiptsByType, receiptsByMethod] = await Promise.all([
     // Total receipts and amount
-    prisma.receipt.aggregate({
+    req.db.receipt.aggregate({
       where,
       _sum: { amount: true },
       _count: true,
     }),
 
     // Receipts by type
-    prisma.receipt.groupBy({
+    req.db.receipt.groupBy({
       by: ['receiptType'],
       where,
       _sum: { amount: true },
@@ -326,7 +325,7 @@ export const getReceiptStats = asyncHandler(async (req, res) => {
     }),
 
     // Receipts by payment method
-    prisma.receipt.groupBy({
+    req.db.receipt.groupBy({
       by: ['paymentMethod'],
       where,
       _sum: { amount: true },

@@ -545,7 +545,7 @@ export default function SaleForm({ onCancel, isLoading }) {
                                 {/* Black Qty Buttons */}
                                 <div className="flex items-center gap-0">
                                     <button onClick={() => updateQuantity(item.id, -1)} className="w-8 h-8 flex items-center justify-center bg-black text-white rounded-l hover:bg-gray-800 transition-colors"><Minus size={14} /></button>
-                                    <input type="number" value={item.quantity} onChange={(e) => handleQuantityInput(item.id, e.target.value)} className="w-12 h-8 text-center border-y border-black text-sm font-bold p-0 focus:ring-0 z-10" />
+                                    <input type="number" step="0.01" value={item.quantity} onChange={(e) => handleQuantityInput(item.id, e.target.value)} className="w-12 h-8 text-center border-y border-black text-sm font-bold p-0 focus:ring-0 z-10" />
                                     <button onClick={() => updateQuantity(item.id, 1)} className="w-8 h-8 flex items-center justify-center bg-black text-white rounded-r hover:bg-gray-800 transition-colors"><Plus size={14} /></button>
                                 </div>
                             </div>
@@ -634,7 +634,7 @@ export default function SaleForm({ onCancel, isLoading }) {
                         {paymentStatus === 'partially' && (
                              <div className="animate-in fade-in pt-2">
                                 <label className="text-xs font-bold text-gray-500 mb-1 block">Amount Paid So Far</label>
-                                <input type="number" value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} className="w-full p-2 border border-gray-300 rounded text-sm focus:border-black focus:ring-1 focus:ring-black outline-none" placeholder="0.00" />
+                                <input type="number" step="0.01" value={partialAmount} onChange={(e) => setPartialAmount(e.target.value)} className="w-full p-2 border border-gray-300 rounded text-sm focus:border-black focus:ring-1 focus:ring-black outline-none" placeholder="0.00" />
                              </div>
                         )}
                     </div>
@@ -660,6 +660,7 @@ export default function SaleForm({ onCancel, isLoading }) {
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">₵</span>
                                     <input 
                                         type="number" 
+                                        step="0.01"
                                         placeholder="0.00"
                                         value={discount}
                                         onChange={(e) => setDiscount(e.target.value)}

@@ -143,12 +143,18 @@ export default function SaleForm({ onCancel, isLoading }) {
     setSelectedMaterialId(material.id);
     // Check Global Stock Availability
     const currentReserved = getReservedStock(material.id, items);
+    const availableStock = material.quantity - currentReserved;
     
-    // We are trying to add 1 base unit
-    if (currentReserved + 1 > material.quantity) {
-        alert(`Insufficient Stock! You have ${material.quantity} available, and ${currentReserved} are already in the cart.`);
+    // If no stock available at all, reject
+    if (availableStock <= 0) {
+        alert(`Insufficient Stock! Out of stock.`);
         return;
     }
+    
+    // Determine quantity to add:
+    // - If available stock is less than 1, add the full remaining amount
+    // - Otherwise, add 1 unit
+    const quantityToAdd = availableStock < 1 ? availableStock : 1;
 
     // ALWAYS create a new item (Distinct Row)
     setItems((prevItems) => [
@@ -158,7 +164,7 @@ export default function SaleForm({ onCancel, isLoading }) {
         itemType: "material",
         materialId: material.id,
         materialName: material.name,
-        quantity: 1,
+        quantity: quantityToAdd,
         maxStock: material.quantity,
         baseUnit: material.baseUnit,
         basePrice: Number(material.sellingPrice),
@@ -166,7 +172,7 @@ export default function SaleForm({ onCancel, isLoading }) {
         unitId: null, // Base Unit
         unitFactor: 1, 
         unitPrice: Number(material.sellingPrice),
-        subtotal: Number(material.sellingPrice),
+        subtotal: quantityToAdd * Number(material.sellingPrice),
         imageUrl: material.imageUrl,
       }
     ]);

@@ -98,7 +98,7 @@ export default function Dashboard() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0">
             <div>
               {/* Dynamic Title based on Role */}
-              <h1 className={`${RESPONSIVE_SPACING.heading} text-gray-900 tracking-tight`}>
+              <h1 className={`${RESPONSIVE_SPACING.subheading} font-bold text-gray-900 tracking-tight`}>
                 {isAdmin ? "Overview" : "Today's Activity"}
               </h1>
               <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Welcome back, {user?.fullName || user?.username}</p>

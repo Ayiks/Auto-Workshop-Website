@@ -51,6 +51,36 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
+  // Register
+  register: async (data) => {
+    set({ isLoading: true, error: null });
+    try {
+      const response = await authApi.register(data);
+      // Response is already unwrapped by axios interceptor
+      const { token, data: user } = response.data || response;
+
+      // Save to localStorage
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+
+      // Update state
+      set({
+        token,
+        user,
+        isAuthenticated: true,
+        isLoading: false,
+      });
+
+      return user;
+    } catch (error) {
+      set({ isLoading: false, error: error.message });
+      return {
+        success: false,
+        error: error.message,
+      };
+    }
+  },
+
   // Logout
   logout: async () => {
     try {

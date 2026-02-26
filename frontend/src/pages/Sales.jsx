@@ -297,7 +297,7 @@ export default function Sales() {
         <div className={`container mx-auto ${RESPONSIVE_SPACING.container}`}>
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0">
             <div>
-              <h1 className={`${RESPONSIVE_SPACING.heading} text-gray-900 tracking-tight`}>Commerce</h1>
+              <h1 className={`${RESPONSIVE_SPACING.subheading} font-bold text-gray-900 tracking-tight`}>Commerce</h1>
               <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Overview of sales transactions</p>
             </div>
             {hasPermission("sales", "create") && (

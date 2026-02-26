@@ -123,26 +123,26 @@ export default function DashboardLayout() {
         } bg-white border-r border-gray-200 transition-all duration-300 flex flex-col z-20`}
       >
         {/* Logo Area */}
-        <div className="h-16 flex items-center justify-between px-4 border-b border-gray-100">
+        <div className="h-14 sm:h-16 flex items-center justify-between px-3 sm:px-4 border-b border-gray-100">
           {isSidebarOpen ? (
-            <div className="flex items-center gap-3">
-              <div className="w-8 h-8 bg-black rounded-lg flex items-center justify-center shadow-sm">
-                <span className="text-white font-bold text-sm">{businessLogo ?? businessInitials}</span>
+            <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+              <div className="w-7 h-7 sm:w-8 sm:h-8 bg-black rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
+                <span className="text-white font-bold text-xs sm:text-sm">{businessLogo ?? businessInitials}</span>
               </div>
-              <h1 className="text-sm font-bold text-gray-900 tracking-tight">
+              <h1 className="text-xs sm:text-sm text-gray-900 tracking-tight truncate">
                 {businessName.toUpperCase()}
               </h1>
             </div>
           ) : (
-            <div className="w-8 h-8 p-2 bg-black rounded-lg flex items-center justify-center mx-auto shadow-sm">
-              <span className="text-white font-bold text-sm">{businessLogo ?? businessInitials}</span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 p-1.5 sm:p-2 bg-black rounded-lg flex items-center justify-center mx-auto shadow-sm flex-shrink-0">
+              <span className="text-white font-bold text-xs sm:text-sm">{businessLogo ?? businessInitials}</span>
             </div>
           )}
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1.5 rounded-md hover:bg-gray-100 text-gray-500 transition-colors"
+            className="p-1 sm:p-1.5 rounded-md hover:bg-gray-100 text-gray-500 transition-colors flex-shrink-0"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {isSidebarOpen ? (
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M11 19l-7-7 7-7m8 14l-7-7 7-7" />
               ) : (
@@ -153,7 +153,7 @@ export default function DashboardLayout() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-6 scrollbar-thin scrollbar-thumb-gray-200">
+        <nav className="flex-1 overflow-y-auto py-4 sm:py-6 px-2 sm:px-3 space-y-4 sm:space-y-6 scrollbar-thin scrollbar-thumb-gray-200">
           {navSections.map((section, idx) => {
             // Filter items based on permissions
             const visibleItems = section.items.filter(item => item.show);
@@ -164,7 +164,7 @@ export default function DashboardLayout() {
             return (
               <div key={idx}>
                 {isSidebarOpen && section.title && (
-                  <h3 className="px-3 text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2 font-mono">
+                  <h3 className="px-2 sm:px-3 text-[8px] sm:text-[10px] text-gray-400 uppercase tracking-widest mb-1.5 sm:mb-2">
                     {section.title}
                   </h3>
                 )}
@@ -174,24 +174,24 @@ export default function DashboardLayout() {
                     <Link
                       key={item.path}
                       to={item.path}
-                      className={`group flex items-center px-3 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                      className={`group flex items-center px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm rounded-lg transition-all duration-200 ${
                         isActive(item.path)
                           ? "bg-gray-900 text-white shadow-md shadow-gray-900/10"
                           : "text-gray-500 hover:bg-gray-100 hover:text-gray-900"
                       }`}
                     >
                       <div className={`${isActive(item.path) ? "text-white" : "text-gray-400 group-hover:text-gray-600"}`}>
-                        {item.icon}
+                        <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">{item.icon}</svg>
                       </div>
                       
                       {isSidebarOpen && (
-                        <span className="ml-3 truncate">
+                        <span className="ml-2 sm:ml-3 truncate text-xs sm:text-sm">
                           {item.name}
                         </span>
                       )}
                       
                       {!isSidebarOpen && (
-                         <div className="absolute left-full rounded-md px-2 py-1 ml-6 bg-gray-900 text-white text-xs invisible opacity-20 -translate-x-3 transition-all group-hover:visible group-hover:opacity-100 group-hover:translate-x-0 z-50 whitespace-nowrap">
+                         <div className="absolute left-full rounded-md px-2 py-1 ml-4 sm:ml-6 bg-gray-900 text-white text-xs invisible opacity-20 -translate-x-3 transition-all group-hover:visible group-hover:opacity-100 group-hover:translate-x-0 z-50 whitespace-nowrap">
                              {item.name}
                          </div>
                       )}
@@ -204,42 +204,42 @@ export default function DashboardLayout() {
         </nav>
 
         {/* User Menu */}
-        <div className="border-t border-gray-100 p-3 bg-white">
+        <div className="border-t border-gray-100 p-2 sm:p-3 bg-white">
           <div className="relative">
             <button
               onClick={() => setShowUserMenu(!showUserMenu)}
-              className={`flex items-center w-full rounded-xl p-2 transition-colors border border-transparent ${showUserMenu ? 'bg-gray-50 border-gray-200' : 'hover:bg-gray-50'}`}
+              className={`flex items-center w-full rounded-lg sm:rounded-xl p-1.5 sm:p-2 transition-colors border border-transparent ${showUserMenu ? 'bg-gray-50 border-gray-200' : 'hover:bg-gray-50'}`}
             >
-              <div className="w-9 h-9 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
-                <span className="text-gray-700 font-bold text-xs">
+              <div className="w-7 h-7 sm:w-9 sm:h-9 rounded-lg bg-gray-100 border border-gray-200 flex items-center justify-center shrink-0">
+                <span className="text-gray-700 text-xs sm:text-sm">
                   {user?.fullName?.charAt(0) || user?.username?.charAt(0).toUpperCase()}
                 </span>
               </div>
               
               {isSidebarOpen && (
-                <div className="ml-3 flex-1 text-left overflow-hidden">
-                  <p className="text-sm font-semibold text-gray-900 truncate">
+                <div className="ml-2 sm:ml-3 flex-1 text-left overflow-hidden">
+                  <p className="text-xs sm:text-sm text-gray-900 truncate">
                     {user?.fullName || user?.username}
                   </p>
-                  <p className="text-[10px] font-medium text-gray-500 uppercase tracking-wide">
+                  <p className="text-[8px] sm:text-[10px] text-gray-500 uppercase tracking-wide">
                     {user?.role}
                   </p>
                 </div>
               )}
               
               {isSidebarOpen && (
-                 <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                 <svg className="w-3 h-3 sm:w-4 sm:h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               )}
             </button>
 
             {/* Dropdown */}
             {showUserMenu && (
-              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-xl shadow-xl shadow-gray-200/50 border border-gray-100 py-1 overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-200">
+              <div className="absolute bottom-full left-0 right-0 mb-2 bg-white rounded-lg sm:rounded-xl shadow-xl shadow-gray-200/50 border border-gray-100 py-0.5 overflow-hidden animate-in slide-in-from-bottom-2 fade-in duration-200">
                 <button
                   onClick={handleLogout}
-                  className="w-full text-left px-4 py-3 text-sm font-medium text-red-600 hover:bg-red-50 flex items-center transition-colors"
+                  className="w-full text-left px-3 sm:px-4 py-2 sm:py-3 text-xs sm:text-sm text-red-600 hover:bg-red-50 flex items-center transition-colors"
                 >
-                  <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-3 h-3 sm:w-4 sm:h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                   </svg>
                   Sign Out

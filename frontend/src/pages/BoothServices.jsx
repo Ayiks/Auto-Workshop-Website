@@ -2,8 +2,8 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { boothServicesApi } from '@api/boothService';
-import { useAuthStore } from '@stores/authStore';
-import Button from '@components/common/Button';
+import { useAuthStore } from '@stores/authStore';import { useResponsive } from "@hooks/useResponsive";
+import { RESPONSIVE_SPACING } from "@utils/responsiveHelpers";import Button from '@components/common/Button';
 import Card, { StatCard } from '@components/common/Card';
 import Table from '@components/common/Table';
 import Modal from '@components/common/Modal';

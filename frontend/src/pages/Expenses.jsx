@@ -3,6 +3,8 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { expensesApi } from "@api/expenses";
 import { useAuthStore } from "@stores/authStore";
+import { useResponsive } from "@hooks/useResponsive";
+import { RESPONSIVE_SPACING } from "@utils/responsiveHelpers";
 import { toast } from "react-hot-toast";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 
@@ -243,19 +245,19 @@ export default function Expenses() {
     <div className="min-h-screen bg-gray-50/50">
       {/* Header */}
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur-md">
-          <div className="px-6 py-4 max-w-7xl mx-auto">
-            <div className="flex items-center justify-between">
+          <div className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 max-w-7xl mx-auto">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
               <div>
-                <h1 className="text-xl font-bold text-gray-900 tracking-tight">Expenses</h1>
-                <p className="text-sm text-gray-500 mt-0.5">Track operational costs and material purchases</p>
+                <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Expenses</h1>
+                <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Track operational costs and material purchases</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-stretch sm:items-center gap-2 w-full sm:w-auto">
               {hasPermission("expenses", "create") && (
                 <Button
                   variant="primary"
                   onClick={() => setShowCreateModal(true)}
                   icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
-                  className="bg-gray-900 hover:bg-black text-white shadow-sm border-transparent"
+                  className="bg-gray-900 hover:bg-black text-white shadow-sm border-transparent text-xs sm:text-sm w-full sm:w-auto"
                 >
                   Add Expense
                 </Button>
@@ -266,10 +268,10 @@ export default function Expenses() {
         </div>
 
       {/* Main Content */}
-      <div className="p-6 lg:p-8 max-w-7xl mx-auto">
-        <div className="mb-8">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto">
+        <div className="mb-6 sm:mb-8">
           {/* Stats Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
             <StatCard 
                 title="Total Expenses" 
                 value={`GH₵${Number(stats.totalExpenses || 0).toLocaleString()}`} 
@@ -301,9 +303,9 @@ export default function Expenses() {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           
           {/* Filter Bar */}
-          <div className="p-5 border-b border-gray-100">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
-              <div className="flex-1 max-w-md">
+          <div className="p-4 sm:p-5 border-b border-gray-100">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+              <div className="flex-1 max-w-md w-full">
                 <div className="relative">
                   <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                   <input
@@ -311,11 +313,11 @@ export default function Expenses() {
                     placeholder="Search expenses..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white transition-all"
+                    className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white transition-all"
                   />
                 </div>
               </div>
-              <div className="flex flex-col sm:flex-row gap-3">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
                  <input
                   type="month"
                   value={format(selectedMonth, 'yyyy-MM')}

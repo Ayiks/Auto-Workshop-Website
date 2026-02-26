@@ -3,9 +3,11 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useNavigate } from "react-router-dom";
 import { materialsApi } from "@api/materials";
 import { settingsApi } from "@api/settings";
-import { salesApi } from "@api/sales";
+import { salesApi, receiptsApi } from "@api/sales";
 import Button from "@components/common/Button";
-import CustomerSelect from "@components/common/CustomerSelect"; 
+import CustomerSelect from "@components/common/CustomerSelect";
+import Modal from "@components/common/Modal";
+import Receipt from "@components/features/sales/Receipt";
 import { format } from "date-fns";
 import { 
   Trash2, Plus, Minus, Search, 
@@ -29,6 +31,14 @@ export default function SaleForm({ onCancel, isLoading }) {
   const [saleType, setSaleType] = useState("counter"); 
   const [items, setItems] = useState([]); 
   const [selectedMaterialId, setSelectedMaterialId] = useState(null);
+  
+  // New state for the mobile bottom sheet pull-up
+  const [configItem, setConfigItem] = useState(null);
+  
+  // Receipt Modal State
+  const [showReceiptModal, setShowReceiptModal] = useState(false);
+  const [receiptData, setReceiptData] = useState(null);
+  const [saleData, setSaleData] = useState(null);
   
   // Payment Details
   const [paymentMethod, setPaymentMethod] = useState("cash");
@@ -69,21 +79,31 @@ export default function SaleForm({ onCancel, isLoading }) {
 
   const createSaleMutation = useMutation({
     mutationFn: (data) => salesApi.createSale(data),
-    onSuccess: (response) => {
-        // 1. Invalidate queries to refresh lists (inventory, sales history)
+    onSuccess: (res) => {
+        // 1. Invalidate queries to refresh lists
         queryClient.invalidateQueries({ queryKey: ["materials"] });
         queryClient.invalidateQueries({ queryKey: ["sales"] });
+        queryClient.invalidateQueries({ queryKey: ["dashboard"] });
         
-        // 2. Alert or Toast
-        alert("Sale created successfully!");
+        // 2. Extract the payload
+        const responsePayload = res.data || res;
         
-        // 3. Navigate away or reset
-        if (onCancel) onCancel(); 
-        else navigate("/app/sales"); 
+        // 3. Look for sale/receipt directly, OR inside .data just in case
+        const completeSale = responsePayload?.sale || responsePayload?.data?.sale;
+        const completeReceipt = responsePayload?.receipt || responsePayload?.data?.receipt;
+        
+        if (completeSale && completeReceipt) {
+          setSaleData(completeSale);
+          setReceiptData(completeReceipt);
+          setShowReceiptModal(true);
+        } else {
+          console.warn("Could not find hydrated receipt data in response", responsePayload);
+          alert("Sale completed, but receipt could not be loaded automatically.");
+        }
     },
     onError: (error) => {
         console.error("Sale Error:", error);
-        alert(error.response?.data?.message || "Failed to create sale. Please try again.");
+        alert(error.response?.data?.error?.message || "Failed to create sale. Please try again.");
     }
   });
 
@@ -97,14 +117,10 @@ export default function SaleForm({ onCancel, isLoading }) {
   }, [materials, searchTerm]);
 
   // --- HELPER: GLOBAL STOCK CHECK ---
-  // Calculates how many of a specific material are currently in the cart across ALL rows
   const getReservedStock = (materialId, cartItems, excludeItemId = null) => {
     return cartItems.reduce((total, item) => {
-      // Skip the item we are currently editing (if provided)
       if (excludeItemId && item.id === excludeItemId) return total;
-      
       if (item.materialId === materialId) {
-        // Calculate based on unit factor (e.g., if item is a 'Box' of 10, it counts as 10)
         return total + (item.quantity * (item.unitFactor || 1));
       }
       return total;
@@ -112,7 +128,6 @@ export default function SaleForm({ onCancel, isLoading }) {
   };
 
   // --- ACTIONS ---
-
   const handleGoBack = () => {
     if (step === 2) setStep(1);
     else if (step === 1) setStep(0);
@@ -138,29 +153,31 @@ export default function SaleForm({ onCancel, isLoading }) {
     setItemCategory("");
   };
 
-  const addToCart = (material) => {
+  const handleCloseReceiptModal = () => {
+    setShowReceiptModal(false);
+    setReceiptData(null);
+    setSaleData(null);
+    if (onCancel) onCancel(); 
+    else navigate("/app/sales");
+  };
 
+  const addToCart = (material) => {
     setSelectedMaterialId(material.id);
+    
     // Check Global Stock Availability
     const currentReserved = getReservedStock(material.id, items);
     const availableStock = material.quantity - currentReserved;
     
-    // If no stock available at all, reject
     if (availableStock <= 0) {
         alert(`Insufficient Stock! Out of stock.`);
         return;
     }
     
-    // Determine quantity to add:
-    // - If available stock is less than 1, add the full remaining amount
-    // - Otherwise, add 1 unit
     const quantityToAdd = availableStock < 1 ? availableStock : 1;
+    const isDesktop = window.innerWidth >= 1024; // Check if LG screen or wider
 
-    // ALWAYS create a new item (Distinct Row)
-    setItems((prevItems) => [
-      ...prevItems, 
-      {
-        id: Date.now() + Math.random(), // Unique Row ID
+    const newItemPayload = {
+        id: Date.now() + Math.random(),
         itemType: "material",
         materialId: material.id,
         materialName: material.name,
@@ -174,8 +191,110 @@ export default function SaleForm({ onCancel, isLoading }) {
         unitPrice: Number(material.sellingPrice),
         subtotal: quantityToAdd * Number(material.sellingPrice),
         imageUrl: material.imageUrl,
+    };
+
+    if (isDesktop) {
+        // DESKTOP: Add directly to cart
+        setItems((prevItems) => [...prevItems, newItemPayload]);
+    } else {
+        // MOBILE/TABLET: Trigger Bottom Sheet
+        setConfigItem(newItemPayload);
+    }
+  };
+
+  // Mobile Bottom Sheet Handlers
+  const handleConfigUnitChange = (newUnitId) => {
+    let newPrice = configItem.basePrice;
+    let newFactor = 1;
+    let newUnitIdVal = null;
+
+    if (newUnitId !== "base") {
+      const unit = configItem.availableUnits.find(u => u.id === parseInt(newUnitId));
+      if (unit) {
+         newPrice = Number(unit.price);
+         newFactor = Number(unit.factor);
+         newUnitIdVal = unit.id;
       }
-    ]);
+    }
+
+    // Stock Check for new unit size
+    const requiredForThisItem = configItem.quantity * newFactor;
+    const otherReserved = getReservedStock(configItem.materialId, items);
+
+    if (otherReserved + requiredForThisItem > configItem.maxStock) {
+        alert("Changing unit would exceed total available stock.");
+        return;
+    }
+
+    setConfigItem({
+      ...configItem,
+      unitId: newUnitIdVal,
+      unitFactor: newFactor,
+      unitPrice: newPrice,
+      subtotal: configItem.quantity * newPrice
+    });
+  };
+
+  const handleConfigQtyChange = (change) => {
+    const newQty = configItem.quantity + change;
+    if (newQty < 1) return;
+
+    // Stock Check
+    const otherReserved = getReservedStock(configItem.materialId, items);
+    const requiredForThisItem = newQty * configItem.unitFactor;
+
+    if (otherReserved + requiredForThisItem > configItem.maxStock) return;
+
+    setConfigItem({
+        ...configItem,
+        quantity: newQty,
+        subtotal: newQty * configItem.unitPrice
+    });
+  };
+
+  const handleConfigQuantityChange = (value) => {
+    // Handle empty input
+    if (value === "") {
+      setConfigItem({
+        ...configItem,
+        quantity: "",
+        subtotal: 0
+      });
+      return;
+    }
+
+    const newQty = parseFloat(value);
+    
+    // Reject invalid or negative numbers
+    if (isNaN(newQty) || newQty < 0) return;
+    
+    // Allow 0 to clear quantity
+    if (newQty === 0) {
+      setConfigItem({
+        ...configItem,
+        quantity: "",
+        subtotal: 0
+      });
+      return;
+    }
+
+    // Stock Check
+    const otherReserved = getReservedStock(configItem.materialId, items);
+    const requiredForThisItem = newQty * (configItem.unitFactor || 1);
+
+    // If exceeds available stock, don't update
+    if (otherReserved + requiredForThisItem > configItem.maxStock) return;
+
+    setConfigItem({
+      ...configItem,
+      quantity: newQty,
+      subtotal: newQty * configItem.unitPrice
+    });
+  };
+
+  const handleConfirmConfig = () => {
+      setItems(prev => [...prev, configItem]);
+      setConfigItem(null);
   };
 
   const handleUnitChange = (itemId, newUnitId) => {
@@ -197,7 +316,6 @@ export default function SaleForm({ onCancel, isLoading }) {
           }
         }
 
-        // Check if changing the unit violates global stock
         const otherReserved = getReservedStock(item.materialId, prev, itemId);
         const requiredForThisItem = item.quantity * newFactor;
 
@@ -226,17 +344,14 @@ export default function SaleForm({ onCancel, isLoading }) {
       const item = prevItems[itemIndex];
       const newQty = parseFloat((item.quantity + change).toFixed(2));
       
-      // Auto-remove if 0
       if (newQty <= 0) {
           return prevItems.filter(i => i.id !== itemId);
       }
 
-      // GLOBAL Stock Check
       const otherReserved = getReservedStock(item.materialId, prevItems, itemId);
       const requiredForThisItem = newQty * (item.unitFactor || 1);
 
       if (otherReserved + requiredForThisItem > item.maxStock) {
-         // Optionally trigger a toast/alert here
          return prevItems;
       }
 
@@ -257,12 +372,9 @@ export default function SaleForm({ onCancel, isLoading }) {
         const itemIndex = prevItems.findIndex(i => i.id === itemId);
         if (itemIndex === -1) return prevItems;
         
-        // Remove on 0 or negative
         if (newQty < 0) return prevItems.filter(i => i.id !== itemId);
 
         const item = prevItems[itemIndex];
-        
-        // GLOBAL Stock Check
         const otherReserved = getReservedStock(item.materialId, prevItems, itemId);
         const requiredForThisItem = newQty * (item.unitFactor || 1);
 
@@ -341,12 +453,12 @@ export default function SaleForm({ onCancel, isLoading }) {
   const showCartPanel = step > 0; 
 
   return (
-    <div className="flex h-full gap-6 font-sans text-gray-900 relative">
+    <div className="flex h-[100dvh] gap-6 font-sans text-gray-900 relative">
       
       {/* -----------------------------
           LEFT COLUMN: INVENTORY
           ----------------------------- */}
-      <div className={`flex-1 flex flex-col bg-white md:rounded-lg shadow-sm border border-gray-200 overflow-hidden h-full w-full absolute inset-0 z-10 md:relative md:z-0 md:w-auto ${step > 0 ? 'hidden md:flex' : 'flex'}`}>
+      <div className={`flex-1 flex flex-col bg-white lg:rounded-lg shadow-sm border border-gray-200 overflow-hidden h-full w-full absolute inset-0 z-10 lg:relative lg:z-0 lg:w-auto ${step > 0 ? 'hidden lg:flex' : 'flex'}`}>
         
         {/* Header */}
         <div className="p-4 border-b border-gray-100 bg-white space-y-4">
@@ -384,7 +496,7 @@ export default function SaleForm({ onCancel, isLoading }) {
         </div>
 
         {/* Inventory Grid */}
-        <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-24 md:pb-4">
+        <div className="flex-1 overflow-y-auto p-4 bg-gray-50 pb-24 lg:pb-4">
           {saleType === "counter" ? (
              isMaterialsLoading ? (
                 <div className="flex items-center justify-center h-full text-gray-400 text-sm">Loading inventory...</div>
@@ -410,7 +522,7 @@ export default function SaleForm({ onCancel, isLoading }) {
                         {material.imageUrl ? <img src={material.imageUrl} alt="" className="w-full h-full object-cover" /> : <span>{material.name.substring(0, 2).toUpperCase()}</span>}
                         {material.quantity <= 0 && <div className="absolute inset-0 bg-white/80 flex items-center justify-center"><span className="bg-gray-100 border border-gray-200 text-gray-500 px-2 py-1 rounded text-[10px] font-bold uppercase tracking-wide">Out of Stock</span></div>}
                       
-                        {/* NEW: Optional Checkmark for Selected State */}
+                        {/* Optional Checkmark for Selected State */}
                           {isSelected && (
                             <div className="absolute top-2 right-2 bg-black text-white rounded-full p-1 shadow-sm">
                               <CheckCircle size={14} />
@@ -436,14 +548,12 @@ export default function SaleForm({ onCancel, isLoading }) {
                 </div>
              )
           ) : (
-            /* Booth UI omitted for brevity, same as before */
             <div className="flex flex-col items-center justify-center h-full">
                 <div className="bg-white p-6 rounded-lg border border-gray-200 w-full max-w-sm text-center shadow-sm">
                     <div className="w-12 h-12 bg-gray-100 rounded mx-auto mb-4 flex items-center justify-center text-black border border-gray-200">
                         <Package size={24} />
                     </div>
                     <h2 className="text-sm font-bold text-gray-900 uppercase tracking-wide mb-4">Booth Configuration</h2>
-                    {/* ... (Booth Selectors) ... */}
                     <div className="space-y-4 text-left">
                         <div>
                             <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Service Type</label>
@@ -472,7 +582,7 @@ export default function SaleForm({ onCancel, isLoading }) {
 
         {/* MOBILE FLOATING BAR */}
         {items.length > 0 && step === 0 && (
-            <div className="md:hidden absolute bottom-4 left-4 right-4 bg-black text-white p-4 rounded-xl shadow-2xl flex items-center justify-between animate-in slide-in-from-bottom-4 cursor-pointer" onClick={() => setStep(1)}>
+            <div className="lg:hidden absolute bottom-4 left-4 right-4 bg-black text-white p-4 rounded-xl shadow-2xl flex items-center justify-between animate-in slide-in-from-bottom-4 cursor-pointer" onClick={() => setStep(1)}>
                  <div className="flex items-center gap-3">
                      <div className="relative">
                          <ShoppingCart size={20} />
@@ -492,17 +602,17 @@ export default function SaleForm({ onCancel, isLoading }) {
           RIGHT COLUMN: CART & CHECKOUT
           ----------------------------- */}
       <div className={`
-         md:w-[400px] flex flex-col bg-white md:rounded-lg shadow-sm border border-gray-200 h-full overflow-hidden 
-         absolute inset-0 z-20 md:relative md:z-0
-         ${step === 0 ? 'hidden md:flex' : 'flex'}
+         lg:w-[400px] flex flex-col bg-white lg:rounded-lg shadow-sm border border-gray-200 h-full overflow-hidden 
+         absolute inset-0 z-20 lg:relative lg:z-0
+         ${step === 0 ? 'hidden lg:flex' : 'flex'}
       `}>
         
         {/* VIEW 1: CART */}
-        {(step === 1 || (step === 0 && window.innerWidth >= 768)) && (
+        {(step === 1 || (step === 0 && window.innerWidth >= 1024)) && (
           <>
             <div className="p-4 border-b border-gray-100 flex items-center justify-between bg-white h-[72px]">
                 <div className="flex items-center gap-2">
-                    <button onClick={() => setStep(0)} className="md:hidden p-1.5 -ml-1 hover:bg-gray-100 rounded text-gray-500">
+                    <button onClick={() => setStep(0)} className="lg:hidden p-1.5 -ml-1 hover:bg-gray-100 rounded text-gray-500">
                         <ArrowLeft size={20} />
                     </button>
                     <h2 className="font-bold text-lg text-gray-900">Cart</h2>
@@ -660,7 +770,7 @@ export default function SaleForm({ onCancel, isLoading }) {
                             )}
                         </div>
                         
-                        {(showDiscountInput || discount) && (
+                         {(showDiscountInput || discount) && (
                             <div className="flex items-center gap-2 animate-in fade-in slide-in-from-top-1">
                                 <div className="relative w-full">
                                     <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 font-bold text-sm">₵</span>
@@ -705,6 +815,115 @@ export default function SaleForm({ onCancel, isLoading }) {
             </>
         )}
       </div>
+
+      {/* -----------------------------
+          MOBILE CONFIG PULL-UP SHEET
+          ----------------------------- */}
+      {configItem && (
+        <div className="fixed inset-0 z-[60] flex flex-col justify-end bg-black/60 backdrop-blur-sm lg:hidden animate-in fade-in duration-200">
+          <div className="flex-1 w-full" onClick={() => setConfigItem(null)}></div>
+          
+          <div className="bg-white rounded-t-3xl w-full p-6 pb-8 animate-in slide-in-from-bottom-8 duration-300 shadow-2xl space-y-6">
+            <div className="flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-xl text-gray-900 leading-tight">{configItem.materialName}</h3>
+                <p className="text-gray-500 text-sm mt-1">Configure item before adding</p>
+              </div>
+              <button onClick={() => setConfigItem(null)} className="p-2 bg-gray-100 rounded-full text-gray-500 hover:bg-gray-200 transition-colors">
+                <X className="w-5 h-5"/>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Unit Selection */}
+              {configItem.availableUnits?.length > 0 && (
+                <div className="flex flex-col gap-2">
+                  <span className="font-medium text-gray-700 text-sm">Select Unit</span>
+                  <select 
+                    value={configItem.unitId || "base"}
+                    onChange={(e) => handleConfigUnitChange(e.target.value)}
+                    className="w-full p-3 border border-gray-200 rounded-xl bg-gray-50 focus:ring-2 focus:ring-black text-gray-900 font-medium outline-none"
+                  >
+                    <option value="base">{configItem.baseUnit} - ₵{configItem.basePrice.toFixed(2)}</option>
+                    {configItem.availableUnits.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} - ₵{Number(u.price).toFixed(2)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Quantity Selection */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="font-medium text-gray-700">Quantity</span>
+                  <span className="text-xs text-gray-500">
+                    Available: {(configItem.maxStock - getReservedStock(configItem.materialId, items)).toFixed(2)} {configItem.baseUnit}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 bg-gray-50 p-3 rounded-xl border border-gray-100">
+                  <button 
+                    onClick={() => handleConfigQtyChange(-1)} 
+                    className="p-2 bg-white rounded-lg shadow-sm text-gray-900 hover:bg-gray-100 border border-gray-200 disabled:opacity-50 transition-colors"
+                    disabled={!configItem.quantity || configItem.quantity <= (configItem.unitFactor || 1)}
+                  >
+                    <Minus className="w-4 h-4"/>
+                  </button>
+                  <input 
+                    type="number" 
+                    step="0.01" 
+                    placeholder="0"
+                    value={configItem.quantity === "" ? "" : configItem.quantity} 
+                    onChange={(e) => handleConfigQuantityChange(e.target.value)} 
+                    className="flex-1 text-center border border-gray-200 rounded-lg px-3 py-2 text-sm font-bold text-gray-900 focus:ring-2 focus:ring-black focus:border-transparent outline-none" 
+                  />
+                  <button 
+                    onClick={() => handleConfigQtyChange(1)} 
+                    className="p-2 bg-white rounded-lg shadow-sm text-gray-900 hover:bg-gray-100 border border-gray-200 transition-colors"
+                    disabled={!configItem.quantity}
+                  >
+                    <Plus className="w-4 h-4"/>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <div className="flex justify-between items-center mb-4 px-1">
+                <span className="text-gray-500 font-medium">Subtotal</span>
+                <span className="text-2xl font-bold text-gray-900">
+                  ₵{configItem.subtotal.toFixed(2)}
+                </span>
+              </div>
+              <Button 
+                onClick={handleConfirmConfig} 
+                disabled={!configItem.quantity || configItem.quantity <= 0}
+                className="w-full py-4 bg-gray-900 text-white rounded-xl text-lg font-bold shadow-lg hover:bg-black transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Add to Cart
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Receipt Modal */}
+      {showReceiptModal && receiptData && saleData && (
+        <Modal isOpen={showReceiptModal} onClose={handleCloseReceiptModal} title="Sale Receipt" size="md">
+          <div className="p-1">
+            <Receipt receipt={receiptData} sale={saleData} />
+          </div>
+          <div className="p-4 border-t border-gray-200 flex justify-end gap-3 bg-gray-50">
+            <button 
+              onClick={handleCloseReceiptModal}
+              className="px-6 py-2 bg-gray-900 text-white font-medium rounded-lg hover:bg-black transition-colors"
+            >
+              Done
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }

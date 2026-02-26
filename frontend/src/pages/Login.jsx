@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@stores/authStore";
+import { useResponsive } from "@hooks/useResponsive";
+import { RESPONSIVE_SPACING } from "@utils/responsiveHelpers";
 
 export default function Login() {
   const navigate = useNavigate();

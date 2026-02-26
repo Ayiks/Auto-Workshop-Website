@@ -128,16 +128,16 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' })
             <div className="bg-white rounded-2xl shadow-2xl overflow-hidden">
               {/* Header */}
               {title && (
-                <div className="px-6 py-4 border-b border-gray-200 bg-white">
-                  <div className="flex items-center justify-between">
-                    <h3 className="text-xl font-semibold text-gray-900">{title}</h3>
+                <div className="px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 bg-white">
+                  <div className="flex items-center justify-between gap-3">
+                    <h3 className="text-lg sm:text-xl text-gray-900">{title}</h3>
                     <button
                       onClick={onClose}
-                      className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                      className="p-1.5 sm:p-2 hover:bg-gray-100 rounded-lg transition-colors flex-shrink-0"
                       aria-label="Close"
                     >
                       <svg
-                        className="w-5 h-5 text-gray-500"
+                        className="w-4 h-4 sm:w-5 sm:h-5 text-gray-500"
                         fill="none"
                         stroke="currentColor"
                         viewBox="0 0 24 24"
@@ -155,7 +155,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' })
               )}
 
               {/* Body */}
-              <div className="max-h-[calc(100vh-200px)] overflow-y-auto p-6">
+              <div className="max-h-[calc(100vh-200px)] overflow-y-auto p-4 sm:p-6">
                 {children}
               </div>
             </div>

@@ -81,7 +81,7 @@ export default function GenerateInvoiceModal({ isOpen, onClose, onSubmit, isLoad
       title="Generate Invoice"
       size="large"
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {/* Job Selection */}
         <div>
           <Select
@@ -102,14 +102,14 @@ export default function GenerateInvoiceModal({ isOpen, onClose, onSubmit, isLoad
           />
 
           {loadingJobs && (
-            <div className="mt-2">
+            <div className="mt-1.5 sm:mt-2">
               <LoadingSpinner size="sm" text="Loading completed jobs..." />
             </div>
           )}
 
           {!loadingJobs && completedJobs.length === 0 && (
-            <div className="mt-2 p-3 bg-warning-50 border border-warning-200 rounded-lg">
-              <p className="text-sm text-warning-700">
+            <div className="mt-1.5 sm:mt-2 p-2.5 sm:p-3 bg-warning-50 border border-warning-200 rounded-lg">
+              <p className="text-xs sm:text-sm text-warning-700">
                 No completed jobs available for invoicing. Complete a job first.
               </p>
             </div>
@@ -118,11 +118,11 @@ export default function GenerateInvoiceModal({ isOpen, onClose, onSubmit, isLoad
 
         {/* Job Details Preview */}
         {selectedJob && (
-          <div className="bg-gray-50 rounded-lg p-4 space-y-4">
-            <h3 className="font-semibold text-gray-900">Job Details</h3>
+          <div className="bg-gray-50 rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4">
+            <h3 className="font-semibold text-sm sm:text-base text-gray-900">Job Details</h3>
 
             {/* Client Info */}
-            <div className="grid grid-cols-2 gap-4 text-sm">
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
               <div>
                 <span className="text-gray-600">Client:</span>
                 <p className="font-medium text-gray-900">{selectedJob.clientName}</p>
@@ -135,7 +135,7 @@ export default function GenerateInvoiceModal({ isOpen, onClose, onSubmit, isLoad
 
             {/* Vehicle Info */}
             {(selectedJob.vehicleMake || selectedJob.vehicleModel) && (
-              <div className="grid grid-cols-2 gap-4 text-sm">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
                 <div>
                   <span className="text-gray-600">Vehicle:</span>
                   <p className="font-medium text-gray-900">
@@ -152,7 +152,7 @@ export default function GenerateInvoiceModal({ isOpen, onClose, onSubmit, isLoad
             )}
 
             {/* Problem */}
-            <div className="text-sm">
+            <div className="text-xs sm:text-sm">
               <span className="text-gray-600">Problem:</span>
               <p className="font-medium text-gray-900 capitalize">{selectedJob.problemType.replace('_', ' ')}</p>
             </div>
@@ -160,14 +160,14 @@ export default function GenerateInvoiceModal({ isOpen, onClose, onSubmit, isLoad
             {/* Materials */}
             {selectedJob.materials && selectedJob.materials.length > 0 && (
               <div>
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">Materials</h4>
-                <div className="space-y-1">
+                <h4 className="text-xs sm:text-sm font-semibold text-gray-900 mb-1.5 sm:mb-2">Materials</h4>
+                <div className="space-y-0.5 sm:space-y-1">
                   {selectedJob.materials.map((material, index) => (
-                    <div key={index} className="flex justify-between text-sm">
+                    <div key={index} className="flex justify-between text-xs sm:text-sm">
                       <span className="text-gray-700">
                         {material.materialName} x {material.quantity}
                         {material.isExternal && (
-                          <span className="ml-2 text-xs text-warning-600">(External)</span>
+                          <span className="ml-2 text-[10px] sm:text-xs text-warning-600">(External)</span>
                         )}
                       </span>
                       <span className="font-medium text-gray-900">
@@ -180,16 +180,16 @@ export default function GenerateInvoiceModal({ isOpen, onClose, onSubmit, isLoad
             )}
 
             {/* Cost Breakdown */}
-            <div className="border-t pt-3 space-y-2">
-              <div className="flex justify-between text-sm">
+            <div className="border-t pt-2 sm:pt-3 space-y-1.5 sm:space-y-2">
+              <div className="flex justify-between text-xs sm:text-sm">
                 <span className="text-gray-600">Materials Cost:</span>
                 <span className="font-medium text-gray-900">GH₵{materialsCost.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-sm">
+              <div className="flex justify-between text-xs sm:text-sm">
                 <span className="text-gray-600">Labour Cost:</span>
                 <span className="font-medium text-gray-900">GH₵{labourCost.toFixed(2)}</span>
               </div>
-              <div className="flex justify-between text-lg font-bold border-t pt-2">
+              <div className="flex justify-between text-base sm:text-lg font-bold border-t pt-1.5 sm:pt-2">
                 <span className="text-gray-900">Total Invoice Amount:</span>
                 <span className="text-primary-700">GH₵{totalAmount.toFixed(2)}</span>
               </div>
@@ -197,14 +197,14 @@ export default function GenerateInvoiceModal({ isOpen, onClose, onSubmit, isLoad
 
             {/* Inventory Warning */}
             {selectedJob.materials?.some(m => !m.isExternal) && (
-              <div className="bg-primary-50 border border-primary-200 rounded-lg p-3">
+              <div className="bg-primary-50 border border-primary-200 rounded-lg p-2.5 sm:p-3">
                 <div className="flex items-start gap-2">
-                  <svg className="w-5 h-5 text-primary-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <svg className="w-4 sm:w-5 h-4 sm:h-5 text-primary-600 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
-                  <div className="text-sm">
+                  <div className="text-xs sm:text-sm">
                     <p className="font-medium text-primary-900">Inventory Deduction</p>
-                    <p className="text-primary-700 mt-1">
+                    <p className="text-primary-700 mt-0.5 sm:mt-1">
                       Generating this invoice will automatically deduct materials from inventory.
                     </p>
                   </div>
@@ -225,7 +225,7 @@ export default function GenerateInvoiceModal({ isOpen, onClose, onSubmit, isLoad
         />
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 border-t pt-4">
+        <div className="flex justify-end gap-2 sm:gap-3 border-t pt-3 sm:pt-4">
           <Button
             type="button"
             variant="secondary"

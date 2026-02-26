@@ -108,30 +108,30 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
     : 0;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
       {/* Current Stock Info */}
-      <div className="bg-gray-50 rounded-xl p-5">
-        <div className="grid grid-cols-2 gap-4">
+      <div className="bg-gray-50 rounded-xl p-3 sm:p-5">
+        <div className="grid grid-cols-2 gap-3 sm:gap-4">
           <div>
-            <p className="text-sm text-gray-600">Current Stock ({material.baseUnit})</p>
-            <p className="text-2xl font-bold text-gray-900">{currentStock}</p>
+            <p className="text-xs sm:text-sm text-gray-600">Current Stock ({material.baseUnit})</p>
+            <p className="text-xl sm:text-2xl font-bold text-gray-900">{currentStock}</p>
           </div>
           <div>
-            <p className="text-sm text-gray-600">Threshold</p>
-            <p className="text-2xl font-bold text-red-600">{material.lowStockThreshold || 0}</p>
+            <p className="text-xs sm:text-sm text-gray-600">Threshold</p>
+            <p className="text-xl sm:text-2xl font-bold text-red-600">{material.lowStockThreshold || 0}</p>
           </div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4 md:gap-4">
         {/* Unit Selector */}
-        <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-900 mb-2">Unit of Measure</label>
+        <div className="sm:col-span-2 md:col-span-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-900 mb-1.5 sm:mb-2">Unit of Measure</label>
             <select
                 name="unitId"
                 value={formData.unitId}
                 onChange={handleUnitChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white"
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 bg-white text-xs sm:text-sm"
                 disabled={isLoading}
             >
                 {unitOptions.map(u => (
@@ -144,7 +144,7 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
 
         {/* Quantity */}
         <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">Quantity</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-900 mb-1.5 sm:mb-2">Quantity</label>
             <input
             type="number"
             step="0.01"
@@ -152,21 +152,21 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
             value={formData.quantityOrdered}
             onChange={handleChange}
             placeholder="0.00"
-            className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+            className={`w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm ${
                 errors.quantityOrdered ? 'border-red-500' : 'border-gray-300'
             }`}
             disabled={isLoading}
             />
-             {errors.quantityOrdered && <p className="text-xs text-red-600 mt-1">{errors.quantityOrdered}</p>}
+             {errors.quantityOrdered && <p className="text-xs text-red-600 mt-0.5 sm:mt-1">{errors.quantityOrdered}</p>}
         </div>
 
         {/* Unit Cost */}
         <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-900 mb-1.5 sm:mb-2">
                 Cost Per {selectedUnit.name}
             </label>
             <div className="relative">
-            <span className="absolute left-3 top-3 text-gray-500">GH₵</span>
+            <span className="absolute left-3 top-2.5 sm:top-3 text-gray-500 text-xs sm:text-sm">GH₵</span>
             <input
                 type="number"
                 name="unitCost"
@@ -174,7 +174,7 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
                 onChange={handleChange}
                 placeholder="0.00"
                 step="0.01"
-                className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
+                className={`w-full pl-8 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm ${
                 errors.unitCost ? 'border-red-500' : 'border-gray-300'
                 }`}
                 disabled={isLoading}
@@ -185,14 +185,14 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
 
       {/* Preview Section */}
       {Number(formData.quantityOrdered) > 0 && (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm">
-            <div className="flex justify-between items-center mb-2">
+        <div className="bg-green-50 border border-green-200 rounded-xl p-3 sm:p-4 text-xs sm:text-sm">
+            <div className="flex justify-between items-center mb-1.5 sm:mb-2">
                 <span className="text-green-800 font-medium">Conversion Preview:</span>
-                <span className="text-green-800 font-bold bg-green-100 px-2 py-1 rounded">
+                <span className="text-green-800 font-bold bg-green-100 px-2 py-0.5 sm:py-1 rounded text-xs sm:text-sm">
                    + {addedStockInBase} {material.baseUnit}
                 </span>
             </div>
-            <p className="text-green-700 text-xs">
+            <p className="text-green-700 text-[10px] sm:text-xs">
                 Buying <strong>{formData.quantityOrdered} {selectedUnit.name}</strong> will increase your base stock to <strong>{newStockLevel} {material.baseUnit}</strong>.
             </p>
         </div>
@@ -200,36 +200,36 @@ export default function ReorderModal({ material, onReorder, onClose, isLoading }
 
       {/* Total Cost Display */}
       {totalCost > 0 && (
-        <div className="flex justify-between items-center bg-blue-50 p-4 rounded-xl border border-blue-100">
+        <div className="flex justify-between items-center bg-blue-50 p-3 sm:p-4 rounded-xl border border-blue-100">
              <div>
-                <p className="text-sm text-blue-900">Total Purchase Cost</p>
-                <p className="text-xl font-bold text-blue-700">GH₵{totalCost.toFixed(2)}</p>
+                <p className="text-xs sm:text-sm text-blue-900">Total Purchase Cost</p>
+                <p className="text-lg sm:text-xl font-bold text-blue-700">GH₵{totalCost.toFixed(2)}</p>
              </div>
              <div className="text-right">
-                <p className="text-xs text-blue-600">Unit Cost (Base): GH₵{baseUnitCostCalc}</p>
+                <p className="text-[10px] sm:text-xs text-blue-600">Unit Cost (Base): GH₵{baseUnitCostCalc}</p>
              </div>
         </div>
       )}
 
       {/* Notes */}
       <div>
-        <label className="block text-sm font-medium text-gray-900 mb-2">Notes</label>
+        <label className="block text-xs sm:text-sm font-medium text-gray-900 mb-1.5 sm:mb-2">Notes</label>
         <textarea
           name="notes"
           value={formData.notes}
           onChange={handleChange}
           rows={2}
-          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+          className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm"
           placeholder="Invoice # or supplier notes..."
           disabled={isLoading}
         />
       </div>
 
-      <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+      <div className="flex justify-end gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-gray-200">
         <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>
           Cancel
         </Button>
-        <Button type="submit" variant="primary" loading={isLoading} className="px-8">
+        <Button type="submit" variant="primary" loading={isLoading} className="px-6 sm:px-8">
           Confirm Restock
         </Button>
       </div>

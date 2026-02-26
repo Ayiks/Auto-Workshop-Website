@@ -158,6 +158,7 @@ import ProtectedRoute from '@components/common/ProtectedRoute';
 
 // Pages
 import LandingPage from '@pages/LandingPage';
+import Register from '@pages/Signup';
 import Login from '@pages/Login';
 import Dashboard from '@pages/Dashboard';
 import Materials from '@pages/Materials';
@@ -209,6 +210,8 @@ function App() {
           <Route path="/" element={<LandingPage />} />
 
           <Route path="/login" element={<Login />} />
+
+          <Route path="/signup" element={<Register />} />
 
           {/* Protected Routes */}
           <Route

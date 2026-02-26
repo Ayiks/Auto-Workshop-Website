@@ -92,17 +92,17 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
 
   // Helper class for inputs to avoid repetition
   const inputClass = (hasError) => `
-    w-full px-3 py-2 border rounded-md shadow-sm text-sm transition-colors
+    w-full px-2 sm:px-3 py-1.5 sm:py-2 border rounded-md shadow-sm text-xs sm:text-sm transition-colors
     focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500
     disabled:bg-gray-100 disabled:text-gray-500
     ${hasError ? 'border-red-300 bg-red-50 text-red-900 focus:ring-red-200' : 'border-gray-300 text-gray-900'}
   `;
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
       {/* Username */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
           Username <span className="text-red-500">*</span>
         </label>
         <input
@@ -114,14 +114,14 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
           className={inputClass(errors.username)}
           placeholder="e.g. john.doe"
         />
-        {errors.username && <p className="mt-1 text-xs text-red-600">{errors.username}</p>}
+        {errors.username && <p className="mt-0.5 sm:mt-1 text-xs text-red-600">{errors.username}</p>}
       </div>
 
       {/* Password Fields (New User Only) */}
       {!user && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
               Password <span className="text-red-500">*</span>
             </label>
             <input
@@ -132,10 +132,10 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
               disabled={isLoading}
               className={inputClass(errors.password)}
             />
-            {errors.password && <p className="mt-1 text-xs text-red-600">{errors.password}</p>}
+            {errors.password && <p className="mt-0.5 sm:mt-1 text-xs text-red-600">{errors.password}</p>}
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
               Confirm Password <span className="text-red-500">*</span>
             </label>
             <input
@@ -146,14 +146,14 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
               disabled={isLoading}
               className={inputClass(errors.confirmPassword)}
             />
-            {errors.confirmPassword && <p className="mt-1 text-xs text-red-600">{errors.confirmPassword}</p>}
+            {errors.confirmPassword && <p className="mt-0.5 sm:mt-1 text-xs text-red-600">{errors.confirmPassword}</p>}
           </div>
         </div>
       )}
 
       {/* Full Name */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">Full Name</label>
         <input
           type="text"
           name="fullName"
@@ -165,9 +165,9 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
       </div>
 
       {/* Contact Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">Email</label>
           <input
             type="email"
             name="email"
@@ -176,10 +176,10 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
             disabled={isLoading}
             className={inputClass(errors.email)}
           />
-          {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
+          {errors.email && <p className="mt-0.5 sm:mt-1 text-xs text-red-600">{errors.email}</p>}
         </div>
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">Phone</label>
           <input
             type="tel"
             name="phone"

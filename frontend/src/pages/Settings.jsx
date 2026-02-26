@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { useAuthStore } from '@stores/authStore';
+import { useResponsive } from '@hooks/useResponsive';
+import { RESPONSIVE_SPACING } from '@utils/responsiveHelpers';
 import Card from '@components/common/Card';
 import BusinessSettings from '@components/features/settings/BusinessSettings';
 import ProfileSettings from '@components/features/settings/ProfileSettings';

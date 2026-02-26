@@ -69,3 +69,23 @@
            bg-gray-50 text-gray-600 transition-all hover:bg-primary-50 hover:text-primary-700 hover:border-primary-100;
   }
 }
+
+html, body {
+  overscroll-behavior: none; /* Stops pull-to-refresh and vertical bouncing */
+  width: 100%;
+  /* overflow-x: hidden; Prevent horizontal overflow on touchscreen */
+  -webkit-user-select: none; /* Prevent text selection on long press (mobile) */
+  user-select: none;
+  -webkit-touch-callout: none; /* Prevent callout menu on long press */
+}
+
+* {
+  -webkit-touch-callout: none;
+}
+
+/* Allow text selection on inputs and textareas */
+input, textarea, [contenteditable="true"] {
+  -webkit-user-select: text;
+  user-select: text;
+  -webkit-touch-callout: default;
+}

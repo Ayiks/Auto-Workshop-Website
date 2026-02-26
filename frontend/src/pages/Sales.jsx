@@ -15,6 +15,8 @@ import EditSaleModal from "@components/features/sales/EditSaleModal";
 import DeleteSaleModal from "@components/features/sales/DeleteSaleModal";
 import Receipt from "@components/features/sales/Receipt";
 import TopUpModal from "@components/features/sales/TopUpModal";
+import { useResponsive } from "@hooks/useResponsive";
+import { RESPONSIVE_SPACING } from "@utils/responsiveHelpers";
 
 export default function Sales() {
   const navigate = useNavigate(); // Hook for navigation
@@ -292,18 +294,18 @@ export default function Sales() {
   return (
     <div className="min-h-screen bg-gray-50/50">
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur-md">
-        <div className="px-6 py-4 max-w-7xl mx-auto">
-          <div className="flex items-center justify-between">
+        <div className={`container mx-auto ${RESPONSIVE_SPACING.container}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0">
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Commerce</h1>
-              <p className="text-sm text-gray-500 mt-0.5">Overview of sales transactions</p>
+              <h1 className={`${RESPONSIVE_SPACING.heading} text-gray-900 tracking-tight`}>Commerce</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">Overview of sales transactions</p>
             </div>
             {hasPermission("sales", "create") && (
               <Button
                 variant="primary"
                 onClick={() => navigate('new')} 
                 icon={<svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>}
-                className="bg-gray-900 hover:bg-black text-white shadow-sm border border-transparent transition-all"
+                className="bg-gray-900 hover:bg-black text-white shadow-sm border border-transparent transition-all w-full sm:w-auto"
               >
                 New Sale
               </Button>
@@ -312,53 +314,55 @@ export default function Sales() {
         </div>
       </div>
 
-      <div className={`px-6 py-8 max-w-7xl mx-auto ${showReceiptModal || showEditModal || showDeleteModal || showTopUpModal ? "blur-sm opacity-50 pointer-events-none" : ""}`}>
+      <div className={`container mx-auto ${RESPONSIVE_SPACING.container} ${RESPONSIVE_SPACING.section} ${showReceiptModal || showEditModal || showDeleteModal || showTopUpModal ? "blur-sm opacity-50 pointer-events-none" : ""}`}>
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-6 sm:mb-8">
+          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <div><p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Sales</p><p className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">{stats.totalSales}</p></div>
-              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg></div>
+              <div><p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Sales</p><p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tracking-tight">{stats.totalSales}</p></div>
+              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600"><svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg></div>
             </div>
           </Card>
-          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-5">
+          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <div><p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Revenue</p><p className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">GH₵{parseFloat(stats.totalRevenue).toFixed(2)}</p></div>
-              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
+              <div><p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Revenue</p><p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tracking-tight">GH₵{parseFloat(stats.totalRevenue).toFixed(2)}</p></div>
+              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600"><svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg></div>
             </div>
           </Card>
-          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-5">
+          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <div><p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cash Sales</p><p className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">{stats.cashCount}</p></div>
-              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg></div>
+              <div><p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Cash Sales</p><p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tracking-tight">{stats.cashCount}</p></div>
+              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600"><svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" /></svg></div>
             </div>
           </Card>
-          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-5">
+          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <div><p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Digital (MoMo)</p><p className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">{stats.momoCount}</p></div>
-              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg></div>
+              <div><p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Digital (MoMo)</p><p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tracking-tight">{stats.momoCount}</p></div>
+              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600"><svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg></div>
             </div>
           </Card>
         </div>
 
         {/* Filters & Content */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-gray-100">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-              <div className="flex flex-col md:flex-row items-start md:items-center gap-3 w-full">
-                <div className="flex items-center gap-2 w-full md:w-auto">
-                    <div className="relative w-full md:w-auto"><label className="text-[10px] uppercase text-gray-400 font-semibold absolute -top-1.5 left-2 bg-white px-1">From</label><input type="date" value={dateRange.from} onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))} className="pl-3 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 bg-gray-50 focus:bg-white w-full" /></div>
-                    <span className="text-gray-400">-</span>
-                    <div className="relative w-full md:w-auto"><label className="text-[10px] uppercase text-gray-400 font-semibold absolute -top-1.5 left-2 bg-white px-1">To</label><input type="date" value={dateRange.to} onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))} className="pl-3 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 bg-gray-50 focus:bg-white w-full" /></div>
+          <div className="p-4 sm:p-5 border-b border-gray-100">
+            <div className="flex flex-col gap-4 md:gap-0">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 w-full">
+                <div className="flex flex-col md:flex-row items-start md:items-center gap-2 md:gap-3 w-full">
+                    <div className="flex items-center gap-1.5 w-full md:w-auto flex-col sm:flex-row">
+                        <div className="relative w-full sm:w-auto"><label className="text-[10px] uppercase text-gray-400 font-semibold absolute -top-1.5 left-2 bg-white px-1">From</label><input type="date" value={dateRange.from} onChange={(e) => setDateRange(prev => ({ ...prev, from: e.target.value }))} className="pl-3 pr-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 bg-gray-50 focus:bg-white w-full" /></div>
+                        <span className="text-gray-400 hidden sm:inline">-</span>
+                        <div className="relative w-full sm:w-auto"><label className="text-[10px] uppercase text-gray-400 font-semibold absolute -top-1.5 left-2 bg-white px-1">To</label><input type="date" value={dateRange.to} onChange={(e) => setDateRange(prev => ({ ...prev, to: e.target.value }))} className="pl-3 pr-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 bg-gray-50 focus:bg-white w-full" /></div>
+                    </div>
+                    <div className="flex w-full md:w-auto gap-2 sm:gap-3">
+                        <select value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)} className="px-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white w-full sm:w-auto flex-1 md:flex-initial"><option value="">All Status</option><option value="paid">Paid</option><option value="partially">Partial</option></select>
+                        <select value={paymentMethodFilter} onChange={(e) => setPaymentMethodFilter(e.target.value)} className="px-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white w-full sm:w-auto flex-1 md:flex-initial"><option value="">All Methods</option><option value="cash">Cash</option><option value="momo">Mobile Money</option><option value="cheque">Cheque</option></select>
+                    </div>
                 </div>
-                <div className="flex w-full md:w-auto gap-3">
-                    <select value={paymentStatusFilter} onChange={(e) => setPaymentStatusFilter(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white w-full sm:w-auto"><option value="">All Status</option><option value="paid">Paid</option><option value="partially">Partial</option></select>
-                    <select value={paymentMethodFilter} onChange={(e) => setPaymentMethodFilter(e.target.value)} className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white w-full sm:w-auto"><option value="">All Methods</option><option value="cash">Cash</option><option value="momo">Mobile Money</option><option value="cheque">Cheque</option></select>
-                </div>
-                {(dateRange.from || dateRange.to || paymentMethodFilter || paymentStatusFilter) && (
-                  <Button variant="ghost" size="sm" onClick={handleResetFilters} className="text-gray-500 hover:text-gray-900">Clear Filters</Button>
-                )}
               </div>
+              {(dateRange.from || dateRange.to || paymentMethodFilter || paymentStatusFilter) && (
+                <Button variant="ghost" size="sm" onClick={handleResetFilters} className="text-gray-500 hover:text-gray-900 w-full md:w-auto md:ml-auto">Clear Filters</Button>
+              )}
             </div>
           </div>
 
@@ -393,7 +397,7 @@ export default function Sales() {
 
            {/* PAGINATION */}
             {!isLoading && totalItems > 0 && (
-              <div className="flex flex-col md:flex-row items-center justify-between p-4 border-t border-gray-100">
+              <div className="flex flex-col sm:flex-row items-center justify-between p-3 sm:p-4 border-t border-gray-100 gap-3 sm:gap-0">
                 <div className="flex justify-between w-full md:hidden">
                   <Button variant="secondary" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page === 1}>Previous</Button>
                   <span className="text-xs text-gray-500 font-medium self-center">Page {page} of {totalPages}</span>

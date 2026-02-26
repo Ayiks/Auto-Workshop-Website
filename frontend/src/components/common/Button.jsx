@@ -23,11 +23,11 @@ export default function Button  ({
     ghost: "bg-transparent text-slate-500 hover:bg-slate-100",
   };
 
-  // 3. Size scales
+  // 3. Size scales - responsive padding
   const sizes = {
-    sm: "px-3 py-1.5 text-xs",
-    md: "px-5 py-2.5 text-sm",
-    lg: "px-8 py-4 text-base",
+    sm: "px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs",
+    md: "px-4 sm:px-5 py-2 sm:py-2.5 text-xs sm:text-sm",
+    lg: "px-6 sm:px-8 py-3 sm:py-4 text-sm sm:text-base",
   };
 
   return (

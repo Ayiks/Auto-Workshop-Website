@@ -2,6 +2,8 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { jobsApi } from '@api/jobs';
 import { useAuthStore } from '@stores/authStore';
+import { useResponsive } from '@hooks/useResponsive';
+import { RESPONSIVE_SPACING } from '@utils/responsiveHelpers';
 import Button from '@components/common/Button';
 import Card from '@components/common/Card';
 import Table from '@components/common/Table';
@@ -39,6 +41,7 @@ const INVOICE_LABELS = {
 export default function Jobs() {
   const queryClient = useQueryClient();
   const { user } = useAuthStore();
+  const { isMobile } = useResponsive();
 
   const [statusFilter, setStatusFilter] = useState('all');
   const [invoiceFilter, setInvoiceFilter] = useState('all');
@@ -279,13 +282,13 @@ export default function Jobs() {
 
   // --- Strict Monochrome Stat Card ---
   const StatCard = ({ label, value, icon }) => (
-    <div className="bg-white p-6 rounded-lg border border-gray-200 shadow-sm flex items-center justify-between hover:border-gray-300 transition-colors">
+    <div className="bg-white p-4 sm:p-5 md:p-6 rounded-lg border border-gray-200 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 hover:border-gray-300 transition-colors">
       <div>
-        <p className="text-sm font-medium text-gray-500">{label}</p>
-        <p className="text-2xl font-bold text-gray-900 mt-1">{value || 0}</p>
+        <p className="text-xs sm:text-sm font-medium text-gray-500 uppercase">{label}</p>
+        <p className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 mt-1">{value || 0}</p>
       </div>
-      <div className="p-3 rounded-md bg-gray-50 border border-gray-100">
-        <div className="w-5 h-5 text-gray-900">{icon}</div>
+      <div className="p-2 sm:p-3 rounded-md bg-gray-50 border border-gray-100 flex-shrink-0">
+        <div className="w-4 sm:w-5 h-4 sm:h-5 text-gray-900">{icon}</div>
       </div>
     </div>
   );
@@ -297,11 +300,11 @@ export default function Jobs() {
       
       {/* Header - Simple Black/White */}
       <div className="sticky top-0 z-20 bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-5">
+        <div className={`max-w-7xl mx-auto ${RESPONSIVE_SPACING.container}`}>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 sm:gap-0 py-4 sm:py-5">
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 tracking-tight">Jobs</h1>
-              <p className="text-sm text-gray-500 mt-1">
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight">Jobs</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-1">
                 {userJobType 
                   ? `${userJobType.charAt(0).toUpperCase() + userJobType.slice(1)} Department` 
                   : 'Overview of all workshop jobs'}
@@ -311,7 +314,7 @@ export default function Jobs() {
             {/* Primary Button - Strict Black */}
             <Button 
               onClick={() => setShowCreateModal(true)} 
-              className="bg-gray-900 hover:bg-black text-white shadow-none border-transparent rounded-lg"
+              className="bg-gray-900 hover:bg-black text-white shadow-none border-transparent rounded-lg w-full sm:w-auto"
               icon={
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -324,10 +327,10 @@ export default function Jobs() {
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 space-y-8">
+      <div className={`max-w-7xl mx-auto ${RESPONSIVE_SPACING.section} space-y-8`}>
         
         {/* Statistics Grid - Monochrome Icons */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 md:gap-8">
           <StatCard 
             label="Total Jobs" 
             value={stats.totalJobs} 
@@ -353,10 +356,10 @@ export default function Jobs() {
         {/* Filters & Content Area */}
         <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
           {/* Controls Bar - Gray Background */}
-          <div className="p-4 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row gap-4 justify-between items-center">
+          <div className="p-4 sm:p-5 md:p-6 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row gap-3 sm:gap-4 md:gap-6 justify-between items-stretch md:items-center">
             
             {/* Search - Focus Black */}
-            <div className="relative w-full md:w-96">
+            <div className="relative flex-1 md:flex-none md:w-96">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
                 <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -364,7 +367,7 @@ export default function Jobs() {
               </div>
               <input
                 type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-black focus:border-black sm:text-sm transition duration-150 ease-in-out"
+                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-black focus:border-black text-xs sm:text-sm transition duration-150 ease-in-out"
                 placeholder="Search..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -372,11 +375,11 @@ export default function Jobs() {
             </div>
 
             {/* Dropdowns - Focus Black */}
-            <div className="flex gap-2 w-full md:w-auto">
+            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value)}
-                className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-black focus:border-black sm:text-sm rounded-md"
+                className="block flex-1 sm:flex-none pl-3 pr-10 py-2 text-xs sm:text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-black focus:border-black rounded-md"
               >
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
@@ -387,7 +390,7 @@ export default function Jobs() {
               <select
                 value={invoiceFilter}
                 onChange={(e) => setInvoiceFilter(e.target.value)}
-                className="block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-black focus:border-black sm:text-sm rounded-md"
+                className="block flex-1 sm:flex-none pl-3 pr-10 py-2 text-xs sm:text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-black focus:border-black rounded-md"
               >
                 <option value="all">All Invoices</option>
                 <option value="not_invoiced">No Invoice</option>

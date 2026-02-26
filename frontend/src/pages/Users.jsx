@@ -3,6 +3,8 @@ import { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '@api/users';
 import { useAuthStore } from '@stores/authStore';
+import { useResponsive } from '@hooks/useResponsive';
+import { RESPONSIVE_SPACING } from '@utils/responsiveHelpers';
 import Modal from '@components/common/Modal';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import EmptyState from '@components/common/EmptyState';

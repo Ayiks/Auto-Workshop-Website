@@ -61,33 +61,33 @@ export default function BusinessSettings() {
 
   return (
     <Card className="bg-white border border-gray-200 shadow-sm overflow-hidden">
-      <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
+      <div className="px-4 sm:px-6 py-4 sm:py-5 border-b border-gray-100 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4 bg-gray-50/50">
         <div>
-          <h2 className="text-base font-bold text-gray-900">Organization Profile</h2>
+          <h2 className="text-sm sm:text-base text-gray-900">Organization Profile</h2>
           <p className="text-xs text-gray-500 mt-0.5">Details used for billing and documentation</p>
         </div>
         {!isEditing ? (
           <Button variant="outline" size="sm" onClick={() => setIsEditing(true)}>Edit Details</Button>
         ) : (
-          <div className="flex gap-2">
-            <Button variant="secondary" size="sm" onClick={handleCancel}>Cancel</Button>
-            <Button variant="primary" size="sm" onClick={handleSave} loading={updateMutation.isPending} className="bg-gray-900 hover:bg-black text-white">Save Changes</Button>
+          <div className="flex gap-2 w-full sm:w-auto">
+            <Button variant="secondary" size="sm" onClick={handleCancel} className="flex-1 sm:flex-none">Cancel</Button>
+            <Button variant="primary" size="sm" onClick={handleSave} loading={updateMutation.isPending} className="flex-1 sm:flex-none bg-gray-900 hover:bg-black text-white">Save Changes</Button>
           </div>
         )}
       </div>
 
-      <div className="p-6 space-y-6">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
         {/* Name */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-          <label className="block text-sm font-medium text-gray-700 md:mt-2">Business Name</label>
-          <div className="md:col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-start">
+          <label className="block text-xs sm:text-sm text-gray-700 sm:mt-2">Business Name</label>
+          <div className="sm:col-span-2">
             <input
               type="text"
               name="name"
               value={isEditing ? formData.name : settings?.name || ''}
               onChange={handleChange}
               disabled={!isEditing}
-              className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
+              className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
               placeholder="e.g. Acme Corp"
             />
           </div>
@@ -96,9 +96,9 @@ export default function BusinessSettings() {
         <hr className="border-gray-100" />
 
         {/* Contact Info */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-          <label className="block text-sm font-medium text-gray-700 md:mt-2">Contact Details</label>
-          <div className="md:col-span-2 space-y-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-start">
+          <label className="block text-xs sm:text-sm text-gray-700 sm:mt-2">Contact Details</label>
+          <div className="sm:col-span-2 space-y-3 sm:space-y-4">
             <div>
                 <label className="block text-xs text-gray-500 mb-1">Email Address</label>
                 <input
@@ -107,7 +107,7 @@ export default function BusinessSettings() {
                 value={isEditing ? formData.email : settings?.email || ''}
                 onChange={handleChange}
                 disabled={!isEditing}
-                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
+                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
                 />
             </div>
             <div>
@@ -118,7 +118,7 @@ export default function BusinessSettings() {
                 value={isEditing ? formData.phone : settings?.phone || ''}
                 onChange={handleChange}
                 disabled={!isEditing}
-                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
+                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
                 />
             </div>
             <div>
@@ -129,7 +129,7 @@ export default function BusinessSettings() {
                 value={isEditing ? formData.website : settings?.website || ''}
                 onChange={handleChange}
                 disabled={!isEditing}
-                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
+                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
                 />
             </div>
           </div>
@@ -138,16 +138,16 @@ export default function BusinessSettings() {
         <hr className="border-gray-100" />
 
         {/* Address */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start">
-          <label className="block text-sm font-medium text-gray-700 md:mt-2">Physical Address</label>
-          <div className="md:col-span-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-start">
+          <label className="block text-xs sm:text-sm text-gray-700 sm:mt-2">Physical Address</label>
+          <div className="sm:col-span-2">
             <textarea
               name="address"
               rows={3}
               value={isEditing ? formData.address : settings?.address || ''}
               onChange={handleChange}
               disabled={!isEditing}
-                        className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
+                        className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
             />
           </div>
         </div>

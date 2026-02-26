@@ -101,12 +101,12 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50 sticky top-0 z-10">
             <tr>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase">Material</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-32">Unit</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-24">Qty</th>
-              <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase w-28">Cost</th>
-              <th className="px-3 py-3 text-right text-xs font-medium text-gray-500 uppercase">Total</th>
-              <th className="px-3 py-3"></th>
+              <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Material</th>
+              <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase w-24 sm:w-32">Unit</th>
+              <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase w-16 sm:w-24">Qty</th>
+              <th className="px-2 sm:px-3 py-2 sm:py-3 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase w-20 sm:w-28">Cost</th>
+              <th className="px-2 sm:px-3 py-2 sm:py-3 text-right text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Total</th>
+              <th className="px-2 sm:px-3 py-2 sm:py-3"></th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
@@ -117,17 +117,17 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
 
               return (
                 <tr key={item.id}>
-                  <td className="px-3 py-4 text-sm font-medium text-gray-900">
+                  <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-xs sm:text-sm font-medium text-gray-900">
                     <div>{item.name}</div>
-                    <div className="text-xs text-gray-400">Stock: {item.currentStock} {item.baseUnit}</div>
+                    <div className="text-[10px] sm:text-xs text-gray-400">Stock: {item.currentStock} {item.baseUnit}</div>
                   </td>
                   
                   {/* Unit Selector */}
-                  <td className="px-3 py-2">
+                  <td className="px-2 sm:px-3 py-1 sm:py-1.5">
                     <select
                         value={item.unitId}
                         onChange={(e) => handleItemChange(item.id, 'unitId', e.target.value)}
-                        className="w-full text-sm border-gray-300 rounded focus:ring-blue-500 py-1"
+                        className="w-full text-xs sm:text-sm border-gray-300 rounded focus:ring-blue-500 py-0.5 sm:py-1"
                     >
                         {item.options.map(opt => (
                             <option key={opt.id} value={opt.id}>
@@ -138,37 +138,37 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
                   </td>
 
                   {/* Quantity */}
-                  <td className="px-3 py-2">
+                  <td className="px-2 sm:px-3 py-1 sm:py-1.5">
                     <input
                       type="number"
                       step="0.01"
                       placeholder="0"
                       value={item.quantityOrdered}
                       onChange={(e) => handleItemChange(item.id, 'quantityOrdered', e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 text-sm"
+                      className="w-full px-1.5 sm:px-2 py-0.5 sm:py-1 border border-gray-300 rounded focus:ring-blue-500 text-xs sm:text-sm"
                       required
                     />
                   </td>
                   
                   {/* Cost */}
-                  <td className="px-3 py-2">
+                  <td className="px-2 sm:px-3 py-1 sm:py-1.5">
                     <input
                       type="number"
                       min="0"
                       step="0.01"
                       value={item.unitCost}
                       onChange={(e) => handleItemChange(item.id, 'unitCost', e.target.value)}
-                      className="w-full px-2 py-1 border border-gray-300 rounded focus:ring-blue-500 text-sm"
+                      className="w-full px-1.5 sm:px-2 py-0.5 sm:py-1 border border-gray-300 rounded focus:ring-blue-500 text-xs sm:text-sm"
                     />
                   </td>
 
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
+                  <td className="px-2 sm:px-3 py-1.5 sm:py-2 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right">
                     {rowTotal.toFixed(2)}
                   </td>
                   
-                  <td className="px-3 py-4 text-right">
+                  <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-right">
                     <button type="button" onClick={() => removeRow(item.id)} className="text-gray-400 hover:text-red-500">
-                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
                     </button>
@@ -180,18 +180,18 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
         </table>
       </div>
 
-      <div className="border-t border-gray-200 pt-4 mt-4 bg-gray-50 -mx-1 px-4 py-4 rounded-b-lg">
-        <div className="flex justify-between items-center mb-4">
-          <span className="text-sm font-medium text-gray-700">Items: {orderItems.length}</span>
+      <div className="border-t border-gray-200 pt-3 sm:pt-4 mt-3 sm:mt-4 bg-gray-50 -mx-1 px-3 sm:px-4 py-3 sm:py-4 rounded-b-lg">
+        <div className="flex justify-between items-center mb-3 sm:mb-4">
+          <span className="text-xs sm:text-sm font-medium text-gray-700">Items: {orderItems.length}</span>
           <div className="text-right">
-            <span className="text-sm text-gray-600 mr-2">Est. Total Cost:</span>
-            <span className="text-xl font-bold text-gray-900">GH₵{calculateTotal().toFixed(2)}</span>
+            <span className="text-xs sm:text-sm text-gray-600 mr-2">Est. Total Cost:</span>
+            <span className="text-lg sm:text-xl font-bold text-gray-900">GH₵{calculateTotal().toFixed(2)}</span>
           </div>
         </div>
         
-        <div className="flex justify-end gap-3">
+        <div className="flex justify-end gap-2 sm:gap-3">
           <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>Cancel</Button>
-          <Button type="submit" variant="primary" loading={isLoading} className="px-8">Confirm Bulk Reorder</Button>
+          <Button type="submit" variant="primary" loading={isLoading} className="px-5 sm:px-8">Confirm Bulk Reorder</Button>
         </div>
       </div>
     </form>

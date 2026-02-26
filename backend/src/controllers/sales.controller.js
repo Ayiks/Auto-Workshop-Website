@@ -17,7 +17,6 @@ const generateReceiptNumber = () => {
 // @route   POST /api/sales
 // @access  Private
 export const createSale = asyncHandler(async (req, res) => {
-  // ... (Extract Data section remains the same) ...
   const { 
     items, paymentMethod, saleDate: userProvidedDate, customerId,
     customerName, paymentStatus, amountPaid, discount 
@@ -75,7 +74,6 @@ export const createSale = asyncHandler(async (req, res) => {
       }
 
       // --- NEW: CHECK TOTAL RESERVED STOCK ---
-      // Get what we have already "promised" to deduct in previous iterations of this loop
       const previouslyReserved = stockReservations[material.id] || 0;
       const totalNeeded = previouslyReserved + quantityToDeduct;
 
@@ -87,7 +85,6 @@ export const createSale = asyncHandler(async (req, res) => {
         );
       }
 
-      // Update the reservation tracker
       stockReservations[material.id] = totalNeeded;
       // ---------------------------------------
 
@@ -107,7 +104,6 @@ export const createSale = asyncHandler(async (req, res) => {
       calculatedSubtotal += subtotal;
 
     } else if (item.itemType === 'booth') {
-       // ... (Booth logic remains the same) ...
        const service = await req.db.service.findUnique({
         where: { type: 'booth', isActive: true, id: parseInt(item.serviceId) },
       });
@@ -125,9 +121,6 @@ export const createSale = asyncHandler(async (req, res) => {
     }
   }
 
-  // ... (Rest of the function: Discount, Transaction, Receipt, Audit remains exactly the same) ...
-  // ... Copy the rest of your original function from "// 2. APPLY DISCOUNT" downwards ...
-  
   const finalDiscount = parseFloat(discount || 0);
   const finalTotalAmount = Math.max(0, calculatedSubtotal - finalDiscount);
   const finalAmountPaid = parseFloat(amountPaid || 0);
@@ -168,8 +161,11 @@ export const createSale = asyncHandler(async (req, res) => {
       }
     }
 
-    // Receipt and Audit Log (Same as your original code)
-    const businessSettings = await tx.businessSettings.findFirst();    
+    // 🌟 Explicitly fetch business settings using the logged-in user's business ID
+    const businessSettings = await tx.businessSettings.findFirst({
+      where: { businessId: req.user.businessId }
+    });    
+    
     const receiptNumber = await generateReceiptNumber();
     const receipt = await tx.receipt.create({
       data: {
@@ -200,13 +196,40 @@ export const createSale = asyncHandler(async (req, res) => {
     return { sale, receipt };
   });
 
+  // 1. Fully hydrate the Sale object
   const completeSale = await req.db.sale.findUnique({
-    where: { id: result.sale.id },
-    include: {
-      items: true,
-      receipt: true,
-      user: { select: { fullName: true, username: true } },
-    },
+      where: { id: result.sale.id },
+      include: {
+        items: {
+          include: {
+            material: true, 
+            service: true,  
+          },
+        },
+        user: { 
+          select: { fullName: true, username: true }
+        },
+        customer: true,
+      },
+    });
+
+  // 2. Fully hydrate the Receipt object (Deeply nesting sale items for the frontend)
+  const completeReceipt = await req.db.receipt.findUnique({
+      where: { id: result.receipt.id },
+      include: {
+        user: {
+          select: { fullName: true, username: true } 
+        },
+        sale: {
+           include: {
+             items: {
+               include: { material: true, service: true }
+             },
+             customer: true,
+             user: { select: { fullName: true, username: true } }
+           }
+        }
+      }
   });
 
   res.status(201).json({
@@ -214,7 +237,7 @@ export const createSale = asyncHandler(async (req, res) => {
     message: 'Sale completed successfully',
     data: {
       sale: completeSale,
-      receipt: result.receipt,
+      receipt: completeReceipt,
     },
   });
 });
@@ -524,13 +547,27 @@ export const addPayment = asyncHandler(async (req, res) => {
 // @access  Private (requires 'sales:view' or 'sales:viewOwn' permission)
 export const getSales = asyncHandler(async (req, res) => {
   // 1. EXTRACT 'paymentStatus' FROM QUERY
-  const { startDate, endDate, paymentMethod, paymentStatus, soldBy, page = 1, limit = 10 } = req.query;
+  let { status, startDate, endDate, paymentMethod, paymentStatus, soldBy, page = 1, limit = 10 } = req.query;
 
   const pageNumber = parseInt(page);
   const limitNumber = parseInt(limit);
   const skip = (pageNumber - 1) * limitNumber;
 
-  const where = { status: 'completed' };
+  const where = {};
+
+  // Security Override for Non-Admins
+  if (req.user.role !== 'admin') {
+    const today = new Date();
+    startDate = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+    endDate = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+    
+    // Enforce own-sales only if applicable
+    if (req.isOwnResource) {
+      where.soldBy = req.user.id;
+    }
+  }
+  
+if (status) where.status = status;
 
   // Date filtering
   if (startDate || endDate) {
@@ -789,9 +826,21 @@ export const deleteSale = asyncHandler(async (req, res) => {
 // @route   GET /api/sales/stats
 // @access  Private (requires 'sales:view' permission)
 export const getSalesStats = asyncHandler(async (req, res) => {
-  const { startDate, endDate } = req.query;
-
+  let { startDate, endDate } = req.query;
   const where = { status: 'completed' };
+
+  // SECURITY OVERRIDE: If not admin, strictly limit to TODAY
+  if (req.user.role !== 'admin') {
+    const today = new Date();
+    startDate = new Date(today.setHours(0, 0, 0, 0)).toISOString();
+    endDate = new Date(today.setHours(23, 59, 59, 999)).toISOString();
+
+    // If the user's permission only allows them to view their OWN resources, enforce it
+    if (req.isOwnResource) {
+      where.soldBy = req.user.id;
+    }
+  }
+
 
   // Date filtering
   if (startDate || endDate) {

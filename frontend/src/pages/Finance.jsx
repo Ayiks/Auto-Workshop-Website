@@ -2,6 +2,8 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { reportsApi } from "@api/reports";
+import { useResponsive } from "@hooks/useResponsive";
+import { RESPONSIVE_SPACING } from "@utils/responsiveHelpers";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import {
   PieChart,

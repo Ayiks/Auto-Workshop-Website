@@ -153,23 +153,23 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="space-y-8">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6 md:space-y-8">
         
         {/* Image Upload */}
-        <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-          <label className="block text-sm font-medium text-gray-900 mb-3">Product Image</label>
+        <div className="bg-gray-50 p-3 sm:p-4 rounded-lg border border-gray-200">
+          <label className="block text-xs sm:text-sm font-medium text-gray-900 mb-2 sm:mb-3">Product Image</label>
           {imagePreview ? (
-            <div className="relative w-40 h-40 group">
+            <div className="relative w-32 sm:w-40 h-32 sm:h-40 group">
               <img src={imagePreview} alt="Preview" className="w-full h-full object-cover rounded-lg border border-gray-300 shadow-sm" />
-              <button type="button" onClick={handleRemoveImage} className="absolute -top-2 -right-2 bg-white text-gray-500 hover:text-red-600 rounded-full p-1.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity">
-                <X className="w-4 h-4" />
+              <button type="button" onClick={handleRemoveImage} className="absolute -top-2 -right-2 bg-white text-gray-500 hover:text-red-600 rounded-full p-1 sm:p-1.5 shadow-md opacity-0 group-hover:opacity-100 transition-opacity">
+                <X className="w-3 sm:w-4 h-3 sm:h-4" />
               </button>
             </div>
           ) : (
-            <div className="flex justify-center rounded-lg border-2 border-dashed border-gray-300 px-6 py-8 hover:bg-gray-100 transition-colors">
+            <div className="flex justify-center rounded-lg border-2 border-dashed border-gray-300 px-4 sm:px-6 py-6 sm:py-8 hover:bg-gray-100 transition-colors">
               <div className="text-center">
-                <ImageIcon className="mx-auto h-12 w-12 text-gray-300" />
-                <label htmlFor="file-upload" className="relative cursor-pointer rounded-md bg-white font-semibold text-blue-600 hover:text-blue-500">
+                <ImageIcon className="mx-auto h-10 sm:h-12 w-10 sm:w-12 text-gray-300" />
+                <label htmlFor="file-upload" className="relative cursor-pointer rounded-md bg-white font-semibold text-blue-600 hover:text-blue-500 text-xs sm:text-sm">
                   <span>Upload a file</span>
                   <input id="file-upload" name="file-upload" type="file" className="sr-only" onChange={handleImageChange} accept="image/*" disabled={isLoading} />
                 </label>
@@ -179,23 +179,23 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
         </div>
 
         {/* Basic Info */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium text-gray-900 mb-2">Product Name</label>
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4 md:gap-6">
+          <div className="sm:col-span-2 md:col-span-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-900 mb-1.5 sm:mb-2">Product Name</label>
             <input
               type="text"
               name="name"
               value={formData.name}
               onChange={handleChange}
               placeholder="e.g., Engine Oil 5W-30"
-              className={`w-full px-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${errors.name ? 'border-red-500' : 'border-gray-300'}`}
+              className={`w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm ${errors.name ? 'border-red-500' : 'border-gray-300'}`}
               disabled={isLoading}
             />
-            {errors.name && <p className="text-sm text-red-600 mt-1">{errors.name}</p>}
+            {errors.name && <p className="text-xs sm:text-sm text-red-600 mt-0.5 sm:mt-1">{errors.name}</p>}
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">
+            <label className="block text-xs sm:text-sm font-medium text-gray-900 mb-1.5 sm:mb-2">
                {material ? 'Current Quantity' : 'Initial Quantity'}
             </label>
             <div className="relative">
@@ -205,52 +205,52 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
                 name="quantity"
                 value={formData.quantity}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm"
                 disabled={isLoading}
               />
-              <span className="absolute right-4 top-3.5 text-gray-500 text-xs font-medium uppercase pointer-events-none">
+              <span className="absolute right-3 sm:right-4 top-2.5 sm:top-3 text-gray-500 text-[10px] sm:text-xs font-medium uppercase pointer-events-none">
                  {getBaseUnitSymbol()}
               </span>
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">Low Stock Alert</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-900 mb-1.5 sm:mb-2">Low Stock Alert</label>
             <input
               type="number"
               name="lowStockThreshold"
               value={formData.lowStockThreshold}
               onChange={handleChange}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm"
               disabled={isLoading}
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">Cost Price (Base)</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-900 mb-1.5 sm:mb-2">Cost Price (Base)</label>
             <div className="relative">
-              <span className="absolute left-3 top-3 text-gray-500">GH₵</span>
+              <span className="absolute left-3 top-2.5 sm:top-3 text-gray-500 text-xs sm:text-sm">GH₵</span>
               <input
                 type="number"
                 name="unitCost"
                 value={formData.unitCost}
                 onChange={handleChange}
-                className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${errors.unitCost ? 'border-red-500' : 'border-gray-300'}`}
+                className={`w-full pl-8 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm ${errors.unitCost ? 'border-red-500' : 'border-gray-300'}`}
                 disabled={isLoading}
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-900 mb-2">Selling Price (Base)</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-900 mb-1.5 sm:mb-2">Selling Price (Base)</label>
             <div className="relative">
-              <span className="absolute left-3 top-3 text-gray-500">GH₵</span>
+              <span className="absolute left-3 top-2.5 sm:top-3 text-gray-500 text-xs sm:text-sm">GH₵</span>
               <input
                 type="number"
                 name="sellingPrice"
                 value={formData.sellingPrice}
                 onChange={handleChange}
-                className={`w-full pl-12 pr-4 py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 ${errors.sellingPrice ? 'border-red-500' : 'border-gray-300'}`}
+                className={`w-full pl-8 sm:pl-12 pr-3 sm:pr-4 py-2 sm:py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm ${errors.sellingPrice ? 'border-red-500' : 'border-gray-300'}`}
                 disabled={isLoading}
               />
             </div>
@@ -258,21 +258,21 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
         </div>
 
         {/* --- UNIT CONFIGURATION SECTION --- */}
-        <div className="border-t border-gray-200 pt-6">
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">Unit Configuration</h3>
-          <p className="text-sm text-gray-500 mb-4">Define how this product is measured and sold in bulk.</p>
+        <div className="border-t border-gray-200 pt-4 sm:pt-6">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-900 mb-1">Unit Configuration</h3>
+          <p className="text-xs sm:text-sm text-gray-500 mb-2 sm:mb-4">Define how this product is measured and sold in bulk.</p>
 
           {/* Base Unit Selector */}
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-100 mb-6">
-            <div className="flex justify-between items-center mb-2">
+          <div className="bg-blue-50 p-3 sm:p-4 rounded-lg border border-blue-100 mb-4 sm:mb-6">
+            <div className="flex justify-between items-center mb-1.5 sm:mb-2">
                <label className="block text-xs font-bold uppercase text-blue-800">Base Unit (Smallest Unit)</label>
                {/* --- QUICK ADD BUTTON --- */}
                <button 
                  type="button"
                  onClick={() => setIsUnitModalOpen(true)}
-                 className="text-xs flex items-center gap-1 text-blue-600 font-bold hover:text-blue-800 hover:underline"
+                 className="text-[10px] sm:text-xs flex items-center gap-1 text-blue-600 font-bold hover:text-blue-800 hover:underline"
                >
-                 <Plus size={14} /> New Unit
+                 <Plus size={12} /> New Unit
                </button>
             </div>
             
@@ -281,7 +281,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
                 name="materialUnitId"
                 value={formData.materialUnitId}
                 onChange={handleChange}
-                className={`w-full max-w-xs px-3 py-2 border rounded-md text-sm focus:ring-2 focus:ring-blue-500 ${errors.materialUnitId ? 'border-red-500' : 'border-blue-200'}`}
+                className={`w-full max-w-xs px-2 sm:px-3 py-1.5 sm:py-2 border rounded-md text-xs sm:text-sm focus:ring-2 focus:ring-blue-500 ${errors.materialUnitId ? 'border-red-500' : 'border-blue-200'}`}
               >
                 <option value="">-- Select Base Unit --</option>
                 {globalUnits.map(unit => (
@@ -291,21 +291,21 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
                 ))}
               </select>
             </div>
-            {errors.materialUnitId && <p className="text-xs text-red-600 mt-1">{errors.materialUnitId}</p>}
+            {errors.materialUnitId && <p className="text-[10px] sm:text-xs text-red-600 mt-0.5 sm:mt-1">{errors.materialUnitId}</p>}
             
-            <p className="text-xs text-blue-600 mt-2">
+            <p className="text-[10px] sm:text-xs text-blue-600 mt-1.5 sm:mt-2">
               All stock quantity will be tracked in <strong>{getBaseUnitSymbol()}</strong>.
             </p>
           </div>
 
           {/* Alternate Units Table */}
-          <div className="space-y-3">
+          <div className="space-y-2 sm:space-y-3">
              <div className="flex items-center justify-between">
-                <label className="block text-sm font-medium text-gray-900">Alternate Selling Units (Optional)</label>
+                <label className="block text-xs sm:text-sm font-medium text-gray-900">Alternate Selling Units (Optional)</label>
                 <button 
                   type="button" 
                   onClick={addUnitRow} 
-                  className="text-xs flex items-center gap-1 text-blue-600 font-medium hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100"
+                  className="text-[10px] sm:text-xs flex items-center gap-1 text-blue-600 font-medium hover:text-blue-700 bg-blue-50 px-2 py-1 rounded-md border border-blue-100"
                 >
                   <Plus className="w-3 h-3" /> Add Unit
                 </button>
@@ -316,20 +316,20 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
                  <table className="min-w-full divide-y divide-gray-200">
                    <thead className="bg-gray-50">
                      <tr>
-                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Unit</th>
-                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Factor ({getBaseUnitSymbol()})</th>
-                       <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Price (GH₵)</th>
+                       <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Unit</th>
+                       <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Factor ({getBaseUnitSymbol()})</th>
+                       <th className="px-2 sm:px-3 py-1.5 sm:py-2 text-left text-[10px] sm:text-xs font-medium text-gray-500 uppercase">Price (GH₵)</th>
                        <th className="w-10"></th>
                      </tr>
                    </thead>
                    <tbody className="bg-white divide-y divide-gray-200">
                      {alternateUnits.map((unit, idx) => (
                        <tr key={idx}>
-                         <td className="p-2">
+                         <td className="p-1.5 sm:p-2">
                            <select
                               value={unit.unitId}
                               onChange={(e) => updateUnitRow(idx, 'unitId', e.target.value)}
-                              className={`w-full p-2 border rounded text-sm ${errors[`unit_${idx}_id`] ? 'border-red-500' : 'border-gray-300'}`}
+                              className={`w-full p-1 sm:p-2 border rounded text-xs sm:text-sm ${errors[`unit_${idx}_id`] ? 'border-red-500' : 'border-gray-300'}`}
                            >
                              <option value="">Select Unit...</option>
                              {globalUnits
@@ -339,27 +339,27 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
                              ))}
                            </select>
                          </td>
-                         <td className="p-2">
+                         <td className="p-1.5 sm:p-2">
                            <input
                              type="number"
                              placeholder="e.g. 12"
                              value={unit.factor}
                              onChange={(e) => updateUnitRow(idx, 'factor', e.target.value)}
-                             className={`w-full p-2 border rounded text-sm ${errors[`unit_${idx}_factor`] ? 'border-red-500' : 'border-gray-300'}`}
+                             className={`w-full p-1 sm:p-2 border rounded text-xs sm:text-sm ${errors[`unit_${idx}_factor`] ? 'border-red-500' : 'border-gray-300'}`}
                            />
                          </td>
-                         <td className="p-2">
+                         <td className="p-1.5 sm:p-2">
                            <input
                              type="number"
                              placeholder="0.00"
                              value={unit.price}
                              onChange={(e) => updateUnitRow(idx, 'price', e.target.value)}
-                             className={`w-full p-2 border rounded text-sm ${errors[`unit_${idx}_price`] ? 'border-red-500' : 'border-gray-300'}`}
+                             className={`w-full p-1 sm:p-2 border rounded text-xs sm:text-sm ${errors[`unit_${idx}_price`] ? 'border-red-500' : 'border-gray-300'}`}
                            />
                          </td>
-                         <td className="p-2 text-center">
+                         <td className="p-1.5 sm:p-2 text-center">
                            <button type="button" onClick={() => removeUnitRow(idx)} className="text-gray-400 hover:text-red-500">
-                             <Trash2 className="w-4 h-4" />
+                             <Trash2 className="w-3 sm:w-4 h-3 sm:h-4" />
                            </button>
                          </td>
                        </tr>
@@ -368,7 +368,7 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
                  </table>
                </div>
              ) : (
-               <div className="text-center py-6 border-2 border-dashed border-gray-200 rounded-lg text-sm text-gray-500">
+               <div className="text-center py-4 sm:py-6 border-2 border-dashed border-gray-200 rounded-lg text-xs sm:text-sm text-gray-500">
                  No alternate units configured. Product is sold only by <strong>{getBaseUnitSymbol()}</strong>.
                </div>
              )}
@@ -376,11 +376,11 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
         </div>
 
         {/* Footer Actions */}
-        <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-          <Button variant="secondary" onClick={onCancel} disabled={isLoading} className="px-6">
+        <div className="flex justify-end gap-2 sm:gap-3 pt-4 sm:pt-6 border-t border-gray-200">
+          <Button variant="secondary" onClick={onCancel} disabled={isLoading} className="px-4 sm:px-6">
             Cancel
           </Button>
-          <Button type="submit" variant="primary" loading={isLoading} className="px-8 shadow-sm">
+          <Button type="submit" variant="primary" loading={isLoading} className="px-5 sm:px-8 shadow-sm">
             {material ? 'Update Material' : 'Add Material'}
           </Button>
         </div>

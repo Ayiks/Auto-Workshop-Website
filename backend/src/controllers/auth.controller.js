@@ -3,6 +3,95 @@ import prisma from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 import { generateToken } from '../middleware/auth.js';
 
+
+// @desc    Register a new business, choose plan, and create admin
+// @route   POST /api/auth/register
+// @access  Public
+export const register = asyncHandler(async (req, res) => {
+  const { fullName, email, phone, password, businessName, selectedPlan } = req.body;
+
+  // 1. Validate required fields
+  if (!fullName || !email || !password || !businessName) {
+    throw new AppError('Please provide all required fields', 400, 'VALIDATION_ERROR');
+  }
+
+  // Ensure they picked a valid plan (default to free)
+  const plan = selectedPlan === 'pro' ? 'pro' : 'free';
+
+  // 2. Check if user already exists
+  const existingUser = await prisma.user.findFirst({
+    where: { 
+      OR: [{ email }, { username: email }]
+    }
+  });
+
+  if (existingUser) {
+    throw new AppError('An account with this email already exists', 400, 'DUPLICATE_ENTRY');
+  }
+
+  // 3. Hash the password
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  // 4. Create Business AND Admin User in one transaction
+  const result = await prisma.$transaction(async (tx) => {
+    
+    // A. Create the Business Workspace
+    const newBusiness = await tx.business.create({
+      data: {
+        name: businessName,
+        plan: plan,
+        subscriptionStatus: 'active', // Active immediately for free plan
+      }
+    });
+
+    // B. Create the Admin User tied to the new Business
+    const newUser = await tx.user.create({
+      data: {
+        fullName,
+        email,
+        username: email, // Defaulting username to email for login
+        phone,
+        passwordHash: hashedPassword,
+        role: 'admin',
+        businessId: newBusiness.id, // Linked!
+        isActive: true,
+        permissions: { "all": ["manage"] } 
+      }
+    });
+
+    return { business: newBusiness, user: newUser };
+  });
+
+  // 5. Initialize default settings in their new isolated sandbox
+  const db = getTenantDB(result.business.id);
+  await db.businessSettings.create({
+    data: {
+      name: businessName,
+      email: email,
+      phone: phone || '',
+      address: 'Please update your address in settings',
+    }
+  });
+
+  // 6. Generate login token
+  const token = generateToken(result.user);
+
+  // 7. Send response
+  res.status(201).json({
+    success: true,
+    token,
+    data: {
+      id: result.user.id,
+      fullName: result.user.fullName,
+      email: result.user.email,
+      role: result.user.role,
+      businessId: result.business.id,
+      businessName: result.business.name,
+      plan: result.business.plan
+    }
+  });
+});
+
 // @desc    Login user
 // @route   POST /api/auth/login
 // @access  Public

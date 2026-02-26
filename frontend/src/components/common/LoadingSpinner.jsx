@@ -8,7 +8,7 @@ export default function LoadingSpinner({ size = 'md', text }) {
   return (
     <div className="flex flex-col items-center justify-center">
       <div className={`animate-spin rounded-full border-b-2 border-primary-600 ${sizes[size]}`}></div>
-      {text && <p className="mt-3 text-sm text-gray-600">{text}</p>}
+      {text && <p className="mt-2 sm:mt-3 text-xs sm:text-sm text-gray-600">{text}</p>}
     </div>
   );
 }
@@ -17,7 +17,7 @@ export default function LoadingSpinner({ size = 'md', text }) {
 export function LoadingOverlay({ text = 'Loading...' }) {
   return (
     <div className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 shadow-xl">
+      <div className="bg-white rounded-lg p-4 sm:p-6 shadow-xl mx-4">
         <LoadingSpinner size="lg" text={text} />
       </div>
     </div>

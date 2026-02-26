@@ -2,6 +2,8 @@ import { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { materialsApi } from "@api/materials";
 import { useAuthStore } from "@stores/authStore";
+import { useResponsive } from "@hooks/useResponsive";
+import { RESPONSIVE_SPACING } from "@utils/responsiveHelpers";
 import { uploadToCloudinary } from "../services/cloudinary";
 
 // Component Imports
@@ -18,7 +20,7 @@ import { Image as ImageIcon } from "lucide-react";
 
 export default function Materials() {
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuthStore();
+  const { hasPermission, hasRole } = useAuthStore();
 
   // --- State Management ---
   const [searchTerm, setSearchTerm] = useState("");
@@ -404,24 +406,24 @@ export default function Materials() {
     <div className="min-h-screen bg-gray-50/50">
       {/* Header */}
       <div className="sticky top-0 z-10 border-b border-gray-200 bg-white/80 backdrop-blur-md">
-        <div className="px-6 py-4 max-w-7xl mx-auto">
-          <div className="flex items-center justify-between">
+        <div className="px-4 sm:px-6 md:px-8 py-3 sm:py-4 max-w-7xl mx-auto">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
             <div>
-              <h1 className="text-xl font-bold text-gray-900 tracking-tight">Inventory</h1>
-              <p className="text-sm text-gray-500 mt-0.5">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 tracking-tight">Inventory</h1>
+              <p className="text-xs sm:text-sm text-gray-500 mt-0.5">
                 {selectedIds.length > 0 
                   ? `${selectedIds.length} item${selectedIds.length !== 1 ? 's' : ''} selected` 
                   : "Manage stock levels and products"}
               </p>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               {/* Conditional Bulk Reorder Button */}
               {selectedIds.length > 0 && hasPermission("materials", "reorder") && (
                 <Button
                   variant="secondary"
                   onClick={() => setShowBulkReorderModal(true)}
-                  className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all"
+                  className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all text-xs sm:text-sm"
                   icon={
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" /></svg>
                   }
@@ -434,7 +436,7 @@ export default function Materials() {
                 <Button
                   variant="primary"
                   onClick={() => setShowAddModal(true)}
-                  className="bg-gray-900 hover:bg-black text-white shadow-sm border border-transparent transition-all"
+                  className="bg-gray-900 hover:bg-black text-white shadow-sm border border-transparent transition-all text-xs sm:text-sm"
                   icon={
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                   }
@@ -448,60 +450,62 @@ export default function Materials() {
       </div>
 
       {/* Main Content */}
-      <div className={`px-6 py-8 max-w-7xl mx-auto transition-all duration-300 ${
+      <div className={`px-4 sm:px-6 md:px-8 py-6 sm:py-8 max-w-7xl mx-auto transition-all duration-300 ${
         showAddModal || showEditModal || showReorderModal || showBulkReorderModal ? 'blur-sm opacity-50 pointer-events-none' : ''
       }`}>
         
         {/* Inventory Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-5">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
+          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Items</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">{inventoryStats.totalItems}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tracking-tight">{inventoryStats.totalItems}</p>
               </div>
-              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
+              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600 flex-shrink-0">
+                <svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
               </div>
             </div>
           </Card>
 
-          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-5">
+          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Low Stock</p>
-                <p className={`text-2xl font-bold mt-1 tracking-tight ${inventoryStats.lowStockItems > 0 ? 'text-red-600' : 'text-gray-900'}`}>
+                <p className={`text-xl sm:text-2xl font-bold mt-1 tracking-tight ${inventoryStats.lowStockItems > 0 ? 'text-red-600' : 'text-gray-900'}`}>
                   {inventoryStats.lowStockItems}
                 </p>
               </div>
-              <div className={`p-2 rounded-lg border ${inventoryStats.lowStockItems > 0 ? 'bg-red-50 border-red-100 text-red-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
+              <div className={`p-2 rounded-lg border flex-shrink-0 ${inventoryStats.lowStockItems > 0 ? 'bg-red-50 border-red-100 text-red-600' : 'bg-gray-50 border-gray-100 text-gray-600'}`}>
+                <svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
               </div>
             </div>
           </Card>
 
-          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-5">
+          {
+            hasRole("admin") && <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Total Value</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tracking-tight">
                   GH₵{inventoryStats.totalCostValue.toFixed(2)}
                 </p>
               </div>
-              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600 flex-shrink-0">
+                <svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </div>
             </div>
           </Card>
+          }
 
-          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-5">
+          <Card className="bg-white border border-gray-200 shadow-[0_2px_4px_rgba(0,0,0,0.02)] p-4 sm:p-5">
             <div className="flex items-start justify-between">
-              <div>
+              <div className="min-w-0 flex-1">
                 <p className="text-xs font-medium text-gray-500 uppercase tracking-wide">Active Items</p>
-                <p className="text-2xl font-bold text-gray-900 mt-1 tracking-tight">{inventoryStats.activeItems}</p>
+                <p className="text-xl sm:text-2xl font-bold text-gray-900 mt-1 tracking-tight">{inventoryStats.activeItems}</p>
               </div>
-              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <div className="p-2 bg-gray-50 rounded-lg border border-gray-100 text-gray-600 flex-shrink-0">
+                <svg className="w-4 sm:w-5 h-4 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               </div>
             </div>
           </Card>
@@ -509,10 +513,10 @@ export default function Materials() {
 
         {/* Filters & Table Container */}
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-5 border-b border-gray-100">
+          <div className="p-4 sm:p-5 border-b border-gray-100">
             {/* Filter Bar */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <div className="flex items-center gap-3 w-full md:w-auto flex-1">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full flex-1">
                 {/* Search */}
                 <div className="relative flex-1 max-w-sm">
                   <input
@@ -520,7 +524,7 @@ export default function Materials() {
                     placeholder="Search inventory..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white transition-all w-full"
+                    className="pl-9 pr-4 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white transition-all w-full"
                   />
                   <svg className="w-4 h-4 absolute left-3 top-2.5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
@@ -531,7 +535,7 @@ export default function Materials() {
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white w-full sm:w-auto cursor-pointer"
+                  className="px-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white w-full sm:w-auto cursor-pointer"
                 >
                   <option value="all">All Status</option>
                   <option value="active">Active</option>
@@ -541,7 +545,7 @@ export default function Materials() {
                 {/* Low Stock Toggle */}
                 <button
                   onClick={() => setShowLowStock(!showLowStock)}
-                  className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-sm font-medium transition-colors whitespace-nowrap ${
+                  className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
                     showLowStock
                       ? 'bg-red-50 border-red-100 text-red-600'
                       : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'

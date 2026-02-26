@@ -7,6 +7,12 @@ export const authApi = {
     return response;
   },
 
+  // Register
+  register: async (data) => {
+    const response = await apiClient.post('/auth/register', data);
+    return response;
+  },
+  
   // Get current user
   getCurrentUser: async () => {
     const response = await apiClient.get('/auth/me');

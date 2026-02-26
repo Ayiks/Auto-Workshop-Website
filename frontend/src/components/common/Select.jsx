@@ -13,7 +13,7 @@ export default function Select({
   return (
     <div className={className}>
       {label && (
-        <label htmlFor={name} className="block text-sm font-medium text-gray-700 mb-2">
+        <label htmlFor={name} className="block text-xs sm:text-sm text-gray-700 mb-1.5 sm:mb-2">
           {label}
           {required && <span className="text-danger-500 ml-1">*</span>}
         </label>
@@ -25,7 +25,7 @@ export default function Select({
         onChange={onChange}
         required={required}
         disabled={disabled}
-        className={`w-full px-4 py-2.5 border rounded-lg transition focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed ${
+        className={`w-full px-3 sm:px-4 py-2 sm:py-2.5 border rounded-lg transition focus:ring-2 focus:ring-primary-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed text-xs sm:text-sm ${
           error ? 'border-danger-500' : 'border-gray-300'
         }`}
       >
@@ -36,7 +36,7 @@ export default function Select({
           </option>
         ))}
       </select>
-      {error && <p className="mt-1 text-sm text-danger-600">{error}</p>}
+      {error && <p className="mt-1 text-xs sm:text-sm text-danger-600">{error}</p>}
     </div>
   );
 }

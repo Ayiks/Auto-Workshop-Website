@@ -1,4 +1,5 @@
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
+import { format} from 'date-fns';
 
 // Helper function to get date range (default: current month)
 const getDateRange = (startDate, endDate) => {
@@ -1025,623 +1026,94 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 });
 
 
-// export const getDashboardOverview = asyncHandler(async (req, res) => {
-//   const dateRange = getDateRange(); // Your existing helper
-
-//   // 1. Define "Today" (For the Daily Revenue Card)
-//   const todayStart = new Date();
-//   todayStart.setHours(0, 0, 0, 0);
-  
-//   const todayEnd = new Date();
-//   todayEnd.setHours(23, 59, 59, 999);
-
-//   // 2. Define "Current Month" explicitly (For the Header Display)
-//   // This ensures the header always shows "1st - 30th/31st"
-//   const now = new Date();
-//   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-//   const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0); // 0th day of next month = last day of current
-//   // endOfMonth.setHours(23, 59, 59, 999);
-
-//   // 3. Parallel Database Queries
-//   const [
-//     totalSales,
-//     totalInvoices,
-//     pendingInvoices,
-//     lowStockMaterials,
-//     dailySalesSum,
-//     dailyJobsSum
-//   ] = await Promise.all([
-//     // Counts (using dateRange - defaults to month)
-//     req.db.sale.count({
-//       where: { status: 'completed', saleDate: dateRange },
-//     }),
-//     req.db.invoice.count({
-//       where: { invoiceDate: dateRange },
-//     }),
-//     req.db.invoice.count({
-//       where: { paymentStatus: { in: ['unpaid', 'partial'] } },
-//     }),
-//     req.db.material.count({
-//       where: { isActive: true, quantity: { lte: req.db.material.fields.lowStockThreshold } },
-//     }),
-//     // Daily Revenue Aggregates (Strictly Today)
-//     req.db.sale.aggregate({
-//       where: { 
-//         status: 'completed', 
-//         saleDate: { gte: todayStart, lte: todayEnd } 
-//       },
-//       _sum: { totalAmount: true },
-//     }),
-//     req.db.invoice.aggregate({
-//       where: { 
-//         invoiceDate: { gte: todayStart, lte: todayEnd } 
-//       },
-//       _sum: { totalAmount: true },
-//     }),
-//   ]);
-
-//   // Revenue overview (Monthly)
-//   const salesRevenue = await req.db.sale.aggregate({
-//     where: { status: 'completed', saleDate: dateRange },
-//     _sum: { totalAmount: true },
-//   });
-
-//   const jobRevenue = await req.db.invoice.aggregate({
-//     where: { invoiceDate: dateRange },
-//     _sum: { totalAmount: true },
-//   });
-
-//   const totalRevenue = 
-//     parseFloat(salesRevenue._sum.totalAmount || 0) + 
-//     parseFloat(jobRevenue._sum.totalAmount || 0);
-
-//   const dailyTotal = 
-//     parseFloat(dailySalesSum._sum.totalAmount || 0) + 
-//     parseFloat(dailyJobsSum._sum.totalAmount || 0);
-
-//   // Outstanding payments
-//   const outstanding = await req.db.invoice.aggregate({
-//     where: { paymentStatus: { in: ['unpaid', 'partial'] } },
-//     _sum: { amountDue: true },
-//   });
-
-//   res.status(200).json({
-//     success: true,
-    
-//     data: {
-//       period: {
-//       // FORCE the period to be the full month boundaries
-//       startDate: startOfMonth,
-//       endDate: endOfMonth,
-//     },  
-//       dailyRevenue: dailyTotal,
-//       sales: {
-//         count: totalSales,
-//         revenue: salesRevenue._sum.totalAmount || 0,
-//       },
-//       jobs: {
-//         count: totalInvoices,
-//         revenue: jobRevenue._sum.totalAmount || 0,
-//       },
-//       totalRevenue,
-//       outstanding: {
-//         count: pendingInvoices,
-//         amount: outstanding._sum.amountDue || 0,
-//       },
-//       alerts: {
-//         lowStockMaterials,
-//       },
-//     },
-//   });
-// });
-
-// @desc    Get Expense Report
-// @route   GET /api/reports/expenses
+// @desc    Get Trends Data for Charts
+// @route   GET /api/reports/trends
 // @access  Private (requires 'reports:view' permission)
-// export const getExpenseReport = asyncHandler(async (req, res) => {
-//   const { startDate, endDate, type, category } = req.query;
-//   const dateRange = getDateRange(startDate, endDate);
+export const getTrends = asyncHandler(async (req, res) => {
+  const { periods = 6, unit = 'month' } = req.query;
+  const numPeriods = parseInt(periods);
+  const now = new Date();
 
-//   const expenseWhere = {
-//     expenseDate: dateRange,
-//   };
+  // Build array of period ranges
+  const ranges = [];
+  for (let i = numPeriods - 1; i >= 0; i--) {
+    let start, end, label;
 
-//   if (type) {
-//     expenseWhere.type = type;
-//   }
+    if (unit === 'month') {
+      start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0, 23, 59, 59, 999);
+      label = format(start, 'MMM yyyy');
+    } else if (unit === 'week') {
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - (i * 7) - now.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekStart.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
+      start = weekStart;
+      end = weekEnd;
+      label = `W${format(start, 'w MMM')}`;
+    }
 
-//   if (category) {
-//     expenseWhere.category = category;
-//   }
+    ranges.push({ start, end, label });
+  }
 
-//   const expenses = await req.db.expense.findMany({
-//     where: expenseWhere,
-//     include: {
-//       user: {
-//         select: { fullName: true, username: true },
-//       },
-//       materialReorder: {
-//         select: {
-//           materialName: true,
-//           quantityOrdered: true,
-//         },
-//       },
-//     },
-//     orderBy: { expenseDate: 'desc' },
-//   });
+  // Run all period queries in parallel
+  const periodData = await Promise.all(
+    ranges.map(async ({ start, end, label }) => {
+      const dateFilter = { gte: start, lte: end };
 
-//   // Calculate totals by type (ONLY operational expenses, no COG)
-//   let operationalTotal = 0;
+      const [salesRev, jobsRev, salesCount, expensesAgg, plData] = await Promise.all([
+        req.db.sale.aggregate({
+          where: { status: 'completed', saleDate: dateFilter },
+          _sum: { totalAmount: true },
+          _count: true,
+        }),
+        req.db.invoice.aggregate({
+          where: { invoiceDate: dateFilter },
+          _sum: { totalAmount: true },
+        }),
+        req.db.sale.count({
+          where: { status: 'completed', saleDate: dateFilter },
+        }),
+        req.db.expense.aggregate({
+          where: {
+            expenseDate: dateFilter,
+            type: 'operational',
+            category: { not: 'materials' },
+          },
+          _sum: { amount: true },
+        }),
+        // COGS via sales items
+        req.db.saleItem.findMany({
+          where: {
+            sale: { status: 'completed', saleDate: dateFilter },
+            itemType: 'material',
+          },
+          select: { unitCost: true, quantity: true },
+        }),
+      ]);
 
-//   expenses.forEach(expense => {
-//     const amount = parseFloat(expense.amount);
-//     if (expense.type === 'operational') {
-//       operationalTotal += amount;
-//     }
-//   });
+      const salesRevenue = parseFloat(salesRev._sum.totalAmount || 0);
+      const jobsRevenue = parseFloat(jobsRev._sum.totalAmount || 0);
+      const totalRevenue = salesRevenue + jobsRevenue;
+      const expenses = parseFloat(expensesAgg._sum.amount || 0);
+      const cogs = plData.reduce((sum, item) =>
+        sum + (parseFloat(item.unitCost || 0) * parseFloat(item.quantity || 0)), 0
+      );
+      const netProfit = totalRevenue - cogs - expenses;
 
-//   const totalExpenses = operationalTotal; // Only operational expenses
+      return {
+        label,
+        revenue: totalRevenue,
+        salesRevenue,
+        jobsRevenue,
+        expenses,
+        netProfit,
+        salesCount: salesRev._count,
+      };
+    })
+  );
 
-//   // Expenses by category - ONLY operational
-//   const expensesByCategoryRaw = await req.db.expense.groupBy({
-//     by: ['category'],
-//     where: {
-//       ...expenseWhere,
-//       type: 'operational', // ONLY operational expenses
-//     },
-//     _sum: { amount: true },
-//     _count: true,
-//   });
-
-//   const byCategory = expensesByCategoryRaw.map(cat => ({
-//     category: cat.category,
-//     amount: parseFloat(cat._sum.amount || 0),
-//     count: cat._count,
-//     percentage: totalExpenses > 0 
-//       ? ((parseFloat(cat._sum.amount || 0) / totalExpenses) * 100).toFixed(1) 
-//       : '0.0',
-//   }));
-
-//   // Expenses by type
-//   const expensesByTypeRaw = await req.db.expense.groupBy({
-//     by: ['type'],
-//     where: expenseWhere,
-//     _sum: { amount: true },
-//     _count: true,
-//   });
-
-//   const byType = expensesByTypeRaw.map(t => ({
-//     type: t.type,
-//     amount: parseFloat(t._sum.amount || 0),
-//     count: t._count,
-//   }));
-
-//   // Monthly trend - ONLY operational
-//   let monthlyExpenses = [];
-//   try {
-//     monthlyExpenses = await req.db.$queryRaw`
-//       SELECT 
-//         DATE_TRUNC('month', expense_date)::TEXT as month,
-//         SUM(amount)::DECIMAL as total
-//       FROM expenses
-//       WHERE expense_date >= ${dateRange.gte}
-//         AND expense_date <= ${dateRange.lte}
-//         AND type = 'operational'
-//       GROUP BY DATE_TRUNC('month', expense_date)
-//       ORDER BY month ASC
-//     `;
-//   } catch (error) {
-//     console.error('Monthly expenses query error:', error);
-//     monthlyExpenses = [];
-//   }
-
-//   // Count operational entries only
-//   const operationalCount = await req.db.expense.count({
-//     where: {
-//       type: 'operational',
-//       expenseDate: dateRange,
-//     },
-//   });
-
-//   res.status(200).json({
-//     success: true,
-//     period: {
-//       startDate: dateRange.gte,
-//       endDate: dateRange.lte,
-//     },
-//     data: {
-//       summary: {
-//         totalExpenses,
-//         operationalTotal,
-//         totalTransactions: operationalCount,
-//         operationalCount,
-//       },
-//       breakdown: {
-//         byCategory,
-//         byType,
-//       },
-//       monthlyTrend: monthlyExpenses,
-//       recentExpenses: expenses.filter(e => e.type === 'operational').slice(0, 10),
-//       allExpenses: expenses.filter(e => e.type === 'operational'),
-//     },
-//   });
-// });
-
-// @desc    Get Profit & Loss Statement
-// @route   GET /api/reports/profit-loss
-// @access  Private (requires 'reports:viewAdvanced' permission)
-
-
-
-
-// version 2
-// @desc    Get Expense Report (Aggregated for Finance Dashboard)
-// @route   GET /api/reports/expenses
-// @access  Private
-// ... imports
-
-// export const getExpenseReport = asyncHandler(async (req, res) => {
-//   const { startDate, endDate, type, category } = req.query;
-//   const dateRange = getDateRange(startDate, endDate);
-
-//   const expenseWhere = {
-//     expenseDate: dateRange,
-//   };
-
-//   // 1. Fetch ALL expenses
-//   const expenses = await req.db.expense.findMany({
-//     where: expenseWhere,
-//     include: {
-//       materialReorder: { select: { materialName: true, quantityOrdered: true } },
-//     },
-//     orderBy: { expenseDate: 'desc' },
-//   });
-
-//   // --- DEBUG LOG START ---
-//   console.log(`[Report Debug] Found ${expenses.length} total expenses for range.`);
-//   // --- DEBUG LOG END ---
-
-//   // 2. Calculate Totals
-//   let operationalTotal = 0;
-//   let cogTotal = 0;
-//   let materialReorderCount = 0;
-//   let operationalCount = 0;
-
-//   expenses.forEach(expense => {
-//     const amount = parseFloat(expense.amount || 0);
-//     const type = expense.type?.toLowerCase(); // Handle case sensitivity
-
-//     // Check for both 'cog' and 'cost_of_goods' just to be safe
-//     if (type === 'cog' || type === 'cost_of_goods') {
-//         cogTotal += amount;
-//         materialReorderCount++;
-//     } else if (type === 'operational') {
-//         operationalTotal += amount;
-//         operationalCount++;
-//     }
-//   });
-
-//   const totalExpenses = operationalTotal + cogTotal;
-
-//   // --- DEBUG LOG START ---
-//   console.log(`[Report Debug] COG Total: ${cogTotal}, Op Total: ${operationalTotal}`);
-//   // --- DEBUG LOG END ---
-
-//   // 3. Breakdown by Category (Operational Only)
-//   const expensesByCategoryRaw = await req.db.expense.groupBy({
-//     by: ['category'],
-//     where: {
-//       ...expenseWhere,
-//       type: 'operational', 
-//     },
-//     _sum: { amount: true },
-//     _count: true,
-//   });
-
-//   const byCategory = expensesByCategoryRaw.map(cat => ({
-//     category: cat.category,
-//     amount: parseFloat(cat._sum.amount || 0),
-//     count: cat._count,
-//     percentage: totalExpenses > 0 
-//       ? ((parseFloat(cat._sum.amount || 0) / totalExpenses) * 100).toFixed(1) 
-//       : '0.0',
-//   }));
-
-//   // 4. CRITICAL FIX: Manually add "Material Purchases" to the list
-//   if (cogTotal > 0) {
-//     byCategory.push({
-//       category: 'Material Purchases', // This name will appear in your table
-//       amount: cogTotal,
-//       count: materialReorderCount,
-//       percentage: totalExpenses > 0 
-//         ? ((cogTotal / totalExpenses) * 100).toFixed(1) 
-//         : '0.0',
-//     });
-//   }
-
-//   // Sort: Highest amount first
-//   byCategory.sort((a, b) => b.amount - a.amount);
-
-//   // 5. Monthly Trend (FIXED TABLE NAME)
-//   let monthlyExpenses = [];
-//   try {
-//     monthlyExpenses = await req.db.$queryRaw`
-//       SELECT 
-//         DATE_TRUNC('month', expense_date)::TEXT as month,
-//         SUM(amount)::DECIMAL as total
-//       FROM "expenses" -- <--- CHANGED "Expense" TO "expenses" (lowercase)
-//       WHERE expense_date >= ${dateRange.gte}
-//         AND expense_date <= ${dateRange.lte}
-//       GROUP BY DATE_TRUNC('month', expense_date)
-//       ORDER BY month ASC
-//     `;
-//   } catch (error) {
-//     console.error('Monthly expenses query error:', error);
-//     monthlyExpenses = [];
-//   }
-
-//   res.status(200).json({
-//     success: true,
-//     period: { startDate: dateRange.gte, endDate: dateRange.lte },
-//     data: {
-//       summary: {
-//         totalExpenses,
-//         operationalTotal,
-//         cogTotal,
-//         totalTransactions: expenses.length,
-//         operationalCount,
-//         materialReorderCount,
-//       },
-//       breakdown: {
-//         byCategory, // This now includes Material Purchases
-//         byType: [
-//           { type: 'Operational', amount: operationalTotal },
-//           { type: 'Cost of Goods', amount: cogTotal }
-//         ]
-//       },
-//       monthlyTrend: monthlyExpenses,
-//       recentExpenses: expenses.slice(0, 10),
-//       allExpenses: expenses,
-//     },
-//   });
-// });
-
-// export const getProfitLoss = asyncHandler(async (req, res) => {
-//   const { startDate, endDate } = req.query;
-//   const dateRange = getDateRange(startDate, endDate);
-
-//   // 1. Calculate Gross Revenue
-//   const counterSales = await req.db.sale.aggregate({
-//     where: {
-//       status: 'completed',
-//       saleDate: dateRange,
-//     },
-//     _sum: { totalAmount: true },
-//   });
-
-//   const counterSalesRevenue = parseFloat(counterSales._sum.totalAmount || 0);
-
-//   const jobInvoices = await req.db.invoice.aggregate({
-//     where: {
-//       invoiceDate: dateRange,
-//     },
-//     _sum: { totalAmount: true },
-//   });
-
-//   const jobRevenue = parseFloat(jobInvoices._sum.totalAmount || 0);
-//   const grossRevenue = counterSalesRevenue + jobRevenue;
-
-//   // 2. Calculate ACTUAL COGS
-//   const salesWithItems = await req.db.sale.findMany({
-//     where: {
-//       status: 'completed',
-//       saleDate: dateRange,
-//     },
-//     include: {
-//       items: {
-//         where: {
-//           itemType: 'material',
-//         },
-//       },
-//     },
-//   });
-
-//   let materialCOGS = 0;
-//   salesWithItems.forEach(sale => {
-//     sale.items.forEach(item => {
-//       const itemCOGS = parseFloat(item.unitCost || 0) * parseFloat(item.quantity || 0);
-//       materialCOGS += itemCOGS;
-//     });
-//   });
-
-//   const jobsWithMaterials = await req.db.invoice.findMany({
-//     where: {
-//       invoiceDate: dateRange,
-//     },
-//     include: {
-//       job: {
-//         include: {
-//           materials: {
-//             where: {
-//               isExternal: false,
-//             },
-//           },
-//         },
-//       },
-//     },
-//   });
-
-//   let jobMaterialsCOGS = 0;
-//   jobsWithMaterials.forEach(invoice => {
-//     invoice.job.materials.forEach(material => {
-//       jobMaterialsCOGS += parseFloat(material.subtotal || 0);
-//     });
-//   });
-
-//   const totalCOGS = materialCOGS + jobMaterialsCOGS;
-
-//   // 3. Calculate Gross Profit
-//   const grossProfit = grossRevenue - totalCOGS;
-
-//   // 4. Calculate Operational Expenses
-//   const operationalExpenses = await req.db.expense.aggregate({
-//     where: {
-//       type: 'operational',
-//       expenseDate: dateRange,
-//     },
-//     _sum: { amount: true },
-//   });
-
-//   const operationalTotal = parseFloat(operationalExpenses._sum.amount || 0);
-
-//   // 5. Calculate Net Profit
-//   const netProfit = grossProfit - operationalTotal;
-
-//   // 6. Get detailed revenue breakdown
-//   const sales = await req.db.sale.findMany({
-//     where: {
-//       status: 'completed',
-//       saleDate: dateRange,
-//     },
-//     include: { items: true },
-//   });
-
-//   let materialSalesRevenue = 0;
-//   let boothSalesRevenue = 0;
-//   let materialSalesCOGS = 0;
-
-//   sales.forEach(sale => {
-//     sale.items.forEach(item => {
-//       if (item.itemType === 'material') {
-//         materialSalesRevenue += parseFloat(item.subtotal || 0);
-//         const itemCOGS = parseFloat(item.unitCost || 0) * parseFloat(item.quantity || 0);
-//         materialSalesCOGS += itemCOGS;
-//       } else if (item.itemType === 'booth') {
-//         boothSalesRevenue += parseFloat(item.subtotal || 0);
-//       }
-//     });
-//   });
-
-//   // 7. Get job revenue breakdown
-//   const invoicesWithJobs = await req.db.invoice.findMany({
-//     where: {
-//       invoiceDate: dateRange,
-//     },
-//     include: {
-//       job: {
-//         select: { jobType: true },
-//       },
-//     },
-//   });
-
-//   const jobRevenueByType = {
-//     mechanic: 0,
-//     sprayer: 0,
-//     bodyworks: 0,
-//   };
-
-//   invoicesWithJobs.forEach(invoice => {
-//     const type = invoice.job.jobType;
-//     if (jobRevenueByType[type] !== undefined) {
-//       jobRevenueByType[type] += parseFloat(invoice.totalAmount);
-//     }
-//   });
-
-//   // 8. Get operational expenses by category
-//   const operationalByCategory = await req.db.expense.groupBy({
-//     by: ['category'],
-//     where: {
-//       type: 'operational',
-//       expenseDate: dateRange,
-//     },
-//     _sum: { amount: true },
-//   });
-
-//   // 9. Calculate margins
-//   const grossProfitMargin = grossRevenue > 0 ? (grossProfit / grossRevenue) * 100 : 0;
-//   const netProfitMargin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
-
-//   const materialGrossProfit = materialSalesRevenue - materialSalesCOGS;
-//   const materialGrossProfitMargin = materialSalesRevenue > 0 
-//     ? (materialGrossProfit / materialSalesRevenue) * 100 
-//     : 0;
-
-//   const jobGrossProfit = jobRevenue - jobMaterialsCOGS;
-//   const jobGrossProfitMargin = jobRevenue > 0 
-//     ? (jobGrossProfit / jobRevenue) * 100 
-//     : 0;
-
-//   res.status(200).json({
-//     success: true,
-//     period: {
-//       startDate: dateRange.gte,
-//       endDate: dateRange.lte,
-//     },
-//     data: {
-//       // Summary
-//       summary: {
-//         grossRevenue,
-//         cogs: totalCOGS,
-//         grossProfit,
-//         operationalExpenses: operationalTotal,
-//         netProfit,
-//         grossProfitMargin: grossProfitMargin.toFixed(2),
-//         netProfitMargin: netProfitMargin.toFixed(2),
-//       },
-
-//       // Revenue Breakdown
-//       revenue: {
-//         total: grossRevenue,
-//         sources: {
-//           counterSales: counterSalesRevenue,
-//           jobs: jobRevenue,
-//         },
-//         counterSalesBreakdown: {
-//           materials: {
-//             revenue: materialSalesRevenue,
-//             cogs: materialSalesCOGS,
-//             grossProfit: materialGrossProfit,
-//             grossProfitMargin: materialGrossProfitMargin.toFixed(2),
-//           },
-//           booth: {
-//             revenue: boothSalesRevenue,
-//             cogs: 0,
-//             grossProfit: boothSalesRevenue,
-//             grossProfitMargin: '100.00',
-//           },
-//         },
-//         jobRevenueByType,
-//         jobProfitAnalysis: {
-//           revenue: jobRevenue,
-//           materialCosts: jobMaterialsCOGS,
-//           grossProfit: jobGrossProfit,
-//           grossProfitMargin: jobGrossProfitMargin.toFixed(2),
-//         },
-//       },
-
-//       // Cost Breakdown
-//       costs: {
-//         cogs: {
-//           total: totalCOGS,
-//           breakdown: {
-//             materialsSold: materialSalesCOGS,
-//             jobMaterials: jobMaterialsCOGS,
-//           },
-//         },
-//         operational: {
-//           total: operationalTotal,
-//           byCategory: operationalByCategory,
-//         },
-//         totalCosts: totalCOGS + operationalTotal,
-//       },
-
-//       // Profitability
-//       profitability: {
-//         grossProfit,
-//         grossProfitMargin: `${grossProfitMargin.toFixed(2)}%`,
-//         netProfit,
-//         netProfitMargin: `${netProfitMargin.toFixed(2)}%`,
-//       },
-//     },
-//   });
-// });
+  res.status(200).json({ success: true, data: periodData });
+});

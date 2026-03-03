@@ -42,4 +42,10 @@ export const reportsApi = {
     const response = await apiClient.get('/reports/material-usage', { params });
     return response;
   },
+
+  // Get trends data for charts
+  getTrends: async (params) => {
+    const response = await apiClient.get('/reports/trends', { params });
+    return response;  
+  },
 };

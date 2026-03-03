@@ -7,6 +7,7 @@ import {
   getRevenueReport,
   getMaterialUsageReport,
   getDashboardOverview,
+  getTrends,
 } from '../controllers/report.controller.js';
 import { protect, requirePermission } from '../middleware/auth.js';
 
@@ -58,6 +59,13 @@ router.get(
   '/material-usage',
   requirePermission('reports', 'view'),
   getMaterialUsageReport
+);
+
+// Trends data for charts
+router.get(
+  '/trends',
+  requirePermission('reports', 'view'),
+  getTrends
 );
 
 export default router;

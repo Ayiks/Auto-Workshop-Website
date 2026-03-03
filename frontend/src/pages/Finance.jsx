@@ -15,6 +15,9 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  LineChart,
+  Line,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 import LoadingSpinner from "@components/common/LoadingSpinner";
@@ -170,24 +173,34 @@ export default function Finance() {
     },
   };
 
-  const isLoading =
-    loadingSales ||
-    loadingJobs ||
-    loadingExpenses ||
-    loadingPL ||
-    loadingRevenue ||
-    loadingMaterialUsage;
+  // const isLoading =
+  //   loadingSales ||
+  //   loadingJobs ||
+  //   loadingExpenses ||
+  //   loadingPL ||
+  //   loadingRevenue ||
+  //   loadingMaterialUsage;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-gray-50">
-        <LoadingSpinner size="lg" text="Loading financial data..." />
-      </div>
-    );
-  }
+  // if (isLoading) {
+  //   return (
+  //     <div className="flex items-center justify-center min-h-screen bg-gray-50">
+  //       <LoadingSpinner size="lg" text="Loading financial data..." />
+  //     </div>
+  //   );
+  // }
+
+  const isFetching =
+  loadingSales || loadingJobs || loadingExpenses ||
+  loadingPL || loadingRevenue || loadingMaterialUsage;
+
 
   return (
     <div className="min-h-screen bg-gray-50">
+       {isFetching && (
+      <div className="fixed top-0 left-0 right-0 z-50 h-0.5 bg-gray-100">
+        <div className="h-full bg-indigo-500 animate-pulse w-full" />
+      </div>
+    )}
       <div className="p-6 lg:p-8 max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
@@ -241,6 +254,7 @@ export default function Finance() {
               sales={sales}
               jobs={jobs}
               expenses={expenses}
+              dateRange={dateRange}
             />
           )}
           {activeTab === "sales" && (
@@ -265,8 +279,8 @@ export default function Finance() {
   );
 }
 
-// --- OVERVIEW TAB (FIXED) ---
-function OverviewTab({ pl, revenue, expenses }) {
+// --- OVERVIEW TAB 
+function OverviewTab({ pl, revenue, expenses, dateRange, sales, jobs }) {
   const [showPurchases, setShowPurchases] = useState(false);
 
   // 1. COGS (Usage) - From P&L
@@ -492,6 +506,7 @@ function OverviewTab({ pl, revenue, expenses }) {
           </div>
         </div>
       </div>
+       <TrendsChart dateRange={dateRange} />
     </div>
   );
 }
@@ -1047,6 +1062,177 @@ function StatCard({ title, value, subtitle }) {
       </p>
       <p className="text-2xl font-bold text-gray-900 mt-1">{value}</p>
       <p className="text-xs text-gray-400 mt-1">{subtitle}</p>
+    </div>
+  );
+}
+
+function TrendsChart({ dateRange }) {
+  const [periods, setPeriods] = useState(6);
+  const [unit, setUnit] = useState('month');
+  const [chartType, setChartType] = useState('line');
+  const [activeMetrics, setActiveMetrics] = useState(['revenue', 'expenses', 'netProfit']);
+
+  const { data: trendsData, isLoading } = useQuery({
+    queryKey: ['trends', periods, unit],
+    queryFn: () => reportsApi.getTrends({ periods, unit }),
+  });
+
+  const data = trendsData?.data || [];
+
+  const METRICS = [
+    { key: 'revenue', label: 'Revenue', color: '#6366F1' },
+    { key: 'expenses', label: 'Expenses', color: '#EF4444' },
+    { key: 'netProfit', label: 'Net Profit', color: '#10B981' },
+    { key: 'salesCount', label: 'Sales Count', color: '#F59E0B' },
+  ];
+
+  const PERIOD_OPTIONS = [
+    { label: '2 Months', value: 2, unit: 'month' },
+    { label: '3 Months', value: 3, unit: 'month' },
+    { label: '6 Months', value: 6, unit: 'month' },
+    { label: '12 Months', value: 12, unit: 'month' },
+  ];
+
+  const toggleMetric = (key) => {
+    setActiveMetrics(prev =>
+      prev.includes(key) ? prev.filter(m => m !== key) : [...prev, key]
+    );
+  };
+
+  const ChartComponent = chartType === 'line' ? LineChart : BarChart;
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900">Trend Comparison</h3>
+          <p className="text-sm text-gray-500 mt-0.5">Compare performance across periods</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Period selector */}
+          <div className="flex bg-gray-100 rounded-lg p-1 gap-1">
+            {PERIOD_OPTIONS.map(opt => (
+              <button
+                key={opt.label}
+                onClick={() => { setPeriods(opt.value); setUnit(opt.unit); }}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                  periods === opt.value && unit === opt.unit
+                    ? 'bg-white text-gray-900 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+          {/* Chart type toggle */}
+          <div className="flex bg-gray-100 rounded-lg p-1">
+            <button
+              onClick={() => setChartType('line')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                chartType === 'line' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+              }`}
+            >
+              Line
+            </button>
+            <button
+              onClick={() => setChartType('bar')}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all ${
+                chartType === 'bar' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
+              }`}
+            >
+              Bar
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Metric toggles */}
+      <div className="flex flex-wrap gap-2 mb-6">
+        {METRICS.map(metric => (
+          <button
+            key={metric.key}
+            onClick={() => toggleMetric(metric.key)}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+              activeMetrics.includes(metric.key)
+                ? 'border-transparent text-white'
+                : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'
+            }`}
+            style={activeMetrics.includes(metric.key)
+              ? { backgroundColor: metric.color, borderColor: metric.color }
+              : {}
+            }
+          >
+            <div
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: activeMetrics.includes(metric.key) ? 'white' : metric.color }}
+            />
+            {metric.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Chart */}
+      {isLoading ? (
+        <div className="h-72 flex items-center justify-center">
+          <LoadingSpinner size="md" text="Loading trends..." />
+        </div>
+      ) : (
+        <div className="h-72">
+          <ResponsiveContainer width="100%" height="100%">
+            {chartType === 'line' ? (
+              <LineChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={12} stroke="#94A3B8" />
+                <YAxis axisLine={false} tickLine={false} fontSize={12} stroke="#94A3B8"
+                  tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                  formatter={(val, name) => {
+                    const metric = METRICS.find(m => m.key === name);
+                    return name === 'salesCount'
+                      ? [val, metric?.label]
+                      : [`GH₵${Number(val).toLocaleString()}`, metric?.label];
+                  }}
+                />
+                <Legend formatter={name => METRICS.find(m => m.key === name)?.label} />
+                {METRICS.filter(m => activeMetrics.includes(m.key)).map(metric => (
+                  <Line
+                    key={metric.key}
+                    type="monotone"
+                    dataKey={metric.key}
+                    stroke={metric.color}
+                    strokeWidth={2.5}
+                    dot={{ r: 4, fill: metric.color }}
+                    activeDot={{ r: 6 }}
+                  />
+                ))}
+              </LineChart>
+            ) : (
+              <BarChart data={data} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="label" axisLine={false} tickLine={false} fontSize={12} stroke="#94A3B8" />
+                <YAxis axisLine={false} tickLine={false} fontSize={12} stroke="#94A3B8"
+                  tickFormatter={v => v >= 1000 ? `${(v/1000).toFixed(0)}k` : v} />
+                <Tooltip
+                  contentStyle={{ borderRadius: '8px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0,0,0,0.1)' }}
+                  formatter={(val, name) => {
+                    const metric = METRICS.find(m => m.key === name);
+                    return name === 'salesCount'
+                      ? [val, metric?.label]
+                      : [`GH₵${Number(val).toLocaleString()}`, metric?.label];
+                  }}
+                />
+                <Legend formatter={name => METRICS.find(m => m.key === name)?.label} />
+                {METRICS.filter(m => activeMetrics.includes(m.key)).map(metric => (
+                  <Bar key={metric.key} dataKey={metric.key} fill={metric.color} radius={[3, 3, 0, 0]} barSize={20} />
+                ))}
+              </BarChart>
+            )}
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }

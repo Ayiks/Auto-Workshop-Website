@@ -13,37 +13,42 @@ export default function ReportFilters({
   };
 
   const setPresetRange = (preset) => {
-    const now = new Date();
-    let start, end;
+  const now = new Date(); // fresh reference
+  let start, end;
 
-    switch (preset) {
-      case 'today':
-        start = end = format(now, 'yyyy-MM-dd');
-        break;
-      case 'this-week':
-        const firstDay = new Date(now.setDate(now.getDate() - now.getDay()));
-        start = format(firstDay, 'yyyy-MM-dd');
-        end = format(new Date(), 'yyyy-MM-dd');
-        break;
-      case 'this-month':
-        start = format(startOfMonth(new Date()), 'yyyy-MM-dd');
-        end = format(endOfMonth(new Date()), 'yyyy-MM-dd');
-        break;
-      case 'last-month':
-        const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-        start = format(startOfMonth(lastMonth), 'yyyy-MM-dd');
-        end = format(endOfMonth(lastMonth), 'yyyy-MM-dd');
-        break;
-      case 'this-year':
-        start = format(new Date(now.getFullYear(), 0, 1), 'yyyy-MM-dd');
-        end = format(new Date(), 'yyyy-MM-dd');
-        break;
-      default:
-        return;
+  switch (preset) {
+    case 'today':
+      start = end = format(now, 'yyyy-MM-dd');
+      break;
+    case 'this-week': {
+      // Don't mutate now — create a new date
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      start = format(weekStart, 'yyyy-MM-dd');
+      end = format(now, 'yyyy-MM-dd');
+      break;
     }
+    case 'this-month':
+      start = format(startOfMonth(now), 'yyyy-MM-dd');
+      end = format(endOfMonth(now), 'yyyy-MM-dd');
+      break;
+    case 'last-month': {
+      // Don't mutate now — pass year/month directly
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      start = format(startOfMonth(lastMonth), 'yyyy-MM-dd');
+      end = format(endOfMonth(lastMonth), 'yyyy-MM-dd');
+      break;
+    }
+    case 'this-year':
+      start = format(new Date(now.getFullYear(), 0, 1), 'yyyy-MM-dd');
+      end = format(now, 'yyyy-MM-dd');
+      break;
+    default:
+      return;
+  }
 
-    onDateChange({ startDate: start, endDate: end });
-  };
+  onDateChange({ startDate: start, endDate: end });
+};
 
   return (
     <Card className="bg-white border border-gray-200 shadow-sm p-3 sm:p-4">

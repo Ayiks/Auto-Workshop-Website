@@ -21,15 +21,15 @@ export const getMaterials = asyncHandler(async (req, res) => {
   });
 
   // Filter low stock items if requested
-  let result = materials;
-  if (lowStock === 'true') {
-    result = materials.filter(m => m.quantity <= m.lowStockThreshold);
-  }
+  // let result = materials;
+  // if (lowStock === 'true') {
+  //   result = materials.filter(m => m.quantity <= m.lowStockThreshold);
+  // }
 
   res.status(200).json({
     success: true,
-    count: result.length,
-    data: result,
+    count: materials.length,
+    data: materials,
   });
 });
 

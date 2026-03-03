@@ -20,8 +20,14 @@ export const protect = asyncHandler(async (req, res, next) => {
   try {
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
+    const userId = decoded.id || decoded.userId;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'Not authorized, token payload is missing ID' });
+    }
+
     const user = await prisma.user.findUnique({
-      where: { id: decoded.id },
+      where: { id: userId },
       select: {
         id: true,
         businessId: true,
@@ -29,7 +35,7 @@ export const protect = asyncHandler(async (req, res, next) => {
         fullName: true,
         email: true,
         role: true,
-        permissions: true, // Crucial: Fetch permissions JSON
+        permissions: true,
         isActive: true,
       },
     });
@@ -42,10 +48,12 @@ export const protect = asyncHandler(async (req, res, next) => {
       throw new AppError('User account is deactivated', 401, 'ACCOUNT_DEACTIVATED');
     }
 
+    if (user.businessId) req.db = getTenantDB(user.businessId);
+
     req.user = user;
 
-    req.db = getTenantDB(user.businessId); // Attach tenant-specific Prisma client to request
-    
+    // req.db = getTenantDB(user.businessId); // Attach tenant-specific Prisma client to request
+
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {
@@ -172,7 +180,7 @@ export const requireJobTypeAccess = (req, res, next) => {
   };
 
   const allowedJobType = roleToJobType[req.user.role];
-  
+
   if (!allowedJobType) {
     throw new AppError('Role not authorized for jobs', 403, 'PERMISSION_DENIED');
   }
@@ -200,9 +208,9 @@ export const generateToken = (user) => {
 // Verify permission helper (for use in controllers)
 export const hasPermission = (user, module, action) => {
   if (user.role === 'admin') return true;
-  
+
   const userPermissions = user.permissions || {};
   const modulePermissions = userPermissions[module] || [];
-  
+
   return modulePermissions.includes(action);
 };

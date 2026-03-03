@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@stores/authStore";
 import { useResponsive } from "@hooks/useResponsive";
@@ -7,10 +7,20 @@ import { RESPONSIVE_SPACING } from "@utils/responsiveHelpers";
 export default function Login() {
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
+  const clearError = useAuthStore((state) => state.clearError);
 
   const [formData, setFormData] = useState({ username: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+
+  // Clear any previous auth errors when component mounts
+  useEffect(() => {
+    setError("");
+    // Clear auth store error if available
+    if (clearError) {
+      clearError();
+    }
+  }, [clearError]);
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -19,12 +29,27 @@ export default function Login() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError("");
-    setIsLoading(true);
-    const result = await login(formData);
-    if (result.success) navigate("/app/dashboard");
-    else setError(result.error || "Login failed. Please try again.");
-    setIsLoading(false);
+    
+    try {
+      setError("");
+      setIsLoading(true);
+      const user = await login(formData);
+      
+      if (user && user.businessId) {
+        // User has a business, go to dashboard
+        navigate('/app/dashboard');
+      } else if (user) {
+        // User logged in but no business yet, go to setup workspace
+        navigate('/setup-workspace');
+      } else {
+        // Login failed
+        setError('Login failed. Please try again.');
+      }
+      setIsLoading(false);
+      
+    } catch (err) {
+      console.error("Login failed", err);
+    }
   };
 
   return (

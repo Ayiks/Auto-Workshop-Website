@@ -170,13 +170,13 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
       <div className="flex flex-col h-full max-h-[80vh]">
         
         {/* Header */}
-        <div className="mb-4 space-y-3">
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+        <div className="mb-3 sm:mb-4 space-y-2 sm:space-y-3">
+          <div className="flex items-center justify-between p-2 sm:p-3 bg-gray-50 rounded-lg border border-gray-100">
             <div>
-              <p className="text-sm text-gray-500">Configuring access for</p>
-              <p className="text-lg font-bold text-gray-900">{user.username}</p>
+              <p className="text-xs sm:text-sm text-gray-500">Configuring access for</p>
+              <p className="text-base sm:text-lg font-bold text-gray-900">{user.username}</p>
             </div>
-            <div className={`px-3 py-1 rounded-full text-sm font-medium border ${
+            <div className={`px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm font-medium border ${
               isAdmin ? 'bg-gray-100 border-gray-200 text-gray-800' : 'bg-blue-50 border-blue-100 text-blue-800'
             }`}>
               {user.role.charAt(0).toUpperCase() + user.role.slice(1)} Role
@@ -184,19 +184,19 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
           </div>
 
           {isAdmin ? (
-            <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex gap-3 items-start">
-               <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <div className="p-2.5 sm:p-4 bg-yellow-50 border border-yellow-200 rounded-lg flex gap-2 sm:gap-3 items-start">
+               <svg className="w-4 sm:w-5 h-4 sm:h-5 text-yellow-600 mt-0.5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                </svg>
                <div>
-                 <p className="font-medium text-yellow-800">Admin Privileges Override</p>
-                 <p className="text-sm text-yellow-700 mt-1">
+                 <p className="font-medium text-xs sm:text-sm text-yellow-800">Admin Privileges Override</p>
+                 <p className="text-xs text-yellow-700 mt-0.5 sm:mt-1">
                    Admins have full access.
                  </p>
                </div>
             </div>
           ) : (
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 sm:gap-2">
               <Button size="sm" variant="outline" onClick={handleSelectAll}>Select All</Button>
               <Button size="sm" variant="outline" onClick={handleClearAll}>Clear All</Button>
             </div>
@@ -205,17 +205,17 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
 
         {/* Grid */}
         <div className="flex-1 overflow-y-auto pr-2 -mr-2">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 gap-3 sm:gap-4 pb-2">
             {PERMISSION_MODULES.map(({ module, label, actions }) => (
               <div 
                 key={module} 
-                className={`p-4 rounded-lg border transition-all ${
+                className={`p-3 sm:p-4 rounded-lg border transition-all ${
                   permissions[module]?.length > 0 
                     ? 'bg-white border-indigo-200 shadow-sm' 
                     : 'bg-gray-50 border-gray-200 opacity-80 hover:opacity-100'
                 }`}
               >
-                <div className="flex items-center justify-between mb-3 pb-2 border-b border-gray-100">
+                <div className="flex items-center justify-between mb-2 sm:mb-3 pb-1.5 sm:pb-2 border-b border-gray-100">
                   <label className="flex items-center gap-2 cursor-pointer select-none">
                     <input
                       type="checkbox"
@@ -224,16 +224,16 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
                       disabled={isAdmin}
                       className="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 w-4 h-4"
                     />
-                    <span className={`font-semibold ${permissions[module]?.length ? 'text-indigo-900' : 'text-gray-700'}`}>
+                    <span className={`font-semibold text-xs sm:text-sm ${permissions[module]?.length ? 'text-indigo-900' : 'text-gray-700'}`}>
                       {label}
                     </span>
                   </label>
-                  <span className="text-xs font-medium text-gray-400">
+                  <span className="text-[10px] sm:text-xs font-medium text-gray-400">
                     {permissions[module]?.length || 0}/{actions.length}
                   </span>
                 </div>
 
-                <div className="grid grid-cols-2 gap-y-2 gap-x-1">
+                <div className="grid grid-cols-2 gap-y-1.5 sm:gap-y-2 gap-x-1">
                   {actions.map(action => (
                     <label key={action} className="flex items-center gap-2 cursor-pointer select-none group">
                       <input
@@ -243,7 +243,7 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
                         disabled={isAdmin}
                         className="rounded text-indigo-600 focus:ring-indigo-500 border-gray-300 w-3.5 h-3.5"
                       />
-                      <span className="text-sm text-gray-600 group-hover:text-gray-900 transition-colors">
+                      <span className="text-xs sm:text-sm text-gray-600 group-hover:text-gray-900 transition-colors">
                         {ACTION_LABELS[action]}
                       </span>
                     </label>
@@ -255,11 +255,11 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
         </div>
 
         {/* Footer */}
-        <div className="mt-4 pt-4 border-t border-gray-200 flex items-center justify-between">
-          <div className="text-sm text-gray-500 hidden sm:block">
+        <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200 flex items-center justify-between">
+          <div className="text-xs sm:text-sm text-gray-500 hidden sm:block">
             <span className="font-medium text-indigo-600">{totalActions}</span> permissions active
           </div>
-          <div className="flex gap-3 w-full sm:w-auto justify-end">
+          <div className="flex gap-2 sm:gap-3 w-full sm:w-auto justify-end">
             <Button variant="secondary" onClick={onClose}>Cancel</Button>
             <Button 
               variant="primary" 

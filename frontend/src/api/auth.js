@@ -8,8 +8,19 @@ export const authApi = {
   },
 
   // Register
-  register: async (data) => {
-    const response = await apiClient.post('/auth/register', data);
+  registerUser: async (userData) => {
+    const response = await apiClient.post('/auth/register', userData);
+    return response;
+  },
+
+  // Verify Email
+  verifyEmail: async (token) => {
+    const response = await apiClient.get(`/auth/verify-email/${token}`);
+    return response;
+  },
+  // Setup Workspace  
+  setupWorkspace: async (data) => {
+    const response = await apiClient.post('/auth/setup-workspace', data);
     return response;
   },
   

@@ -547,7 +547,7 @@ export const addPayment = asyncHandler(async (req, res) => {
 // @access  Private (requires 'sales:view' or 'sales:viewOwn' permission)
 export const getSales = asyncHandler(async (req, res) => {
   // 1. EXTRACT 'paymentStatus' FROM QUERY
-  let { status, startDate, endDate, paymentMethod, paymentStatus, soldBy, page = 1, limit = 10 } = req.query;
+  let { status, startDate, endDate, paymentMethod, paymentStatus, itemType, soldBy, page = 1, limit = 10 } = req.query;
 
   const pageNumber = parseInt(page);
   const limitNumber = parseInt(limit);
@@ -578,6 +578,14 @@ if (status) where.status = status;
       end.setHours(23, 59, 59, 999);
       where.saleDate.lte = end;
     }
+  }
+
+  if (itemType) {
+    where.items = {
+      some:{
+        itemType: itemType
+      }
+    };
   }
 
   // Filter by payment method

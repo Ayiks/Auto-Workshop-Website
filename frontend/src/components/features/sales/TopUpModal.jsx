@@ -40,10 +40,10 @@ export default function TopUpModal({
       title={`Add Payment for Receipt #${sale?.receipt?.receiptNumber}`}
       maxWidth="max-w-md"
     >
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <form onSubmit={handleSubmit} className="p-3 sm:p-4 space-y-3 sm:space-y-4">
         
         {/* Info Box */}
-        <div className="bg-amber-50 border border-amber-100 rounded-lg p-3 text-sm text-amber-800">
+        <div className="bg-amber-50 border border-amber-100 rounded-lg p-2 sm:p-3 text-xs sm:text-sm text-amber-800">
             <div className="flex justify-between">
                 <span>Total Amount:</span>
                 <span className="font-semibold">GH₵{parseFloat(sale?.totalAmount || 0).toFixed(2)}</span>
@@ -56,7 +56,7 @@ export default function TopUpModal({
 
         {/* Amount Input */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
             Amount to Pay (GH₵)
           </label>
           <input
@@ -65,19 +65,19 @@ export default function TopUpModal({
             required
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+            className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm"
           />
         </div>
 
         {/* Payment Method Select */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">
             Payment Method
           </label>
           <select
             value={paymentMethod}
             onChange={(e) => setPaymentMethod(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500"
+            className="w-full px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-amber-500 text-sm"
           >
             <option value="cash">Cash</option>
             <option value="momo">Mobile Money</option>
@@ -86,7 +86,7 @@ export default function TopUpModal({
         </div>
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 mt-6">
+        <div className="flex justify-end gap-2 sm:gap-3 mt-4 sm:mt-6">
           <Button
             variant="secondary"
             onClick={onClose}

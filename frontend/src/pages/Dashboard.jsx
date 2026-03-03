@@ -202,7 +202,7 @@ export default function Dashboard() {
                     <TrendBadge value={stats?.dailyRevenue?.trend} />
                 </div>
                 <div className="relative z-10">
-                    <p className="text-xs sm:text-sm font-medium text-gray-500">Daily Revenue</p>
+                    <p className="text-xs sm:text-sm font-medium text-gray-500">Today's Revenue</p>
                     <h3 className="text-xl sm:text-2xl font-bold text-indigo-900 mt-1 tracking-tight">GH₵{Number(stats?.dailyRevenue?.amount || 0).toLocaleString()}</h3>
                     <p className="text-xs text-gray-400 mt-1">earned today</p>
                 </div>

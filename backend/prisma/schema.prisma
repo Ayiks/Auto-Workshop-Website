@@ -53,14 +53,17 @@ model User {
   isActive         Boolean           @default(true) @map("is_active")
   createdAt        DateTime          @default(now()) @map("created_at")
   lastLogin        DateTime?         @map("last_login")
-  businessId       String            @map("business_id")
+  businessId       String?           @map("business_id")
+  isEmailVerified         Boolean   @default(false) @map("is_email_verified")
+  emailVerificationToken  String?   @unique @map("email_verification_token")
+  verificationTokenExpiry DateTime? @map("verification_token_expiry")
   expensesRecorded Expense[]
   jobsAssigned     Job[]
   reordersCreated  MaterialReorder[]
   paymentsReceived Payment[]
   receiptsIssued   Receipt[]
   salesMade        Sale[]
-  business         Business          @relation(fields: [businessId], references: [id])
+  business         Business?          @relation(fields: [businessId], references: [id])
 
   @@map("users")
 }

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { materialsApi } from "@api/materials";
 import { useAuthStore } from "@stores/authStore";
@@ -45,37 +45,73 @@ export default function Materials() {
     queryFn: () =>
       materialsApi.getMaterials({
         status: statusFilter === "all" ? undefined : statusFilter,
-        lowStock: showLowStock ? "true" : undefined,
+        // lowStock: showLowStock ? "true" : undefined,
       }),
   });
 
   const materials = data?.data || [];
 
   // --- Derived State ---
+  // const filteredMaterials = useMemo(() => {
+  //   return materials.filter((material) => {
+  //     const matchesSearch = material.name
+  //       .toLowerCase()
+  //       .includes(searchTerm.toLowerCase());
+  //     const matchesStatus = showLowStock
+  //       ? material.isActive
+  //       : statusFilter === "all"
+  //         ? true
+  //         : statusFilter === "active"
+  //           ? material.isActive
+  //           : !material.isActive;
+  //     const isLow =
+  //       Number(material.quantity) <= Number(material.lowStockThreshold);
+  //     // Only show active low stock items, matching what inventoryStats counts
+  //     const matchesLowStock = !showLowStock || (isLow && material.isActive);
+
+  //     return matchesSearch && matchesStatus && matchesLowStock;
+  //   });
+  // }, [materials, searchTerm, showLowStock, statusFilter]);
+
   const filteredMaterials = useMemo(() => {
-    return materials.filter((material) => {
+    const result = materials.filter((material) => {
       const matchesSearch = material.name
         .toLowerCase()
         .includes(searchTerm.toLowerCase());
-      const matchesStatus =
-        statusFilter === "all"
+      const matchesStatus = showLowStock
+        ? material.isActive
+        : statusFilter === "all"
           ? true
           : statusFilter === "active"
             ? material.isActive
             : !material.isActive;
       const isLow =
         Number(material.quantity) <= Number(material.lowStockThreshold);
-      // Only show active low stock items, matching what inventoryStats counts
-      const matchesLowStock = !showLowStock || (isLow && material.isActive);
-
+      const matchesLowStock = !showLowStock || isLow;
       return matchesSearch && matchesStatus && matchesLowStock;
     });
+
+    // if (showLowStock) {
+    //   console.log(
+    //     "Low stock filter ON. Matches:",
+    //     result.map((m) => ({
+    //       name: m.name,
+    //       qty: Number(m.quantity),
+    //       threshold: Number(m.lowStockThreshold),
+    //       isActive: m.isActive,
+    //       isLow: Number(m.quantity) <= Number(m.lowStockThreshold),
+    //     })),
+    //   );
+    // }
+
+    return result;
   }, [materials, searchTerm, showLowStock, statusFilter]);
+
 
   const inventoryStats = useMemo(() => {
     if (!materials || materials.length === 0) {
       return {
-        totalItems: 0,
+        totalItems: filteredMaterials.length,
         lowStockItems: 0,
         totalCostValue: 0,
         totalRetailValue: 0,
@@ -85,8 +121,9 @@ export default function Materials() {
 
     const activeMaterials = materials.filter((m) => m.isActive);
 
+
     return {
-      totalItems: activeMaterials.length,
+      totalItems: filteredMaterials.length,
       activeItems: activeMaterials.length,
       lowStockItems: activeMaterials.filter(
         (m) => Number(m.quantity) <= Number(m.lowStockThreshold),
@@ -100,7 +137,7 @@ export default function Materials() {
         0,
       ),
     };
-  }, [materials]);
+  }, [materials, filteredMaterials]);
 
   // --- Selection Logic ---
   const toggleSelectAll = () => {
@@ -192,6 +229,11 @@ export default function Materials() {
     },
     onError: (err) => alert(err.message || "Failed to update status"),
   });
+
+  // Add this useEffect
+useEffect(() => {
+  setSelectedIds([]);
+}, [showLowStock, statusFilter, searchTerm]);
 
   // --- Handlers ---
 

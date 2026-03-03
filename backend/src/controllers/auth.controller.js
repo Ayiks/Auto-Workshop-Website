@@ -1,93 +1,250 @@
+import crypto from 'crypto';
 import bcrypt from 'bcryptjs';
-import prisma from '../config/database.js';
+import prisma, { getTenantDB } from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 import { generateToken } from '../middleware/auth.js';
+import { sendVerificationEmail } from "../utils/sendEmail.js";
+
 
 
 // @desc    Register a new business, choose plan, and create admin
 // @route   POST /api/auth/register
 // @access  Public
-export const register = asyncHandler(async (req, res) => {
-  const { fullName, email, phone, password, businessName, selectedPlan } = req.body;
+// export const register = asyncHandler(async (req, res) => {
+//   const { fullName, email, phone, password, businessName, selectedPlan } = req.body;
 
-  // 1. Validate required fields
-  if (!fullName || !email || !password || !businessName) {
-    throw new AppError('Please provide all required fields', 400, 'VALIDATION_ERROR');
-  }
+//   // 1. Validate required fields
+//   if (!fullName || !email || !password || !businessName) {
+//     throw new AppError('Please provide all required fields', 400, 'VALIDATION_ERROR');
+//   }
 
-  // Ensure they picked a valid plan (default to free)
-  const plan = selectedPlan === 'pro' ? 'pro' : 'free';
+//   // Ensure they picked a valid plan (default to free)
+//   const plan = selectedPlan === 'pro' ? 'pro' : 'free';
 
-  // 2. Check if user already exists
-  const existingUser = await prisma.user.findFirst({
-    where: { 
-      OR: [{ email }, { username: email }]
+//   // 2. Check if user already exists
+//   const existingUser = await prisma.user.findFirst({
+//     where: { 
+//       OR: [{ email }, { username: email }]
+//     }
+//   });
+
+//   if (existingUser) {
+//     throw new AppError('An account with this email already exists', 400, 'DUPLICATE_ENTRY');
+//   }
+
+//   // 3. Hash the password
+//   const hashedPassword = await bcrypt.hash(password, 12);
+
+//   // 4. Create Business AND Admin User in one transaction
+//   const result = await prisma.$transaction(async (tx) => {
+
+//     // A. Create the Business Workspace
+//     const newBusiness = await tx.business.create({
+//       data: {
+//         name: businessName,
+//         plan: plan,
+//         subscriptionStatus: 'active', // Active immediately for free plan
+//       }
+//     });
+
+//     // B. Create the Admin User tied to the new Business
+//     const newUser = await tx.user.create({
+//       data: {
+//         fullName,
+//         email,
+//         username: email, // Defaulting username to email for login
+//         phone,
+//         passwordHash: hashedPassword,
+//         role: 'admin',
+//         businessId: newBusiness.id, // Linked!
+//         isActive: true,
+//         permissions: { "all": ["manage"] } 
+//       }
+//     });
+
+//     return { business: newBusiness, user: newUser };
+//   });
+
+//   // 5. Initialize default settings in their new isolated sandbox
+//   const db = getTenantDB(result.business.id);
+//   await db.businessSettings.create({
+//     data: {
+//       name: businessName,
+//       email: email,
+//       phone: phone || '',
+//       address: 'Please update your address in settings',
+//     }
+//   });
+
+//   // 6. Generate login token
+//   const token = generateToken(result.user);
+
+//   // 7. Send response
+//   res.status(201).json({
+//     success: true,
+//     token,
+//     data: {
+//       id: result.user.id,
+//       fullName: result.user.fullName,
+//       email: result.user.email,
+//       role: result.user.role,
+//       businessId: result.business.id,
+//       businessName: result.business.name,
+//       plan: result.business.plan
+//     }
+//   });
+// });
+
+// 1. STEP ONE: Create Account & Send Email
+export const registerUser = asyncHandler(async (req, res) => {
+  const { fullName, email, phone, password } = req.body;
+
+  if (!fullName || !email || !password) throw new AppError('Please provide all required fields', 400);
+
+  const existingUser = await prisma.user.findFirst({ where: { email } });
+  if (existingUser) throw new AppError('Email already in use', 400);
+
+  // Generate a random token for the email link
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+  const hashedPassword = await bcrypt.hash(password, 12);
+
+  // Create User WITHOUT a business yet
+  const user = await prisma.user.create({
+    data: {
+      fullName,
+      email,
+      username: email,
+      phone,
+      passwordHash: hashedPassword,
+      role: 'admin',
+      isEmailVerified: false,
+      emailVerificationToken: verificationToken,
+      verificationTokenExpiry: tokenExpiry,
+      permissions: { "all": ["manage"] }
     }
   });
 
-  if (existingUser) {
-    throw new AppError('An account with this email already exists', 400, 'DUPLICATE_ENTRY');
+  // Send the email
+  await sendVerificationEmail(user.email, user.fullName, verificationToken);
+
+  res.status(201).json({
+    success: true,
+    message: 'Account created. Please check your email for the verification link.'
+  });
+});
+
+// 2. STEP TWO: User Clicks Link -> Verify & Log Them In
+export const verifyEmail = asyncHandler(async (req, res) => {
+  // 1. Grab the token and clean it up (removes accidental spaces from URL parsing)
+  const rawToken = req.params.token;
+  if (!rawToken) throw new AppError('No token provided', 400);
+
+  const token = rawToken.trim();
+
+  // 2. Use findFirst to avoid Prisma @unique crashing bugs
+  const user = await prisma.user.findFirst({
+    where: { emailVerificationToken: token }
+  });
+
+  // 3. Detailed error handling so we know EXACTLY what failed
+  if (!user) {
+    throw new AppError('Invalid token: This link has already been used or does not exist.', 400);
   }
 
-  // 3. Hash the password
-  const hashedPassword = await bcrypt.hash(password, 12);
+  // 4. Safe Date check (checking if the token is older than the expiry)
+  if (user.verificationTokenExpiry && new Date() > new Date(user.verificationTokenExpiry)) {
+    throw new AppError('This verification link has expired. Please sign up again.', 400);
+  }
 
-  // 4. Create Business AND Admin User in one transaction
+  // 5. Update user as verified, but DO NOT delete the token yet!
+  // (We delete it in setupWorkspace so they can safely refresh the page)
+  const updatedUser = await prisma.user.update({
+    where: { id: user.id },
+    data: {
+      isEmailVerified: true,
+      // intentionally leaving emailVerificationToken alone for now
+    }
+  });
+
+  // 6. Generate the JWT 
+  const authToken = generateToken(updatedUser);
+
+  res.status(200).json({
+    success: true,
+    token: authToken,
+    message: 'Email verified successfully!',
+    user: {
+      id: updatedUser.id,
+      email: updatedUser.email,
+      businessId: updatedUser.businessId
+    }
+  });
+});
+
+// 3. STEP THREE: Setup the Workspace (Requires the User to be logged in via JWT)
+export const setupWorkspace = asyncHandler(async (req, res) => {
+  const { businessName, plan = 'free' } = req.body;
+  const userId = req.user.id; // From your JWT auth middleware
+
+  if (!businessName) throw new AppError('Business name is required', 400);
+
+  // Check if they already have a workspace to prevent duplicates
+  if (req.user.businessId) throw new AppError('You already have a workspace', 400);
+
   const result = await prisma.$transaction(async (tx) => {
-    
-    // A. Create the Business Workspace
+    // A. Create the Business
     const newBusiness = await tx.business.create({
       data: {
         name: businessName,
         plan: plan,
-        subscriptionStatus: 'active', // Active immediately for free plan
+        subscriptionStatus: 'active',
       }
     });
 
-    // B. Create the Admin User tied to the new Business
-    const newUser = await tx.user.create({
+    // B. Attach the Business ID to the User
+    const updatedUser = await tx.user.update({
+      where: { id: userId },
       data: {
-        fullName,
-        email,
-        username: email, // Defaulting username to email for login
-        phone,
-        passwordHash: hashedPassword,
-        role: 'admin',
-        businessId: newBusiness.id, // Linked!
-        isActive: true,
-        permissions: { "all": ["manage"] } 
+        businessId: newBusiness.id, emailVerificationToken: null,
+        verificationTokenExpiry: null
       }
     });
 
-    return { business: newBusiness, user: newUser };
+    return { business: newBusiness, user: updatedUser };
   });
 
-  // 5. Initialize default settings in their new isolated sandbox
+  // C. Initialize default settings using the new Tenant ID
   const db = getTenantDB(result.business.id);
   await db.businessSettings.create({
     data: {
       name: businessName,
-      email: email,
-      phone: phone || '',
+      email: req.user.email,
+      phone: req.user.phone || '',
       address: 'Please update your address in settings',
     }
   });
 
-  // 6. Generate login token
-  const token = generateToken(result.user);
+  // Since the user now has a business ID, generate a NEW JWT token for them 
+  // so the frontend knows their new business context.
+  // const finalToken = generateToken({ id: result.user.id, role: result.user.role, businessId: result.business.id });
+  const finalToken = generateToken(result.user);
 
-  // 7. Send response
   res.status(201).json({
     success: true,
-    token,
+    token: finalToken,
+    message: 'Workspace created successfully!',
     data: {
       id: result.user.id,
       fullName: result.user.fullName,
       email: result.user.email,
+      username: result.user.username,
       role: result.user.role,
       businessId: result.business.id,
       businessName: result.business.name,
-      plan: result.business.plan
+      permissions: result.user.permissions,
+      isActive: result.user.isActive,
     }
   });
 });
@@ -230,7 +387,7 @@ export const updateProfile = asyncHandler(async (req, res) => {
 
   // 3. Update using req.user.id (from the auth token middleware)
   const user = await prisma.user.update({
-    where: { id: req.user.id }, 
+    where: { id: req.user.id },
     data: updateData,
     select: {
       id: true,

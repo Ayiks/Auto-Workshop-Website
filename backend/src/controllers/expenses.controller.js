@@ -699,7 +699,7 @@ export const createExpense = asyncHandler(async (req, res) => {
     'marketing',
     'transportation',
     'miscellaneous',
-    'materials', // <--- ADDED THIS
+    'materials', 
   ];
 
   if (!validCategories.includes(category.toLowerCase())) {
@@ -709,6 +709,12 @@ export const createExpense = asyncHandler(async (req, res) => {
       'VALIDATION_ERROR'
     );
   }
+  const expenseDateObj =  expenseDate ? (() => {
+  const selected = new Date(expenseDate); // e.g. 2026-03-01T00:00:00Z
+  const now = new Date();
+  selected.setHours(now.getHours(), now.getMinutes(), now.getSeconds(), now.getMilliseconds());
+  return selected;
+})() : new Date();
 
   const expense = await req.db.expense.create({
     data: {
@@ -716,7 +722,7 @@ export const createExpense = asyncHandler(async (req, res) => {
       category: category.toLowerCase(),
       description: description.trim(),
       amount: parseFloat(amount),
-      expenseDate: expenseDate ? new Date(expenseDate) : new Date(),
+      expenseDate: expenseDateObj,
       source: 'manual',
       isReadOnly: false,
       recordedBy: req.user.id,

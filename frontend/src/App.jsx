@@ -159,6 +159,9 @@ import ProtectedRoute from '@components/common/ProtectedRoute';
 // Pages
 import LandingPage from '@pages/LandingPage';
 import Register from '@pages/Signup';
+import SignupSuccess from '@pages/SignupSuccess';
+import VerifyEmail from '@pages/VerifyEmail';
+import SetupWorkspace from '@pages/SetupWorkspace';
 import Login from '@pages/Login';
 import Dashboard from '@pages/Dashboard';
 import Materials from '@pages/Materials';
@@ -180,7 +183,7 @@ const queryClient = new QueryClient({
     queries: {
       refetchOnWindowFocus: false,
       retry: 1,
-      staleTime: 5 * 60 * 1000, // 5 minutes
+      staleTime: 3 * 60 * 1000, // 3 minutes
     },
   },
 });
@@ -208,12 +211,15 @@ function App() {
         <Routes>
           {/* Public Routes */}
           <Route path="/" element={<LandingPage />} />
-
           <Route path="/login" element={<Login />} />
-
           <Route path="/signup" element={<Register />} />
+          <Route path="/signup-success" element={<SignupSuccess />} />
+          <Route path="/verify-email" element={<VerifyEmail />} />
+
+          <Route path="/setup-workspace" element={<SetupWorkspace />} />
 
           {/* Protected Routes */}
+          {/* <Route path="/setup-workspace" element={<ProtectedRoute><SetupWorkspace /></ProtectedRoute>} /> */}
           <Route
             path="/app"
             element={

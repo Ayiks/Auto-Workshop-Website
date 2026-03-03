@@ -147,17 +147,17 @@ const AddMaterialModal = ({ isOpen, onClose, onSubmit, jobId }) => {
       onClose={onClose}
       title="Add Material to Job"
     >
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
         {/* Material Type Selection */}
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2 sm:mb-3">
             Material Source
           </label>
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => setMaterialType('inventory')}
-              className={`px-4 py-3 border-2 rounded-lg font-medium transition-colors ${
+              className={`px-3 sm:px-4 py-2 sm:py-3 border-2 rounded-lg font-medium text-xs sm:text-sm transition-colors ${
                 materialType === 'inventory'
                   ? 'border-blue-600 bg-blue-50 text-blue-700'
                   : 'border-gray-300 bg-white text-gray-700 hover:border-gray-400'
@@ -186,7 +186,7 @@ const AddMaterialModal = ({ isOpen, onClose, onSubmit, jobId }) => {
         {materialType === 'inventory' ? (
           <>
             {loading ? (
-              <div className="text-center py-4 text-gray-500">Loading materials...</div>
+              <div className="text-center py-3 sm:py-4 text-xs sm:text-sm text-gray-500">Loading materials...</div>
             ) : (
               <Select
                 label="Select Material"
@@ -206,13 +206,13 @@ const AddMaterialModal = ({ isOpen, onClose, onSubmit, jobId }) => {
             )}
 
             {formData.materialId && (
-              <div className="bg-gray-50 p-3 rounded-lg">
-                <div className="text-sm text-gray-600">
+              <div className="bg-gray-50 p-2 sm:p-3 rounded-lg">
+                <div className="text-xs sm:text-sm text-gray-600 space-y-1">
                   <div className="flex justify-between">
                     <span>Unit Price:</span>
-                    <span className="font-medium">GHS {formData.unitPrice}</span>
+                    <span className="font-medium">GH₵{formData.unitPrice}</span>
                   </div>
-                  <div className="flex justify-between mt-1">
+                  <div className="flex justify-between">
                     <span>Available Stock:</span>
                     <span className="font-medium">
                       {materials.find(m => m.id === parseInt(formData.materialId))?.quantity || 0} units
@@ -262,23 +262,24 @@ const AddMaterialModal = ({ isOpen, onClose, onSubmit, jobId }) => {
 
         {/* Subtotal */}
         {formData.quantity && formData.unitPrice && (
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+          <div className="bg-blue-50 p-3 sm:p-4 rounded-lg border border-blue-200">
             <div className="flex justify-between items-center">
-              <span className="text-sm font-medium text-gray-700">Subtotal:</span>
-              <span className="text-xl font-bold text-blue-700">
-                GHS {calculateSubtotal()}
+              <span className="text-xs sm:text-sm font-medium text-gray-700">Subtotal:</span>
+              <span className="text-lg sm:text-xl font-bold text-blue-700">
+                GH₵{calculateSubtotal()}
               </span>
             </div>
           </div>
         )}
 
         {/* Actions */}
-        <div className="flex justify-end gap-3 border-t pt-4">
+        <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 border-t pt-3 sm:pt-4">
           <Button
             type="button"
             variant="secondary"
             onClick={onClose}
             disabled={isSubmitting}
+            className="text-xs sm:text-sm"
           >
             Cancel
           </Button>
@@ -287,6 +288,7 @@ const AddMaterialModal = ({ isOpen, onClose, onSubmit, jobId }) => {
             variant="primary"
             disabled={isSubmitting || loading}
             loading={isSubmitting}
+            className="text-xs sm:text-sm"
           >
             Add Material
           </Button>

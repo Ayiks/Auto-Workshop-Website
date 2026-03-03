@@ -194,7 +194,7 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
 
       {/* Role Selection */}
       <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
+        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
           Role <span className="text-red-500">*</span>
         </label>
         <select
@@ -210,24 +210,24 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
         </select>
         
         {/* Role Helper Text */}
-        <div className="mt-3 p-3 bg-blue-50 border border-blue-100 rounded-md">
+        <div className="mt-2 sm:mt-3 p-2 sm:p-3 bg-blue-50 border border-blue-100 rounded-md">
           <div className="flex gap-2">
-            <svg className="w-5 h-5 text-blue-600 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 sm:w-5 h-4 sm:h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            <p className="text-xs text-blue-800 leading-5">
+            <p className="text-[10px] sm:text-xs text-blue-800 leading-4 sm:leading-5">
               {formData.role === 'admin' && 'Full system access: Manage users, settings, and all modules.'}
               {formData.role === 'sales' && 'Sales access: Counter sales, payments, and daily reports.'}
               {formData.role === 'mechanic' && 'Workshop access: View assigned jobs, add parts, update labor.'}
               {formData.role === 'sprayer' && 'Workshop access: View assigned spray jobs, material usage.'}
-              {formData.role === 'bodyworks' && 'Workshop access: Body repair jobs, estimations.'}
+              {formData.role === 'bodyworks' && 'Body repair jobs, estimations.'}
             </p>
           </div>
         </div>
       </div>
 
       {/* Actions */}
-      <div className="flex justify-end gap-3 pt-4 border-t border-gray-100 mt-6">
+      <div className="flex justify-end gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-gray-100 mt-4 sm:mt-6">
         <Button variant="secondary" onClick={onCancel} disabled={isLoading}>
           Cancel
         </Button>

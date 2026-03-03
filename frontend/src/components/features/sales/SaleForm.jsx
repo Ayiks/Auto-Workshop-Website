@@ -233,35 +233,35 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   };
 
   return (
-    <div className="flex flex-col lg:flex-row h-[calc(100vh-140px)] gap-6">
+    <div className="flex flex-col lg:flex-row h-[calc(100vh-140px)] gap-4 sm:gap-6">
       
       {/* LEFT COLUMN: PRODUCTS */}
       <div className="flex-1 flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden h-full">
         {/* Toggle Header */}
-        <div className="p-4 border-b border-gray-100 bg-white z-10 space-y-4">
+        <div className="p-3 sm:p-4 border-b border-gray-100 bg-white z-10 space-y-3 sm:space-y-4">
           <div className="flex p-1 bg-gray-100 rounded-lg">
             <button
               type="button"
               onClick={() => setSaleType("counter")}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 ${saleType === "counter" ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5" : "text-gray-500 hover:text-gray-700"}`}
+              className={`flex-1 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-all duration-200 ${saleType === "counter" ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5" : "text-gray-500 hover:text-gray-700"}`}
             >
               Materials
             </button>
             <button
               type="button"
               onClick={() => setSaleType("booth")}
-              className={`flex-1 py-2 text-sm font-medium rounded-md transition-all duration-200 ${saleType === "booth" ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5" : "text-gray-500 hover:text-gray-700"}`}
+              className={`flex-1 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md transition-all duration-200 ${saleType === "booth" ? "bg-white text-gray-900 shadow-sm ring-1 ring-black/5" : "text-gray-500 hover:text-gray-700"}`}
             >
               Booth Services
             </button>
           </div>
           {saleType === "counter" && (
             <div className="relative">
-                <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <svg className="absolute left-3 sm:left-3 top-1/2 -translate-y-1/2 w-3.5 sm:w-4 h-3.5 sm:h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 <input
                 type="text"
                 placeholder="Search inventory..."
-                className="block w-full pl-10 pr-4 py-2 text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
+                className="block w-full pl-9 sm:pl-10 pr-3 sm:pr-4 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-200 rounded-lg bg-gray-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-gray-400 focus:border-gray-400 transition-colors"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 />
@@ -271,9 +271,9 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
 
         <div className="flex-1 overflow-y-auto p-4 bg-gray-50/50">
           {saleType === "counter" ? (
-            <div className="grid grid-cols-2 lg:grid-cols-2 xl:grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-2 gap-3 sm:gap-4">
               {filteredMaterials.map((material) => (
-                <div key={material.id} className="group bg-white p-3 rounded-xl border border-gray-200 hover:border-gray-300 shadow-sm transition-all flex flex-col relative">
+                <div key={material.id} className="group bg-white p-2 sm:p-3 rounded-xl border border-gray-200 hover:border-gray-300 shadow-sm transition-all flex flex-col relative">
                   <div className={`aspect-square rounded-lg mb-3 flex items-center justify-center text-white font-bold text-xl relative overflow-hidden ${material.imageUrl ? "" : getItemColor(material.id)}`}>
                     {material.imageUrl ? <img src={material.imageUrl} alt={material.name} className="w-full h-full object-cover" /> : <span>{material.name.substring(0, 2).toUpperCase()}</span>}
                     {material.quantity < 10 && material.quantity > 0 && <span className="absolute top-2 right-2 bg-black/75 backdrop-blur-sm text-white text-[10px] px-2 py-0.5 rounded-full font-medium">{material.quantity} left</span>}
@@ -355,13 +355,13 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
       </div>
 
       {/* RIGHT COLUMN: CHECKOUT */}
-      <div className="w-full lg:w-[400px] flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 h-full relative">
-        <div className="p-4 border-b border-gray-100 bg-white rounded-t-xl flex justify-between items-center">
-           <h2 className="font-bold text-base text-gray-900">Current Order</h2>
-           <button onClick={clearAll} className="text-xs font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 px-3 py-1.5 rounded-md transition-colors">Clear</button>
+      <div className="w-full lg:w-[380px] sm:w-[350px] flex flex-col bg-white rounded-xl shadow-sm border border-gray-200 h-full relative">
+        <div className="p-3 sm:p-4 border-b border-gray-100 bg-white rounded-t-xl flex justify-between items-center">
+           <h2 className="font-bold text-sm sm:text-base text-gray-900">Current Order</h2>
+           <button onClick={clearAll} className="text-xs font-medium text-gray-500 hover:text-gray-900 hover:bg-gray-100 px-2 sm:px-3 py-1 sm:py-1.5 rounded-md transition-colors">Clear</button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-4 space-y-2 sm:space-y-3">
           {saleType === 'counter' && items.length === 0 && (
              <div className="flex flex-col items-center justify-center h-40 text-gray-400">
                 <svg className="w-10 h-10 mb-2 opacity-20" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>
@@ -369,7 +369,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
              </div>
           )}
           {saleType === "counter" && items.map((item) => (
-              <div key={item.id} className="flex gap-3 bg-white group hover:bg-gray-50 border border-gray-100 p-2.5 rounded-lg transition-colors">
+              <div key={item.id} className="flex gap-2 sm:gap-3 bg-white group hover:bg-gray-50 border border-gray-100 p-2 sm:p-2.5 rounded-lg transition-colors">
                 <div className={`w-10 h-10 rounded-md flex items-center justify-center text-white text-xs font-bold shrink-0 ${item.imageUrl ? "" : getItemColor(item.materialId)}`}>
                   {item.imageUrl ? <img src={item.imageUrl} className="w-full h-full object-cover rounded-md" alt="" /> : item.materialName.charAt(0)}
                 </div>
@@ -429,21 +429,21 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
         </div>
 
         {/* BOTTOM SECTION */}
-        <div className="p-4 bg-gray-50 border-t border-gray-200 space-y-4 text-sm rounded-b-xl">
+        <div className="p-3 sm:p-4 bg-gray-50 border-t border-gray-200 space-y-3 sm:space-y-4 text-sm rounded-b-xl">
           
           {/* CUSTOMER SELECT */}
           <div className="relative z-20">
             <CustomerSelect value={selectedCustomer} onChange={setSelectedCustomer} label="Customer (Optional)" />
           </div>
 
-          <div className="grid grid-cols-2 gap-3 z-10 relative">
+          <div className="grid grid-cols-2 gap-2 sm:gap-3 z-10 relative">
              <div>
-                 <label className="text-xs font-semibold text-gray-500 mb-1 block">Date</label>
-                 <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:ring-1 focus:ring-gray-900 focus:border-gray-900" />
+                 <label className="text-xs sm:text-sm font-semibold text-gray-500 mb-1 block">Date</label>
+                 <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full p-1.5 sm:p-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white focus:ring-1 focus:ring-gray-900 focus:border-gray-900" />
              </div>
              <div>
-                <label className="text-xs font-semibold text-gray-500 mb-1 block">Method</label>
-                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full p-2 border border-gray-300 rounded-lg text-xs bg-white focus:ring-1 focus:ring-gray-900 focus:border-gray-900">
+                <label className="text-xs sm:text-sm font-semibold text-gray-500 mb-1 block">Method</label>
+                <select value={paymentMethod} onChange={(e) => setPaymentMethod(e.target.value)} className="w-full p-1.5 sm:p-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white focus:ring-1 focus:ring-gray-900 focus:border-gray-900">
                   <option value="cash">Cash</option>
                   <option value="momo">MoMo</option>
                   <option value="card">Card</option>
@@ -457,21 +457,21 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
              <label className="block text-xs font-semibold text-gray-500 mb-1">Payment Status</label>
              <div className="grid grid-cols-3 gap-1 p-1 bg-gray-200 rounded-lg">
                 {['paid', 'partially', 'unpaid'].map(status => (
-                   <button key={status} type="button" onClick={() => setPaymentStatus(status)} className={`py-1.5 text-xs font-medium rounded-md capitalize transition-all ${paymentStatus === status ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{status}</button>
+                   <button key={status} type="button" onClick={() => setPaymentStatus(status)} className={`py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-md capitalize transition-all ${paymentStatus === status ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}>{status}</button>
                 ))}
              </div>
              
              {/* PARTIAL AMOUNT INPUT */}
              {paymentStatus === 'partially' && (
-                <div className="mt-3 animate-in fade-in slide-in-from-top-1 bg-white border border-gray-200 p-2 rounded-lg">
-                    <label className="text-xs text-gray-700 font-semibold mb-1 block">Amount Paid:</label>
+                <div className="mt-2 sm:mt-3 animate-in fade-in slide-in-from-top-1 bg-white border border-gray-200 p-2 sm:p-3 rounded-lg">
+                    <label className="text-xs sm:text-sm text-gray-700 font-semibold mb-1 block">Amount Paid:</label>
                     <div className="relative">
-                        <span className="absolute left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs">GH₵</span>
+                        <span className="absolute left-1.5 sm:left-2 top-1/2 -translate-y-1/2 text-gray-400 text-xs sm:text-sm">GH₵</span>
                         <input 
                             type="number" 
                             value={partialAmount} 
                             onChange={(e) => setPartialAmount(e.target.value)}
-                            className="w-full pl-8 pr-2 py-1.5 text-sm border border-gray-300 rounded focus:ring-1 focus:ring-gray-900 outline-none"
+                            className="w-full pl-8 sm:pl-9 pr-2 sm:pr-3 py-1.5 sm:py-2 text-xs sm:text-sm border border-gray-300 rounded focus:ring-1 focus:ring-gray-900 outline-none"
                             placeholder="0.00"
                         />
                     </div>
@@ -479,8 +479,8 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
              )}
           </div>
 
-          <div className="border-t border-gray-200 pt-3 space-y-1">
-             <div className="flex justify-between text-xs text-gray-600"><span>Subtotal</span><span>GH₵ {subTotal.toFixed(2)}</span></div>
+          <div className="border-t border-gray-200 pt-2 sm:pt-3 space-y-1">
+             <div className="flex justify-between text-xs sm:text-sm text-gray-600"><span>Subtotal</span><span>GH₵ {subTotal.toFixed(2)}</span></div>
              <button type="button" onClick={() => setShowDiscountInput(!showDiscountInput)} className="text-xs text-orange-500 hover:text-gray-900 hover:underline text-left transition-colors">Add Discount?</button>
              {showDiscountInput && (
                 <div className="flex items-center gap-2 mt-1">
@@ -488,10 +488,10 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                     <input type="number" value={discount} onChange={(e) => setDiscount(e.target.value)} className="w-24 p-1 text-xs border border-gray-300 rounded focus:border-gray-900 focus:ring-0" placeholder="0.00" />
                 </div>
              )}
-             <div className="flex justify-between text-xl font-bold text-gray-900 pt-2"><span>Total</span><span>GH₵ {grandTotal.toFixed(2)}</span></div>
+             <div className="flex justify-between text-lg sm:text-xl font-bold text-gray-900 pt-2"><span>Total</span><span>GH₵ {grandTotal.toFixed(2)}</span></div>
           </div>
 
-          <Button onClick={handleFinalSubmit} variant="primary" className="w-full py-3 bg-gray-900 hover:bg-black text-white rounded-lg shadow-sm" loading={isLoading} disabled={grandTotal < 0 || (saleType === "counter" && items.length === 0)}>
+          <Button onClick={handleFinalSubmit} variant="primary" className="w-full py-2 sm:py-3 text-sm sm:text-base bg-gray-900 hover:bg-black text-white rounded-lg shadow-sm" loading={isLoading} disabled={grandTotal < 0 || (saleType === "counter" && items.length === 0)}>
             Complete Order
           </Button>
         </div>

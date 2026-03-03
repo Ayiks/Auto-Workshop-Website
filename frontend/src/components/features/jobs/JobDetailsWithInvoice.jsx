@@ -135,14 +135,14 @@ export default function JobDetailsWithInvoice({
               </div>
 
               {/* SCREEN HEADER (Visible on Screen) */}
-              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-6 border-b border-gray-100 no-print">
+              <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3 sm:gap-4 pb-4 sm:pb-6 border-b border-gray-100 no-print">
                 <div>
-                  <h1 className="text-2xl font-bold text-gray-900">Job Order Details</h1>
-                  <p className="text-sm text-gray-500 mt-1">
+                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Job Order Details</h1>
+                  <p className="text-xs sm:text-sm text-gray-500 mt-1">
                     Created on {format(new Date(job.createdAt), 'MMMM d, yyyy')}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-2">
+                <div className="flex flex-col items-start sm:items-end gap-2">
                   <span className={`px-3 py-1 rounded-md text-xs font-semibold uppercase tracking-wide ${STATUS_STYLES[job.status]}`}>
                     {STATUS_LABELS[job.status]}
                   </span>
@@ -151,45 +151,45 @@ export default function JobDetailsWithInvoice({
 
               {/* INVOICE BANNER */}
               {hasInvoice ? (
-                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-lg p-4 flex justify-between items-center gap-4 shadow-sm no-print">
-                  <div className="flex items-center gap-3">
-                    <div className="p-2 bg-white rounded-md shadow-sm text-indigo-600">
-                      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                <div className="bg-gradient-to-r from-indigo-50 to-blue-50 border border-indigo-100 rounded-lg p-3 sm:p-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-4 shadow-sm no-print">
+                  <div className="flex items-center gap-2 sm:gap-3">
+                    <div className="p-1.5 sm:p-2 bg-white rounded-md shadow-sm text-indigo-600">
+                      <svg className="w-5 sm:w-6 h-5 sm:h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                     </div>
                     <div>
                       <h3 className="text-xs font-bold text-indigo-900 uppercase tracking-wider">Invoice Generated</h3>
-                      <p className="text-lg font-mono font-semibold text-gray-900">#{job.invoice.invoiceNumber}</p>
+                      <p className="text-base sm:text-lg font-mono font-semibold text-gray-900">#{job.invoice.invoiceNumber}</p>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-left sm:text-right">
                      <div className="text-xs text-gray-500 uppercase">Balance Due</div>
-                     <div className={`text-xl font-bold ${job.invoice.amountDue > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                     <div className={`text-lg sm:text-xl font-bold ${job.invoice.amountDue > 0 ? 'text-red-600' : 'text-green-600'}`}>
                         GH₵{parseFloat(job.invoice.amountDue).toFixed(2)}
                      </div>
                   </div>
                 </div>
               ) : (
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 flex items-start gap-3 no-print">
-                  <svg className="w-5 h-5 text-amber-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 sm:p-4 flex items-start gap-2 sm:gap-3 no-print">
+                  <svg className="w-4.5 sm:w-5 h-4.5 sm:h-5 text-amber-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                   <div>
-                    <h4 className="text-sm font-bold text-amber-800">Pending Approval</h4>
-                    <p className="text-sm text-amber-700 mt-1">Print Estimate for client approval. Generate Invoice to lock inventory.</p>
+                    <h4 className="text-xs sm:text-sm font-bold text-amber-800">Pending Approval</h4>
+                    <p className="text-xs sm:text-sm text-amber-700 mt-1">Print Estimate for client approval. Generate Invoice to lock inventory.</p>
                   </div>
                 </div>
               )}
 
               {/* CLIENT & VEHICLE GRID */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-6">
                 <Card className="shadow-sm border-gray-200">
-                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2 mb-3">Client</h3>
-                  <dl className="space-y-2 text-sm">
+                  <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2 mb-2 sm:mb-3">Client</h3>
+                  <dl className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
                     <div className="flex justify-between"><dt className="text-gray-500">Name</dt><dd className="font-medium">{job.clientName}</dd></div>
                     <div className="flex justify-between"><dt className="text-gray-500">Phone</dt><dd className="font-medium">{job.clientPhone || '—'}</dd></div>
                   </dl>
                 </Card>
                 <Card className="shadow-sm border-gray-200">
-                  <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2 mb-3">Vehicle</h3>
-                  <dl className="space-y-2 text-sm">
+                  <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider border-b border-gray-100 pb-2 mb-2 sm:mb-3">Vehicle</h3>
+                  <dl className="space-y-1.5 sm:space-y-2 text-xs sm:text-sm">
                     <div className="flex justify-between"><dt className="text-gray-500">Vehicle</dt><dd className="font-medium">{job.vehicleMake} {job.vehicleModel}</dd></div>
                     <div className="flex justify-between"><dt className="text-gray-500">Reg #</dt><dd className="font-mono bg-gray-100 px-2 rounded">{job.vehicleRegNumber || '—'}</dd></div>
                   </dl>
@@ -197,75 +197,73 @@ export default function JobDetailsWithInvoice({
               </div>
 
               {/* MATERIALS TABLE */}
-              <div className="border border-gray-200 rounded-lg overflow-hidden mt-6">
-                 <table className="w-full text-sm">
+              <div className="border border-gray-200 rounded-lg overflow-hidden mt-4 sm:mt-6">
+                 <table className="w-full text-xs sm:text-sm">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
-                      <th className="py-2 px-4 text-left font-semibold text-gray-700">Description</th>
-                      <th className="py-2 px-4 text-center font-semibold text-gray-700">Qty</th>
-                      <th className="py-2 px-4 text-right font-semibold text-gray-700">Amount</th>
+                      <th className="py-1.5 sm:py-2 px-2 sm:px-4 text-left font-semibold text-gray-700">Description</th>
+                      <th className="py-1.5 sm:py-2 px-2 sm:px-4 text-center font-semibold text-gray-700">Qty</th>
+                      <th className="py-1.5 sm:py-2 px-2 sm:px-4 text-right font-semibold text-gray-700">Amount</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
                     {job.materials?.map((material, idx) => (
                       <tr key={idx}>
-                        <td className="py-2 px-4">
+                        <td className="py-1.5 sm:py-2 px-2 sm:px-4">
                           <div className="font-medium text-gray-900">{material.materialName}</div>
                           <div className="text-xs text-gray-500">@ GH₵{parseFloat(material.unitPrice).toFixed(2)}</div>
                         </td>
-                        <td className="py-2 px-4 text-center text-gray-600">{material.quantity}</td>
-                        <td className="py-2 px-4 text-right font-medium text-gray-900">GH₵{parseFloat(material.subtotal).toFixed(2)}</td>
+                        <td className="py-1.5 sm:py-2 px-2 sm:px-4 text-center text-gray-600">{material.quantity}</td>
+                        <td className="py-1.5 sm:py-2 px-2 sm:px-4 text-right font-medium text-gray-900">GH₵{parseFloat(material.subtotal).toFixed(2)}</td>
                       </tr>
                     ))}
                     <tr className="bg-blue-50/20">
-                      <td className="py-2 px-4 font-medium text-blue-900" colSpan="2">Labour Charges</td>
-                      <td className="py-2 px-4 text-right font-medium text-blue-900">GH₵{labourCost.toFixed(2)}</td>
+                      <td className="py-1.5 sm:py-2 px-2 sm:px-4 font-medium text-blue-900" colSpan="2">Labour Charges</td>
+                      <td className="py-1.5 sm:py-2 px-2 sm:px-4 text-right font-medium text-blue-900">GH₵{labourCost.toFixed(2)}</td>
                     </tr>
                   </tbody>
                  </table>
               </div>
 
               {/* TOTALS SECTION */}
-              <div className="flex justify-end mt-4">
+              <div className="flex justify-end mt-2 sm:mt-4">
                 <div className="w-full sm:w-1/2">
                   <div className="flex justify-between items-center py-2 border-t-2 border-gray-900">
-                    <span className="text-base font-bold uppercase">Total</span>
-                    <span className="text-2xl font-bold">GH₵{totalCost.toFixed(2)}</span>
+                    <span className="text-sm sm:text-base font-bold uppercase">Total</span>
+                    <span className="text-xl sm:text-2xl font-bold">GH₵{totalCost.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
 
               {/* 2. PAYMENT HISTORY (The Ledger) */}
               {hasInvoice && sortedPayments.length > 0 && (
-                <div className="mt-8">
-                   <h3 className="text-sm font-bold text-gray-900 uppercase tracking-wider mb-3 border-b border-gray-200 pb-1">Payment History</h3>
+                <div className="mt-6 sm:mt-8">
+                   <h3 className="text-xs sm:text-sm font-bold text-gray-900 uppercase tracking-wider mb-2 sm:mb-3 border-b border-gray-200 pb-1">Payment History</h3>
                    <div className="border border-gray-200 rounded-md overflow-hidden">
-                     <table className="w-full text-sm text-left">
+                     <table className="w-full text-xs sm:text-sm text-left">
                        <thead className="bg-gray-50 text-gray-500">
                          <tr>
-                           <th className="px-4 py-2 font-medium">Date</th>
-                           <th className="px-4 py-2 font-medium">Method</th>
-                           <th className="px-4 py-2 font-medium text-right">Amount</th>
+                           <th className="px-2 sm:px-4 py-1.5 sm:py-2 font-medium">Date</th>
+                           <th className="px-2 sm:px-4 py-1.5 sm:py-2 font-medium">Method</th>
+                           <th className="px-2 sm:px-4 py-1.5 sm:py-2 font-medium text-right">Amount</th>
                          </tr>
                        </thead>
                        <tbody className="divide-y divide-gray-100">
                          {sortedPayments.map((payment) => (
                            <tr key={payment.id} className="payment-row">
-                             <td className="px-4 py-2">{format(new Date(payment.paymentDate), 'MMM d, yyyy')}</td>
-                             <td className="px-4 py-2 capitalize">
+                             <td className="px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm">{format(new Date(payment.paymentDate), 'MMM d, yyyy')}</td>
+                             <td className="px-2 sm:px-4 py-1.5 sm:py-2 capitalize text-xs sm:text-sm">
                                {payment.paymentMethod}
-                               {/* Show Check/Momo ref if exists */}
-                               {/* Note: Ensure your getJob query includes payment notes/refs if needed */}
                              </td>
-                             <td className="px-4 py-2 text-right font-mono font-medium text-gray-900">
+                             <td className="px-2 sm:px-4 py-1.5 sm:py-2 text-right font-mono font-medium text-gray-900 text-xs sm:text-sm">
                                GH₵{parseFloat(payment.amount).toFixed(2)}
                              </td>
                            </tr>
                          ))}
                          {/* Balance Row */}
                          <tr className="bg-gray-50 font-bold border-t border-gray-200">
-                           <td colSpan="2" className="px-4 py-2 text-right text-gray-600">Balance Due:</td>
-                           <td className="px-4 py-2 text-right text-red-600">GH₵{parseFloat(job.invoice.amountDue).toFixed(2)}</td>
+                           <td colSpan="2" className="px-2 sm:px-4 py-1.5 sm:py-2 text-right text-gray-600 text-xs sm:text-sm">Balance Due:</td>
+                           <td className="px-2 sm:px-4 py-1.5 sm:py-2 text-right text-red-600 text-xs sm:text-sm">GH₵{parseFloat(job.invoice.amountDue).toFixed(2)}</td>
                          </tr>
                        </tbody>
                      </table>
@@ -274,7 +272,7 @@ export default function JobDetailsWithInvoice({
               )}
 
               {/* TERMS / DISCLAIMER */}
-              <div className="mt-12 pt-4 border-t border-gray-200 text-xs text-gray-500 text-center">
+              <div className="mt-8 sm:mt-12 pt-3 sm:pt-4 border-t border-gray-200 text-xs text-gray-500 text-center">
                  {hasInvoice ? (
                    <p>Thank you for your business. Please retain this invoice for warranty purposes.</p>
                  ) : (
@@ -287,15 +285,17 @@ export default function JobDetailsWithInvoice({
           </div>
 
           {/* --- FOOTER ACTIONS (No Print) --- */}
-          <div className="mt-4 pt-4 border-t border-gray-200 bg-white no-print">
-            <div className="flex flex-col sm:flex-row justify-between gap-3">
+          <div className="mt-3 sm:mt-4 pt-3 sm:pt-4 border-t border-gray-200 bg-white no-print">
+            <div className="flex flex-col sm:flex-row justify-between gap-2 sm:gap-3">
               <div>
                 {canEdit && onDelete && (
-                  <Button variant="danger" onClick={onDelete} size="sm">Delete</Button>
+                  <Button variant="danger" onClick={onDelete} size="sm">
+                    Delete
+                  </Button>
                 )}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex flex-col sm:flex-row gap-1.5 sm:gap-2">
                 <Button variant="secondary" onClick={onClose} size="sm">Close</Button>
                 
                 {canEdit && onEdit && <Button variant="outline" onClick={onEdit} size="sm">Edit</Button>}

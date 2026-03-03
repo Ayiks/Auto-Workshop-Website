@@ -243,7 +243,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
           )}
 
           {/* 6. Header Grid: Customer + Date + Time */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             {/* Customer Column */}
             <div className="relative z-20"> 
                {/* z-20 ensures dropdown goes over other inputs */}
@@ -256,7 +256,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
             </div>
 
             {/* Date/Time Column */}
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 sm:gap-3">
               <Input
                 type="date"
                 label="Sale Date"
@@ -307,11 +307,11 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
               </div>
             )}
 
-            <div className="space-y-3">
+            <div className="space-y-2 sm:space-y-3">
               {items.map((item, index) => (
                 <div 
                   key={item.id} 
-                  className={`p-3 rounded-lg border transition-colors ${
+                  className={`p-2 sm:p-3 rounded-lg border transition-colors ${
                     item.itemType === 'material' ? 'bg-white border-gray-200' : 'bg-indigo-50/50 border-indigo-100'
                   }`}
                 >
@@ -423,7 +423,7 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
 
         {/* Footer Area */}
         <div className="border-t border-gray-200 pt-4 mt-4 bg-white">
-          <div className="grid grid-cols-2 gap-6 mb-4">
+          <div className="grid grid-cols-2 gap-4 sm:gap-6 mb-4">
             <div>
               <Select
                 label="Payment Method"
@@ -451,10 +451,10 @@ export default function EditSaleModal({ isOpen, onClose, sale, onSubmit, isLoadi
             </div>
           </div>
 
-          <div className="flex items-center justify-between bg-gray-50 p-4 rounded-lg">
+          <div className="flex items-center justify-between bg-gray-50 p-3 sm:p-4 rounded-lg">
             <div className="text-right flex-1">
-              <span className="text-sm text-gray-500 mr-2">Total Amount:</span>
-              <span className="text-2xl font-bold text-gray-900">GH₵{calculateTotal.toFixed(2)}</span>
+              <span className="text-xs sm:text-sm text-gray-500 mr-2">Total Amount:</span>
+              <span className="text-xl sm:text-2xl font-bold text-gray-900">GH₵{calculateTotal.toFixed(2)}</span>
             </div>
           </div>
 

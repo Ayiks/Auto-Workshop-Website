@@ -16,19 +16,19 @@ export default function RevertReorderModal({ isOpen, onClose, expense, onConfirm
       title="Revert Material Purchase" 
       size="md"
     >
-      <div className="space-y-6">
+      <div className="space-y-3 sm:space-y-6">
         {/* Danger Warning Banner */}
-        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md">
+        <div className="bg-red-50 border-l-4 border-red-500 p-2 sm:p-4 rounded-r-md">
           <div className="flex">
             <div className="flex-shrink-0">
               {/* Warning Icon */}
-              <svg className="h-5 w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
+              <svg className="h-4 sm:h-5 w-4 sm:w-5 text-red-500" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
             </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-red-800">Inventory Reduction Warning</h3>
-              <div className="mt-1 text-sm text-red-700">
+            <div className="ml-2 sm:ml-3">
+              <h3 className="text-xs sm:text-sm font-medium text-red-800">Inventory Reduction Warning</h3>
+              <div className="mt-1 text-xs sm:text-sm text-red-700">
                 <p>
                   This action cannot be undone. Doing this will <strong>remove {quantity} units</strong> from your inventory immediately.
                 </p>
@@ -38,30 +38,30 @@ export default function RevertReorderModal({ isOpen, onClose, expense, onConfirm
         </div>
 
         {/* Order Details Summary */}
-        <div className="bg-gray-50 rounded-lg border border-gray-200 p-4">
-          <h4 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">
+        <div className="bg-gray-50 rounded-lg border border-gray-200 p-2 sm:p-4">
+          <h4 className="text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 sm:mb-3">
             Order to be Reverted
           </h4>
           
-          <dl className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm">
+          <dl className="grid grid-cols-2 gap-x-2 sm:gap-x-4 gap-y-2 sm:gap-y-4 text-xs sm:text-sm">
             <div className="col-span-2">
-              <dt className="text-gray-500">Description</dt>
-              <dd className="font-medium text-gray-900 mt-1">{expense.description}</dd>
+              <dt className="text-xs sm:text-sm text-gray-500">Description</dt>
+              <dd className="font-medium text-gray-900 mt-0.5 sm:mt-1 text-xs sm:text-sm">{expense.description}</dd>
             </div>
             
             <div>
-              <dt className="text-gray-500">Amount Paid</dt>
-              <dd className="font-medium text-gray-900 mt-1">GH₵ {parseFloat(expense.amount).toFixed(2)}</dd>
+              <dt className="text-xs sm:text-sm text-gray-500">Amount Paid</dt>
+              <dd className="font-medium text-gray-900 mt-0.5 sm:mt-1 text-xs sm:text-sm">GH₵ {parseFloat(expense.amount).toFixed(2)}</dd>
             </div>
 
             <div>
-              <dt className="text-gray-500">Quantity to Remove</dt>
-              <dd className="font-medium text-red-600 mt-1">-{quantity} units</dd>
+              <dt className="text-xs sm:text-sm text-gray-500">Quantity to Remove</dt>
+              <dd className="font-medium text-red-600 mt-0.5 sm:mt-1 text-xs sm:text-sm">-{quantity} units</dd>
             </div>
 
             <div>
-              <dt className="text-gray-500">Date Recorded</dt>
-              <dd className="font-medium text-gray-900 mt-1">
+              <dt className="text-xs sm:text-sm text-gray-500">Date Recorded</dt>
+              <dd className="font-medium text-gray-900 mt-0.5 sm:mt-1 text-xs sm:text-sm">
                 {new Date(expense.expenseDate).toLocaleDateString()}
               </dd>
             </div>
@@ -69,15 +69,15 @@ export default function RevertReorderModal({ isOpen, onClose, expense, onConfirm
         </div>
 
         {/* Action Buttons */}
-        <div className="flex justify-end gap-3 pt-2">
-          <Button variant="outline" onClick={onClose} disabled={isLoading}>
+        <div className="flex justify-end gap-2 sm:gap-3 pt-1 sm:pt-2">
+          <Button variant="outline" onClick={onClose} disabled={isLoading} className="text-xs sm:text-sm">
             Keep Order
           </Button>
           <Button 
             variant="danger" 
             onClick={() => onConfirm(expense.id)} 
             isLoading={isLoading}
-            className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-500"
+            className="bg-red-600 hover:bg-red-700 text-white focus:ring-red-500 text-xs sm:text-sm"
           >
             Revert & Reduce Stock
           </Button>

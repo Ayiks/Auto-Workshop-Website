@@ -72,7 +72,7 @@ export default function BoothServiceForm({ service, onSubmit, onCancel, isLoadin
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-6">
       {/* Service Name */}
       <Input
         label="Service Name"
@@ -114,14 +114,14 @@ export default function BoothServiceForm({ service, onSubmit, onCancel, isLoadin
       />
 
       {/* Info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <div className="flex items-start gap-2">
-          <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-2 sm:p-4">
+        <div className="flex items-start gap-1.5 sm:gap-2">
+          <svg className="w-4 sm:w-5 h-4 sm:h-5 text-blue-600 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
           </svg>
-          <div className="text-sm text-blue-700">
+          <div className="text-xs sm:text-sm text-blue-700">
             <p className="font-medium">About Booth Services</p>
-            <ul className="mt-1 space-y-1">
+            <ul className="mt-1 space-y-0.5 sm:space-y-1">
               <li>• No inventory tracking - unlimited usage</li>
               <li>• Can be sold at counter or included in jobs</li>
               <li>• Price changes only affect new sales</li>
@@ -131,12 +131,13 @@ export default function BoothServiceForm({ service, onSubmit, onCancel, isLoadin
       </div>
 
       {/* Actions */}
-      <div className="flex justify-end gap-3 border-t pt-4">
+      <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 border-t pt-2 sm:pt-4">
         <Button
           type="button"
           variant="secondary"
           onClick={onCancel}
           disabled={isLoading}
+          className="text-xs sm:text-sm"
         >
           Cancel
         </Button>
@@ -144,6 +145,7 @@ export default function BoothServiceForm({ service, onSubmit, onCancel, isLoadin
           type="submit"
           variant="primary"
           loading={isLoading}
+          className="text-xs sm:text-sm"
         >
           {service ? 'Update Service' : 'Create Service'}
         </Button>

@@ -8,6 +8,7 @@ import receiptRoutes from './receipt.routes.js';
 import expenseRoutes from './expenses.routes.js';
 import reportRoutes from './report.routes.js';
 
+
 /**
  * Configure all API routes
  * @param {Express.Application} app - Express app instance

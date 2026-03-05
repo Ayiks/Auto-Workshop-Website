@@ -19,6 +19,7 @@ import userRoutes from './routes/user.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 import serviceRoutes from './routes/service.routes.js';
 import customerRoutes from './routes/customer.routes.js';
+import sandboxRoutes from './routes/sandbox.routes.js';
 
 const app = express();
 
@@ -87,6 +88,7 @@ app.use(`${API_PREFIX}/users`, userRoutes);
 app.use(`${API_PREFIX}/settings`, settingsRoutes);
 app.use(`${API_PREFIX}/services`, serviceRoutes);
 app.use(`${API_PREFIX}/customers`, customerRoutes);
+app.use(`${API_PREFIX}/sandboxes`, sandboxRoutes);
 // ============================================
 // ERROR HANDLING
 // ============================================

@@ -1,6 +1,7 @@
 import dotenv from 'dotenv';
 import app from './app.js';
 import prisma from './config/database.js';
+import { startScheduler } from './utils/scheduler.js';
 
 // Load environment variables
 dotenv.config();
@@ -15,6 +16,8 @@ const server = app.listen(PORT, async () => {
   try {
     await prisma.$connect();
     console.log('✅ Database connected successfully');
+    // Start any scheduled tasks after DB connection
+    startScheduler();
   } catch (error) {
     console.error('❌ Database connection failed:', error.message);
     process.exit(1);

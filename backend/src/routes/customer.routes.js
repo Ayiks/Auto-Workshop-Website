@@ -6,25 +6,25 @@ import {
   updateCustomer,
   deleteCustomer,
 } from '../controllers/customer.controller.js';
-import { protect, authorize } from '../middleware/auth.js';
+// import requirePermission instead of authorize
+// authorize() only accepts role strings, not resource/action pairs
+import { protect, requirePermission } from '../middleware/auth.js';
 
 const router = express.Router();
 
-// Apply authentication to all routes
 router.use(protect);
 
 // == Read Routes ==
-// Accessible by all authenticated staff (Mechanics need to find customers to make job cards)
+// All authenticated staff can look up customers (mechanics need this for job cards)
 router.get('/', getCustomers);
 router.get('/:id', getCustomer);
 
 // == Write Routes ==
-// Restricted to Admin and Manager
-router.post('/', authorize('admin', 'customer', 'create'), createCustomer);
-router.put('/:id', authorize('admin', 'customer', 'update'), updateCustomer);
+// was authorize('admin', 'customer', 'create') which is wrong usage
+router.post('/', requirePermission('customers', 'create'), createCustomer);
+router.put('/:id', requirePermission('customers', 'edit'), updateCustomer);
 
 // == Delete Routes ==
-// Restricted to Admin only (Safety measure)
-router.delete('/:id', authorize('admin', 'customer', 'delete'), deleteCustomer);
+router.delete('/:id', requirePermission('customers', 'delete'), deleteCustomer);
 
 export default router;

@@ -1,27 +1,25 @@
-import { getTenantDB } from '../config/database.js'; 
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Get all customers (with optional search)
 // @route   GET /api/customers
 // @access  Private
 export const getCustomers = asyncHandler(async (req, res) => {
-  const db = getTenantDB(req.user.businessId);
   const { search } = req.query;
 
-  // Build search filter
   const whereClause = {
-    isActive: true, // Only fetch active customers
+    isActive: true,
+    businessId: req.user.businessId, // scope to tenant
     ...(search && {
       OR: [
-        { firstName: { contains: search } }, 
-        { lastName: { contains: search } }, 
+        { firstName: { contains: search, mode: 'insensitive' } },
+        { lastName: { contains: search, mode: 'insensitive' } },
         { phone: { contains: search } },
-        { email: { contains: search } },
+        { email: { contains: search, mode: 'insensitive' } },
       ],
     }),
   };
 
-  const customers = await db.customer.findMany({
+  const customers = await req.db.customer.findMany({
     where: whereClause,
     orderBy: { createdAt: 'desc' },
   });
@@ -40,12 +38,11 @@ export const getCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
   const customer = await req.db.customer.findFirst({
-    where: { 
+    where: {
       id: parseInt(id),
-      isActive: true 
+      isActive: true,
+      businessId: req.user.businessId, // prevent cross-tenant access
     },
-    // Include relations here later if needed (e.g., invoices)
-    // include: { invoices: true } 
   });
 
   if (!customer) {
@@ -64,23 +61,20 @@ export const getCustomer = asyncHandler(async (req, res) => {
 export const createCustomer = asyncHandler(async (req, res) => {
   const { firstName, lastName, phone, email, address, notes } = req.body;
 
-  // Basic Validation
   if (!firstName || !phone) {
     throw new AppError('First name and phone number are required', 400, 'VALIDATION_ERROR');
   }
 
-  // Check for duplicate phone number
-  // (Prisma would catch this with P2002, but a custom message is sometimes nicer)
+  // duplicate check is now scoped to this business only
   const existingCustomer = await req.db.customer.findFirst({
-    where: { phone }
+    where: { phone, businessId: req.user.businessId },
   });
 
   if (existingCustomer) {
-    // If they exist but were soft-deleted, we might want to reactivate them?
-    // For now, just throw duplicate error
     throw new AppError('Customer with this phone number already exists', 400, 'DUPLICATE_ENTRY');
   }
 
+  // businessId explicitly written on create
   const customer = await req.db.customer.create({
     data: {
       firstName,
@@ -89,10 +83,10 @@ export const createCustomer = asyncHandler(async (req, res) => {
       email,
       address,
       notes,
+      businessId: req.user.businessId,
     },
   });
 
-  // Optional: Audit Log
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -100,6 +94,7 @@ export const createCustomer = asyncHandler(async (req, res) => {
       entity: 'Customer',
       entityId: customer.id,
       description: `Created customer ${firstName} ${lastName || ''}`,
+      businessId: req.user.businessId,
     },
   });
 
@@ -116,22 +111,34 @@ export const updateCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { firstName, lastName, phone, email, address, notes } = req.body;
 
-  // We rely on Prisma's P2025 error (Record not found) which your middleware handles,
-  // or P2002 (Unique constraint) if phone is duplicated.
-  
-  const customer = await req.db.customer.update({
-    where: { id: parseInt(id) },
-    data: {
-      firstName,
-      lastName,
-      phone,
-      email,
-      address,
-      notes,
-    },
+  // verify ownership before updating
+  const existing = await req.db.customer.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
   });
 
-  // Optional: Audit Log
+  if (!existing) {
+    throw new AppError('Customer not found', 404, 'NOT_FOUND');
+  }
+
+  // if phone is changing, check for duplicates within this business only
+  if (phone && phone !== existing.phone) {
+    const phoneConflict = await req.db.customer.findFirst({
+      where: {
+        phone,
+        businessId: req.user.businessId,
+        id: { not: parseInt(id) },
+      },
+    });
+    if (phoneConflict) {
+      throw new AppError('Another customer with this phone number already exists', 400, 'DUPLICATE_ENTRY');
+    }
+  }
+
+  const customer = await req.db.customer.update({
+    where: { id: parseInt(id) },
+    data: { firstName, lastName, phone, email, address, notes },
+  });
+
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -139,6 +146,7 @@ export const updateCustomer = asyncHandler(async (req, res) => {
       entity: 'Customer',
       entityId: customer.id,
       description: `Updated customer ${customer.firstName}`,
+      businessId: req.user.businessId,
     },
   });
 
@@ -154,22 +162,20 @@ export const updateCustomer = asyncHandler(async (req, res) => {
 export const deleteCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  // Check if customer exists first
-  const customer = await req.db.customer.findUnique({
-    where: { id: parseInt(id) }
+  // verify ownership before deleting
+  const customer = await req.db.customer.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
   });
 
   if (!customer) {
     throw new AppError('Customer not found', 404, 'NOT_FOUND');
   }
 
-  // Perform Soft Delete
   await req.db.customer.update({
     where: { id: parseInt(id) },
     data: { isActive: false },
   });
 
-  // Audit Log
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -177,6 +183,7 @@ export const deleteCustomer = asyncHandler(async (req, res) => {
       entity: 'Customer',
       entityId: parseInt(id),
       description: `Soft deleted customer ${customer.firstName} ${customer.lastName || ''}`,
+      businessId: req.user.businessId,
     },
   });
 

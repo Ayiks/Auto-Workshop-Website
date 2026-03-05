@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { authApi } from '@api/auth';
+import { sandboxApi } from '@api/sandbox';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -8,11 +9,18 @@ export const useAuthStore = create((set, get) => ({
   isLoading: true,
   error: null,
 
+  // Sandbox state as plain values — never functions.
+  // If stored as functions, (s) => s.isSandbox returns the function reference
+  // itself (always truthy), making the banner appear on every page.
+  isSandbox: false,
+  sandboxExpiresAt: null,
+
   // Initialize auth state from localStorage
   initAuth: () => {
-    const token = localStorage.getItem('token');
-    const user = localStorage.getItem('user');
-    
+    const token            = localStorage.getItem('token');
+    const user             = localStorage.getItem('user');
+    const sandboxExpiresAt = localStorage.getItem('sandboxExpiresAt');
+
     if (token && user) {
       set({
         token,
@@ -20,15 +28,19 @@ export const useAuthStore = create((set, get) => ({
         isAuthenticated: true,
         isLoading: false,
         error: null,
+        // Rehydrate sandbox state so the banner survives page refreshes
+        isSandbox: !!sandboxExpiresAt,
+        sandboxExpiresAt: sandboxExpiresAt || null,
       });
     } else {
-      // No token/user in localStorage, clear all auth state
-      set({ 
+      set({
         token: null,
         user: null,
         isAuthenticated: false,
         isLoading: false,
         error: null,
+        isSandbox: false,
+        sandboxExpiresAt: null,
       });
     }
   },
@@ -37,21 +49,12 @@ export const useAuthStore = create((set, get) => ({
   login: async (credentials) => {
     try {
       const response = await authApi.login(credentials);
-      // Response is already unwrapped by axios interceptor
       const { token, user } = response.data || response;
 
-      // Save to localStorage
       localStorage.setItem('token', token);
       localStorage.setItem('user', JSON.stringify(user));
 
-      // Update state - clear error and set authenticated
-      set({
-        token,
-        user,
-        isAuthenticated: true,
-        error: null,
-      });
-
+      set({ token, user, isAuthenticated: true, error: null });
       return user;
     } catch (error) {
       set({ error: error.message, isLoading: false });
@@ -59,52 +62,82 @@ export const useAuthStore = create((set, get) => ({
     }
   },
 
-  // registers the user
-  registerUser: async (userData) => {
-  set({ error: null });
-  try {
-    if (userData.password.length < 8) {
-      throw new Error('Password must be at least 8 characters long');
+  // One-click sandbox / demo login
+  loginAsSandbox: async () => {
+    // Do NOT set isLoading:true here — isLoading is only for initAuth.
+    // Setting it causes App.jsx to unmount the router and show a spinner,
+    // so navigate('/app/dashboard') fires into nothing on the first click.
+    set({ error: null });
+    try {
+      const response = await sandboxApi.createSandbox();
+      const { token, user, expiresAt } = response;
+
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      localStorage.setItem('sandboxExpiresAt', expiresAt);
+
+      set({
+        token,
+        user,
+        isAuthenticated: true,
+        error: null,
+        isSandbox: true,
+        sandboxExpiresAt: expiresAt,
+      });
+
+      return user;
+    } catch (error) {
+      set({ error: error.message || 'Failed to create demo. Please try again.' });
+      throw error;
     }
-    await authApi.registerUser(userData);
-    return { success: true };
-  } catch (error) {
-    set({ error: error.message || 'Registration failed' });
-    throw error;
-  }
-},
+  },
 
-  // Verifies the token and logs in!
+  // Register
+  registerUser: async (userData) => {
+    set({ error: null });
+    try {
+      if (userData.password.length < 8) {
+        throw new Error('Password must be at least 8 characters long');
+      }
+      await authApi.registerUser(userData);
+      return { success: true };
+    } catch (error) {
+      set({ error: error.message || 'Registration failed' });
+      throw error;
+    }
+  },
+
+  // Verify email
   verifyEmail: async (token) => {
-  set({ isLoading: true, error: null });
-  try {
-    const { token: authToken, user } = await authApi.verifyEmail(token);
-    if (!authToken || !user) throw new Error("Missing token or user data in response");
-    localStorage.setItem('token', authToken);
-    localStorage.setItem('user', JSON.stringify(user));
-    set({ user, isAuthenticated: true, isLoading: false, error: null });
-    return { token: authToken, user };
-  } catch (error) {
-    set({ error: error.message || 'Verification failed', isLoading: false });
-    throw error;
-  }
-},
+    set({ isLoading: true, error: null });
+    try {
+      const { token: authToken, user } = await authApi.verifyEmail(token);
+      if (!authToken || !user) throw new Error('Missing token or user data in response');
+      localStorage.setItem('token', authToken);
+      localStorage.setItem('user', JSON.stringify(user));
+      set({ user, isAuthenticated: true, isLoading: false, error: null });
+      return { token: authToken, user };
+    } catch (error) {
+      set({ error: error.message || 'Verification failed', isLoading: false });
+      throw error;
+    }
+  },
 
-  // Creates the business and updates the token
+  // Setup workspace
   setupWorkspace: async (workspaceData) => {
-  set({ isLoading: true, error: null });
-  try {
-    const { token, data: user } = await authApi.setupWorkspace(workspaceData);
-    localStorage.setItem('token', token);
-    localStorage.setItem('user', JSON.stringify(user));
-    set({ token, user, isAuthenticated: true, isLoading: false, error: null });
-    return user;
-  } catch (error) {
-    set({ error: error.message || 'Workspace setup failed', isLoading: false });
-    throw error;
-  }
-},
-  
+    set({ isLoading: true, error: null });
+    try {
+      const { token, data: user } = await authApi.setupWorkspace(workspaceData);
+      localStorage.setItem('token', token);
+      localStorage.setItem('user', JSON.stringify(user));
+      set({ token, user, isAuthenticated: true, isLoading: false, error: null });
+      return user;
+    } catch (error) {
+      set({ error: error.message || 'Workspace setup failed', isLoading: false });
+      throw error;
+    }
+  },
+
   // Logout
   logout: async () => {
     try {
@@ -112,17 +145,18 @@ export const useAuthStore = create((set, get) => ({
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
-      // Clear localStorage
       localStorage.removeItem('token');
       localStorage.removeItem('user');
+      localStorage.removeItem('sandboxExpiresAt');
 
-      // Clear ALL state including error and loading
       set({
         token: null,
         user: null,
         isAuthenticated: false,
         isLoading: false,
         error: null,
+        isSandbox: false,
+        sandboxExpiresAt: null,
       });
     }
   },
@@ -131,18 +165,12 @@ export const useAuthStore = create((set, get) => ({
   refreshUser: async () => {
     try {
       const response = await authApi.getCurrentUser();
-      // Response is already unwrapped by axios interceptor
       const user = response.data?.user || response.user;
-
       localStorage.setItem('user', JSON.stringify(user));
       set({ user });
-
       return { success: true };
     } catch (error) {
-      return {
-        success: false,
-        error: error.message,
-      };
+      return { success: false, error: error.message };
     }
   },
 
@@ -150,26 +178,16 @@ export const useAuthStore = create((set, get) => ({
   hasPermission: (module, action) => {
     const { user } = get();
     if (!user) return false;
-    
-    // Admin has all permissions
     if (user.role === 'admin') return true;
-
     const permissions = user.permissions || {};
-    const modulePermissions = permissions[module] || [];
-    
-    return modulePermissions.includes(action);
+    return (permissions[module] || []).includes(action);
   },
 
   // Check if user has role
   hasRole: (role) => {
     const { user } = get();
     if (!user) return false;
-    
-    if (Array.isArray(role)) {
-      return role.includes(user.role);
-    }
-    
-    return user.role === role;
+    return Array.isArray(role) ? role.includes(user.role) : user.role === role;
   },
 
   setUser: (userData) => {
@@ -177,8 +195,5 @@ export const useAuthStore = create((set, get) => ({
     set({ user: userData });
   },
 
-  // Clear error messages
-  clearError: () => {
-    set({ error: null });
-  },
+  clearError: () => set({ error: null }),
 }));

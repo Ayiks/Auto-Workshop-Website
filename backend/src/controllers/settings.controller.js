@@ -2,10 +2,9 @@ import { getTenantDB } from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // @desc    Get business settings
-// @route   GET /api/settings
-// @access  Public (no authentication for public website to display info)
+// @route   GET /api/settings/business
+// @access  Private (or Public with ?businessId=)
 export const getSettings = asyncHandler(async (req, res) => {
-  // SMART CHECK: Use logged-in user's ID, OR grab it from the public query URL
   const businessId = req.user?.businessId || req.query.businessId;
 
   if (!businessId) {
@@ -13,9 +12,10 @@ export const getSettings = asyncHandler(async (req, res) => {
   }
 
   const db = getTenantDB(businessId);
-  let settings = await db.businessSettings.findFirst();
+  let settings = await db.businessSettings.findFirst({
+    where: { businessId }, // ✅ explicit filter even inside tenant DB
+  });
 
-  // If no settings exist, create default
   if (!settings) {
     settings = await db.businessSettings.create({
       data: {
@@ -23,6 +23,7 @@ export const getSettings = asyncHandler(async (req, res) => {
         address: 'Accra, Greater Accra, Ghana',
         phone: '+233 24 000 0000',
         email: 'info@graymanager.com',
+        businessId,
       },
     });
   }
@@ -34,31 +35,22 @@ export const getSettings = asyncHandler(async (req, res) => {
 });
 
 // @desc    Update business settings
-// @route   PUT /api/settings
-// @access  Private (requires admin role)
+// @route   PUT /api/settings/business
+// @access  Private (requires 'settings:update' permission)
 export const updateSettings = asyncHandler(async (req, res) => {
   const { name, logo, address, phone, email, website } = req.body;
 
-  // Validation
   if (email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
-      throw new AppError(
-        'Invalid email format',
-        400,
-        'VALIDATION_ERROR'
-      );
+      throw new AppError('Invalid email format', 400, 'VALIDATION_ERROR');
     }
   }
 
   if (phone) {
     const phoneRegex = /^[\d\s\+\-\(\)]+$/;
     if (!phoneRegex.test(phone)) {
-      throw new AppError(
-        'Invalid phone number format',
-        400,
-        'VALIDATION_ERROR'
-      );
+      throw new AppError('Invalid phone number format', 400, 'VALIDATION_ERROR');
     }
   }
 
@@ -73,8 +65,10 @@ export const updateSettings = asyncHandler(async (req, res) => {
     }
   }
 
-  // Get existing settings or create new
-  let settings = await req.db.businessSettings.findFirst();
+  // scope findFirst to this business
+  let settings = await req.db.businessSettings.findFirst({
+    where: { businessId: req.user.businessId },
+  });
 
   const updateData = {};
   if (name !== undefined) updateData.name = name.trim();
@@ -85,13 +79,11 @@ export const updateSettings = asyncHandler(async (req, res) => {
   if (website !== undefined) updateData.website = website?.trim();
 
   if (settings) {
-    // Update existing settings
     settings = await req.db.businessSettings.update({
       where: { id: settings.id },
       data: updateData,
     });
   } else {
-    // Create new settings if none exist
     settings = await req.db.businessSettings.create({
       data: {
         name: name || 'Auto Workshop',
@@ -100,11 +92,11 @@ export const updateSettings = asyncHandler(async (req, res) => {
         phone: phone || '+233 24 000 0000',
         email: email || 'info@autoworkshop.com',
         website,
+        businessId: req.user.businessId, // ✅ always set on create
       },
     });
   }
 
-  // Log audit
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -112,6 +104,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
       entity: 'BusinessSettings',
       entityId: settings.id,
       description: 'Updated business settings',
+      businessId: req.user.businessId,
     },
   });
 
@@ -124,7 +117,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
 
 // @desc    Update business logo
 // @route   PUT /api/settings/logo
-// @access  Private (requires admin role)
+// @access  Private (requires 'settings:update' permission)
 export const updateLogo = asyncHandler(async (req, res) => {
   const { logo } = req.body;
 
@@ -132,8 +125,10 @@ export const updateLogo = asyncHandler(async (req, res) => {
     throw new AppError('Please provide logo URL or base64 string', 400, 'VALIDATION_ERROR');
   }
 
-  // Get existing settings
-  let settings = await req.db.businessSettings.findFirst();
+  // scope to this business
+  let settings = await req.db.businessSettings.findFirst({
+    where: { businessId: req.user.businessId },
+  });
 
   if (!settings) {
     throw new AppError(
@@ -148,7 +143,6 @@ export const updateLogo = asyncHandler(async (req, res) => {
     data: { logo: logo.trim() },
   });
 
-  // Log audit
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -156,6 +150,7 @@ export const updateLogo = asyncHandler(async (req, res) => {
       entity: 'BusinessSettings',
       entityId: settings.id,
       description: 'Updated business logo',
+      businessId: req.user.businessId,
     },
   });
 
@@ -170,26 +165,27 @@ export const updateLogo = asyncHandler(async (req, res) => {
 // @route   GET /api/settings/booth-price
 // @access  Public
 export const getBoothPrice = asyncHandler(async (req, res) => {
-  const service = await req.db.service.findFirst({
-    where: { type: 'booth', isActive: true },
+  // This is a public route - businessId should come from query param
+  const businessId = req.query.businessId;
+  if (!businessId) {
+    throw new AppError('Business ID is required', 400, 'VALIDATION_ERROR');
+  }
+
+  const db = getTenantDB(businessId);
+  const service = await db.service.findFirst({
+    where: { type: 'booth', isActive: true, businessId },
   });
 
   if (!service) {
     return res.status(200).json({
       success: true,
-      data: {
-        price: null,
-        message: 'Booth service price not configured',
-      },
+      data: { price: null, message: 'Booth service price not configured' },
     });
   }
 
   res.status(200).json({
     success: true,
-    data: {
-      price: service.price,
-      type: service.type,
-    },
+    data: { price: service.price, type: service.type },
   });
 });
 
@@ -197,12 +193,13 @@ export const getBoothPrice = asyncHandler(async (req, res) => {
    UNIT OF MEASURE (UoM) SETTINGS
    ========================================================================== */
 
-// @desc    Get all global units (Master List)
+// @desc    Get all global units
 // @route   GET /api/settings/units
 // @access  Private
 export const getGlobalUnits = asyncHandler(async (req, res) => {
+  // scope to this business's units
   const units = await req.db.globalUnit.findMany({
-    where: { isActive: true },
+    where: { isActive: true, businessId: req.user.businessId },
     orderBy: { name: 'asc' },
   });
 
@@ -223,9 +220,9 @@ export const addGlobalUnit = asyncHandler(async (req, res) => {
     throw new AppError('Name and Abbreviation are required', 400, 'VALIDATION_ERROR');
   }
 
-  // FIXED: Changed findUnique to findFirst
+  // duplicate check scoped to this business
   const existing = await req.db.globalUnit.findFirst({
-    where: { name: name.trim() }
+    where: { name: name.trim(), businessId: req.user.businessId },
   });
 
   if (existing) {
@@ -236,33 +233,14 @@ export const addGlobalUnit = asyncHandler(async (req, res) => {
     data: {
       name: name.trim(),
       abbreviation: abbreviation.trim(),
-    }
+      businessId: req.user.businessId, // ✅ always set on create
+    },
   });
 
   res.status(201).json({
     success: true,
     message: 'Unit added successfully',
     data: unit,
-  });
-});
-// @desc    Delete a global unit
-// @route   DELETE /api/settings/units/:id
-// @access  Private (Admin)
-export const deleteGlobalUnit = asyncHandler(async (req, res) => {
-  const { id } = req.params;
-
-  // Optional: Check if any materials are using this unit string before deleting?
-  // For now, we allow deletion as it's just a string reference in Material model, 
-  // but soft delete (isActive=false) is safer.
-
-  await req.db.globalUnit.update({
-    where: { id: parseInt(id) },
-    data: { isActive: false } // Soft delete
-  });
-
-  res.status(200).json({
-    success: true,
-    message: 'Unit removed successfully',
   });
 });
 
@@ -273,23 +251,23 @@ export const updateGlobalUnit = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { name, abbreviation } = req.body;
 
-  // Check if unit exists
-  const unit = await req.db.globalUnit.findUnique({
-    where: { id: parseInt(id) }
+  // verify ownership before updating
+  const unit = await req.db.globalUnit.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
   });
 
   if (!unit) {
     throw new AppError('Unit not found', 404, 'NOT_FOUND');
   }
 
-  // Check for duplicate name (excluding current unit)
   if (name) {
     const duplicate = await req.db.globalUnit.findFirst({
       where: {
         name: name.trim(),
-        id: { not: parseInt(id) }, // Exclude self
-        isActive: true
-      }
+        businessId: req.user.businessId,
+        id: { not: parseInt(id) },
+        isActive: true,
+      },
     });
     if (duplicate) {
       throw new AppError(`Unit '${name}' already exists`, 400, 'DUPLICATE_ENTRY');
@@ -301,12 +279,38 @@ export const updateGlobalUnit = asyncHandler(async (req, res) => {
     data: {
       name: name ? name.trim() : undefined,
       abbreviation: abbreviation ? abbreviation.trim() : undefined,
-    }
+    },
   });
 
   res.status(200).json({
     success: true,
     message: 'Unit updated successfully',
     data: updatedUnit,
+  });
+});
+
+// @desc    Delete a global unit (soft delete)
+// @route   DELETE /api/settings/units/:id
+// @access  Private (Admin)
+export const deleteGlobalUnit = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  // verify ownership before soft-deleting
+  const unit = await req.db.globalUnit.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
+  });
+
+  if (!unit) {
+    throw new AppError('Unit not found', 404, 'NOT_FOUND');
+  }
+
+  await req.db.globalUnit.update({
+    where: { id: parseInt(id) },
+    data: { isActive: false },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Unit removed successfully',
   });
 });

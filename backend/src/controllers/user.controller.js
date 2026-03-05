@@ -7,19 +7,19 @@ import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 export const getUsers = asyncHandler(async (req, res) => {
   const { role, isActive, search } = req.query;
 
-  const where = {};
+  // always scope to caller's business
+  const where = {
+    businessId: req.user.businessId,
+  };
 
-  // Filter by role
   if (role) {
     where.role = role;
   }
 
-  // Filter by active status
   if (isActive !== undefined) {
     where.isActive = isActive === 'true';
   }
 
-  // Search by username, fullName, or email
   if (search) {
     where.OR = [
       { username: { contains: search, mode: 'insensitive' } },
@@ -65,8 +65,12 @@ export const getUsers = asyncHandler(async (req, res) => {
 export const getUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const user = await req.db.user.findUnique({
-    where: { id: parseInt(id) },
+  // use findFirst with businessId to prevent cross-tenant access
+  const user = await req.db.user.findFirst({
+    where: {
+      id: parseInt(id),
+      businessId: req.user.businessId,
+    },
     select: {
       id: true,
       username: true,
@@ -115,7 +119,6 @@ export const createUser = asyncHandler(async (req, res) => {
     permissions = {},
   } = req.body;
 
-  // Validation
   if (!username || !password || !role) {
     throw new AppError(
       'Please provide username, password, and role',
@@ -132,7 +135,6 @@ export const createUser = asyncHandler(async (req, res) => {
     );
   }
 
-  // Validate role
   const validRoles = ['admin', 'sales', 'mechanic', 'sprayer', 'bodyworks'];
   if (!validRoles.includes(role)) {
     throw new AppError(
@@ -142,23 +144,18 @@ export const createUser = asyncHandler(async (req, res) => {
     );
   }
 
-  // Check if username already exists
+  // Username is globally unique (it's a login credential), so this check stays global
   const existingUser = await req.db.user.findUnique({
-    where: { username },
+    where: { username: username.trim().toLowerCase() },
   });
 
   if (existingUser) {
-    throw new AppError(
-      'Username already exists',
-      400,
-      'DUPLICATE_ENTRY'
-    );
+    throw new AppError('Username already exists', 400, 'DUPLICATE_ENTRY');
   }
 
-  // Hash password
   const passwordHash = await bcrypt.hash(password, 12);
 
-  // Create user
+  // explicitly attach businessId when creating a new user
   const user = await req.db.user.create({
     data: {
       username: username.trim().toLowerCase(),
@@ -168,6 +165,7 @@ export const createUser = asyncHandler(async (req, res) => {
       phone: phone?.trim(),
       role,
       permissions,
+      businessId: req.user.businessId,
     },
     select: {
       id: true,
@@ -182,7 +180,6 @@ export const createUser = asyncHandler(async (req, res) => {
     },
   });
 
-  // Log audit
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -190,6 +187,7 @@ export const createUser = asyncHandler(async (req, res) => {
       entity: 'User',
       entityId: user.id,
       description: `Created user: ${user.username} (${user.role})`,
+      businessId: req.user.businessId,
     },
   });
 
@@ -207,15 +205,15 @@ export const updateUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
   const { fullName, email, phone, role, isActive } = req.body;
 
-  const user = await req.db.user.findUnique({
-    where: { id: parseInt(id) },
+  // verify the user belongs to this business before updating
+  const user = await req.db.user.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
   });
 
   if (!user) {
     throw new AppError('User not found', 404, 'NOT_FOUND');
   }
 
-  // Cannot deactivate yourself
   if (parseInt(id) === req.user.id && isActive === false) {
     throw new AppError(
       'You cannot deactivate your own account',
@@ -224,7 +222,6 @@ export const updateUser = asyncHandler(async (req, res) => {
     );
   }
 
-  // Validate role if provided
   if (role) {
     const validRoles = ['admin', 'sales', 'mechanic', 'sprayer', 'bodyworks'];
     if (!validRoles.includes(role)) {
@@ -260,7 +257,6 @@ export const updateUser = asyncHandler(async (req, res) => {
     },
   });
 
-  // Log audit
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -268,6 +264,7 @@ export const updateUser = asyncHandler(async (req, res) => {
       entity: 'User',
       entityId: updatedUser.id,
       description: `Updated user: ${updatedUser.username}`,
+      businessId: req.user.businessId,
     },
   });
 
@@ -293,15 +290,15 @@ export const updateUserPermissions = asyncHandler(async (req, res) => {
     );
   }
 
-  const user = await req.db.user.findUnique({
-    where: { id: parseInt(id) },
+  // verify ownership before modifying permissions
+  const user = await req.db.user.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
   });
 
   if (!user) {
     throw new AppError('User not found', 404, 'NOT_FOUND');
   }
 
-  // Admin users automatically have all permissions
   if (user.role === 'admin') {
     throw new AppError(
       'Cannot modify admin permissions. Admins have all permissions by default.',
@@ -322,7 +319,6 @@ export const updateUserPermissions = asyncHandler(async (req, res) => {
     },
   });
 
-  // Log audit
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -330,6 +326,7 @@ export const updateUserPermissions = asyncHandler(async (req, res) => {
       entity: 'User',
       entityId: updatedUser.id,
       description: `Updated permissions for user: ${updatedUser.username}`,
+      businessId: req.user.businessId,
     },
   });
 
@@ -355,15 +352,15 @@ export const changeUserPassword = asyncHandler(async (req, res) => {
     );
   }
 
-  const user = await req.db.user.findUnique({
-    where: { id: parseInt(id) },
+  // verify ownership before changing password
+  const user = await req.db.user.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
   });
 
   if (!user) {
     throw new AppError('User not found', 404, 'NOT_FOUND');
   }
 
-  // Hash new password
   const passwordHash = await bcrypt.hash(newPassword, 12);
 
   await req.db.user.update({
@@ -371,7 +368,6 @@ export const changeUserPassword = asyncHandler(async (req, res) => {
     data: { passwordHash },
   });
 
-  // Log audit
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -379,6 +375,7 @@ export const changeUserPassword = asyncHandler(async (req, res) => {
       entity: 'User',
       entityId: parseInt(id),
       description: `Changed password for user: ${user.username}`,
+      businessId: req.user.businessId,
     },
   });
 
@@ -394,15 +391,15 @@ export const changeUserPassword = asyncHandler(async (req, res) => {
 export const deactivateUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const user = await req.db.user.findUnique({
-    where: { id: parseInt(id) },
+  // verify ownership
+  const user = await req.db.user.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
   });
 
   if (!user) {
     throw new AppError('User not found', 404, 'NOT_FOUND');
   }
 
-  // Cannot deactivate yourself
   if (parseInt(id) === req.user.id) {
     throw new AppError(
       'You cannot deactivate your own account',
@@ -418,15 +415,9 @@ export const deactivateUser = asyncHandler(async (req, res) => {
   const updatedUser = await req.db.user.update({
     where: { id: parseInt(id) },
     data: { isActive: false },
-    select: {
-      id: true,
-      username: true,
-      fullName: true,
-      isActive: true,
-    },
+    select: { id: true, username: true, fullName: true, isActive: true },
   });
 
-  // Log audit
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -434,6 +425,7 @@ export const deactivateUser = asyncHandler(async (req, res) => {
       entity: 'User',
       entityId: updatedUser.id,
       description: `Deactivated user: ${updatedUser.username}`,
+      businessId: req.user.businessId,
     },
   });
 
@@ -450,8 +442,9 @@ export const deactivateUser = asyncHandler(async (req, res) => {
 export const activateUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const user = await req.db.user.findUnique({
-    where: { id: parseInt(id) },
+  // verify ownership
+  const user = await req.db.user.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
   });
 
   if (!user) {
@@ -465,15 +458,9 @@ export const activateUser = asyncHandler(async (req, res) => {
   const updatedUser = await req.db.user.update({
     where: { id: parseInt(id) },
     data: { isActive: true },
-    select: {
-      id: true,
-      username: true,
-      fullName: true,
-      isActive: true,
-    },
+    select: { id: true, username: true, fullName: true, isActive: true },
   });
 
-  // Log audit
   await req.db.auditLog.create({
     data: {
       userId: req.user.id,
@@ -481,6 +468,7 @@ export const activateUser = asyncHandler(async (req, res) => {
       entity: 'User',
       entityId: updatedUser.id,
       description: `Activated user: ${updatedUser.username}`,
+      businessId: req.user.businessId,
     },
   });
 
@@ -497,8 +485,9 @@ export const activateUser = asyncHandler(async (req, res) => {
 export const deleteUser = asyncHandler(async (req, res) => {
   const { id } = req.params;
 
-  const user = await req.db.user.findUnique({
-    where: { id: parseInt(id) },
+  // verify ownership before delete
+  const user = await req.db.user.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
     include: {
       _count: {
         select: {
@@ -514,7 +503,6 @@ export const deleteUser = asyncHandler(async (req, res) => {
     throw new AppError('User not found', 404, 'NOT_FOUND');
   }
 
-  // Cannot delete yourself
   if (parseInt(id) === req.user.id) {
     throw new AppError(
       'You cannot delete your own account',
@@ -523,14 +511,12 @@ export const deleteUser = asyncHandler(async (req, res) => {
     );
   }
 
-  // Check if user has transaction history
-  const hasTransactions = 
+  const hasTransactions =
     user._count.salesMade > 0 ||
     user._count.jobsAssigned > 0 ||
     user._count.expensesRecorded > 0;
 
   if (hasTransactions) {
-    // Soft delete - deactivate instead
     const deactivatedUser = await req.db.user.update({
       where: { id: parseInt(id) },
       data: { isActive: false },
@@ -543,6 +529,7 @@ export const deleteUser = asyncHandler(async (req, res) => {
         entity: 'User',
         entityId: deactivatedUser.id,
         description: `Deactivated user with transaction history: ${deactivatedUser.username}`,
+        businessId: req.user.businessId,
       },
     });
 
@@ -553,7 +540,6 @@ export const deleteUser = asyncHandler(async (req, res) => {
     });
   }
 
-  // Hard delete if no transaction history
   await req.db.user.delete({
     where: { id: parseInt(id) },
   });
@@ -565,6 +551,7 @@ export const deleteUser = asyncHandler(async (req, res) => {
       entity: 'User',
       entityId: parseInt(id),
       description: `Deleted user: ${user.username}`,
+      businessId: req.user.businessId,
     },
   });
 
@@ -578,23 +565,26 @@ export const deleteUser = asyncHandler(async (req, res) => {
 // @route   GET /api/users/stats
 // @access  Private (requires 'users:view' permission)
 export const getUserStats = asyncHandler(async (req, res) => {
-  const [totalUsers, usersByRole, activeUsers, recentUsers] = await Promise.all([
-    // Total users
-    req.db.user.count(),
+  const bizId = req.user.businessId;
 
-    // Users by role
+  // all counts scoped to this business
+  const [totalUsers, usersByRole, activeUsers, recentUsers] = await Promise.all([
+    req.db.user.count({
+      where: { businessId: bizId },
+    }),
+
     req.db.user.groupBy({
       by: ['role'],
+      where: { businessId: bizId },
       _count: true,
     }),
 
-    // Active users
     req.db.user.count({
-      where: { isActive: true },
+      where: { isActive: true, businessId: bizId },
     }),
 
-    // Recent users
     req.db.user.findMany({
+      where: { businessId: bizId },
       select: {
         id: true,
         username: true,

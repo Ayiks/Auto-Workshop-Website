@@ -8,6 +8,7 @@ import {
   Menu, X, Check, Wrench, BarChart3,
   FileText, Layers, MapPin,
   Phone, Mail, ArrowRight, FlaskConical, Loader2,
+  BookOpen, GraduationCap, Package, Camera, Smartphone,
 } from 'lucide-react';
 
 // ─── Animation variants ───────────────────────────────────────────────────────
@@ -88,8 +89,9 @@ const Header = () => {
   const navLinks = [
     { name: 'Home',     href: '#hero'     },
     { name: 'About',    href: '#about'    },
-    { name: 'Services', href: '#services' },
+    { name: 'Features', href: '#services' },
     { name: 'Pricing',  href: '#pricing'  },
+    { name: 'Support',  href: '#support'  },
     { name: 'Contact',  href: '#contact'  },
   ];
 
@@ -186,13 +188,14 @@ const Hero = () => {
 
       <div className="container mx-auto px-4 sm:px-6 relative z-10 text-center">
         <motion.div initial="hidden" animate="visible" variants={fadeInUp} className="max-w-4xl mx-auto">
-          <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-4 sm:mb-6 leading-tight tracking-tight">
-            The Smarter Way <br className="hidden sm:block" />
-            to Grow Your <span className="text-gray-400">Workshop</span>
+          <h1 className="font-display text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-7xl font-bold text-white mb-4 sm:mb-6 leading-tight tracking-tight">
+            Run Your Paint Shop. <br className="hidden sm:block" />
+            Track Stock. <span className="text-gray-400">Showcase Every Job.</span>
           </h1>
           <p className="text-base sm:text-lg md:text-xl text-gray-400 mb-8 sm:mb-10 max-w-2xl mx-auto leading-relaxed px-2">
-            Take control of jobs, inventory, and finances. Built specifically for auto mechanics,
-            sprayers, and collision repairers in Africa and beyond.
+            The complete management platform for auto paint professionals, sprayers, and paint
+            material suppliers — from stock tracking to sprayer portfolios. Works on any device,
+            built for Africa's auto paint industry.
           </p>
 
           {/* ── CTA row ── */}
@@ -238,17 +241,17 @@ const Hero = () => {
 // ─── About ────────────────────────────────────────────────────────────────────
 const About = () => {
   const highlights = [
-    { icon: <Layers   className="text-black" size={32} />, title: 'Effortless Management', desc: 'Manage sales, active jobs, and inventory flow from a single dashboard.' },
-    { icon: <FileText className="text-black" size={32} />, title: 'Automated Invoicing',   desc: 'Generate professional receipts and invoices instantly. No more paperwork.' },
-    { icon: <BarChart3 className="text-black" size={32} />, title: 'Real-time Finance',    desc: 'Track revenue, expenses, and profit margins automatically as you work.' },
+    { icon: <Package    className="text-black" size={32} />, title: 'Paint & Materials Stock',  desc: 'Track every tin, thinner, primer, and hardener in real time. Get low-stock alerts before you run out.' },
+    { icon: <Camera     className="text-black" size={32} />, title: 'Sprayer Portfolio & Jobs', desc: 'Every sprayer logs and showcases their completed jobs — builds credibility and tracks performance over time.' },
+    { icon: <Smartphone className="text-black" size={32} />, title: 'Works on Any Device',      desc: 'Use your own phone, tablet, or laptop. No special hardware required — access your business from anywhere.' },
   ];
   return (
     <section id="about" className="py-16 sm:py-20 md:py-24 bg-gray-50">
       <div className="container mx-auto px-4 sm:px-6">
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}
                     className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-3 sm:mb-4">Why Choose Graymanager?</h2>
-          <p className="text-slate-600 text-base sm:text-lg px-2">Running a workshop is hard work. Managing it shouldn't be.</p>
+          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-3 sm:mb-4">Built for the Auto Paint Industry</h2>
+          <p className="text-slate-600 text-base sm:text-lg px-2">For professional sprayers, paint material suppliers, and collision repair shops — Graymanager keeps everything organized.</p>
         </motion.div>
         <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }}
                     className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 md:gap-10">
@@ -269,19 +272,19 @@ const About = () => {
 // ─── Services ─────────────────────────────────────────────────────────────────
 const Services = () => {
   const features = [
-    { title: 'Inventory Control', desc: 'Track parts, paints, and materials down to the last unit.' },
-    { title: 'Job Cards',         desc: 'Digital job cards to track progress from entry to delivery.' },
-    { title: 'Booth Services',    desc: 'Schedule and manage spray booth times effortlessly.' },
-    { title: 'Analytics',         desc: "Visual graphs showing your workshop's growth and health." },
-    { title: 'Custom Receipts',   desc: 'Branded receipts with your logo sent via email or WhatsApp.' },
-    { title: 'Team Access',       desc: 'Granular permissions for mechanics, managers, and cashiers.' },
+    { title: 'Paint Stock Control',  desc: 'Track tins, thinners, primers, hardeners, and accessories down to the last unit.' },
+    { title: 'Job Cards',            desc: 'Digital job cards for every spray and refinishing job — from panel prep to final delivery.' },
+    { title: 'Spray Booth Booking',  desc: 'Schedule and manage spray booth slots to eliminate downtime and clashes.' },
+    { title: 'Sprayer Portfolio',    desc: 'Each sprayer builds a portfolio of completed jobs with photos and full client history.' },
+    { title: 'Custom Receipts',      desc: 'Branded receipts and professional invoices delivered via WhatsApp or email in seconds.' },
+    { title: 'Team & Role Access',   desc: 'Set custom permissions for sprayers, managers, cashiers, and sales staff.' },
   ];
   return (
     <section id="services" className="py-16 sm:py-20 md:py-24 bg-white">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="mb-12 sm:mb-16">
-          <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-2 sm:mb-4">Powerful Features</h2>
-          <p className="text-slate-600 text-base sm:text-lg">Everything you need to run a modern automotive business.</p>
+          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-2 sm:mb-4">Powerful Features</h2>
+          <p className="text-slate-600 text-base sm:text-lg">Everything you need to run a professional auto paint business.</p>
         </div>
         <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-5 sm:gap-6 md:gap-8">
           {features.map((f, i) => (
@@ -308,83 +311,91 @@ const Pricing = () => {
   const { isMobile } = useResponsive();
   const navigate = useNavigate();
 
+  const plans = [
+    {
+      name: 'Starter',
+      price: 'GH₵35',
+      desc: 'Perfect for solo sprayers or small paint shops just getting started.',
+      features: ['Single branch access', 'Basic paint stock tracking', 'Up to 3 users', 'Job cards & receipts'],
+      style: 'light',
+    },
+    {
+      name: 'Manager',
+      price: 'GH₵90',
+      desc: 'For growing paint businesses that need more control and visibility.',
+      features: ['Multi-branch access', 'Full inventory & materials', 'Up to 10 users', 'Sprayer portfolio', 'Analytics & reports'],
+      badge: 'Most Popular',
+      style: 'dark',
+    },
+    {
+      name: 'Pro Manager',
+      price: 'GH₵150',
+      desc: 'Full power for large operations, teams, and serious business growth.',
+      features: ['Unlimited branch access', 'Advanced analytics', 'Custom branding', 'Unlimited users', 'Priority support & training'],
+      style: 'premium',
+    },
+  ];
+
   return (
     <section id="pricing" className="py-16 sm:py-20 md:py-24 bg-[#f8f9fa]">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="text-center mb-12 sm:mb-16">
-          <h2 className="text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-3 sm:mb-4 tracking-tight">No Contract, No Surprises</h2>
-          <p className="text-gray-500 text-base sm:text-lg">Consistent Pricing and Value Each Month, with the Flexibility to Cancel Anytime.</p>
+          <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-3 sm:mb-4 tracking-tight">Simple, Honest Pricing</h2>
+          <p className="text-gray-500 text-base sm:text-lg">No contracts, no hidden fees. Cancel anytime.</p>
         </div>
 
-        <div className="grid sm:grid-cols-2 gap-5 sm:gap-6 md:gap-8 max-w-5xl mx-auto">
-          {/* Starter */}
-          <motion.div whileHover={{ y: -5 }}
-                      className="bg-white border border-gray-200 p-6 sm:p-8 md:p-10 rounded-2xl md:rounded-[2.5rem] flex flex-col shadow-sm">
-            <div className="flex items-center gap-3 mb-4 sm:mb-6">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full border border-gray-200 flex items-center justify-center">
-                <Wrench size={isMobile ? 18 : 20} className="text-gray-800" />
-              </div>
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2 sm:mb-3">Starter</h3>
-            <div className="bg-gray-100 p-3 sm:p-4 rounded-xl sm:rounded-2xl mb-6 sm:mb-8">
-              <p className="text-gray-600 text-xs sm:text-sm leading-relaxed">Ideal for solo mechanics or small neighborhood shops who need basic tools.</p>
-            </div>
-            <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-12 flex-1">
-              {['Single branch access', 'Basic Inventory', 'Up to 5 users'].map((f) => (
-                <li key={f} className="flex items-center gap-3 text-gray-700 text-sm sm:text-base">
-                  <Check size={16} className="text-gray-400 flex-shrink-0" /> {f}
-                </li>
-              ))}
-            </ul>
-            <div className="mt-auto">
-              <div className="text-3xl sm:text-4xl font-bold">GH₵50</div>
-              <div className="text-xs sm:text-sm text-gray-400 mt-1 font-medium mb-4">/ per month</div>
-              <button onClick={() => navigate('/signup')}
-                      className="bg-black text-white px-6 py-2.5 sm:py-3.5 rounded-full font-bold text-sm sm:text-base hover:bg-gray-800 transition-colors w-full">
-                Get Started Today
-              </button>
-              <a href="#contact" className="block text-center text-xs text-gray-400 hover:text-gray-600 transition-colors mt-2">or Book a Call</a>
-            </div>
-          </motion.div>
-
-          {/* Pro */}
-          <motion.div whileHover={{ y: -5 }}
-                      className="bg-[#111111] p-6 sm:p-8 md:p-10 rounded-2xl md:rounded-[2.5rem] flex flex-col text-white shadow-2xl">
-            <div className="flex items-center justify-between mb-4 sm:mb-6 flex-wrap gap-2">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gray-800 flex items-center justify-center">
-                <Layers size={isMobile ? 18 : 20} className="text-white" />
-              </div>
-              <div className="flex items-center gap-2 sm:gap-3">
-                <span className="text-xs font-semibold text-gray-400">Annual Billing</span>
-                <div className="w-9 h-5 sm:w-10 sm:h-6 bg-white rounded-full flex items-center px-1">
-                  <div className="w-3.5 h-3.5 sm:w-4 sm:h-4 bg-black rounded-full transform translate-x-3 sm:translate-x-4" />
+        <div className="grid md:grid-cols-3 gap-5 sm:gap-6 max-w-6xl mx-auto">
+          {plans.map((plan, i) => {
+            const isDark    = plan.style === 'dark';
+            const isPremium = plan.style === 'premium';
+            return (
+              <motion.div key={i} whileHover={{ y: -5 }}
+                className={`relative p-6 sm:p-8 rounded-2xl md:rounded-[2rem] flex flex-col ${
+                  isDark    ? 'bg-[#111111] text-white shadow-2xl' :
+                  isPremium ? 'bg-white border-2 border-gray-900 text-gray-900 shadow-sm' :
+                              'bg-white border border-gray-200 text-gray-900 shadow-sm'
+                }`}>
+                {plan.badge && (
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
+                    <span className="bg-white text-black text-xs font-bold px-4 py-1.5 rounded-full border border-gray-200 shadow-sm whitespace-nowrap">
+                      {plan.badge}
+                    </span>
+                  </div>
+                )}
+                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center mb-4 sm:mb-5 ${
+                  isDark ? 'bg-gray-800' : 'border border-gray-200'
+                }`}>
+                  <Wrench size={isMobile ? 16 : 18} className={isDark ? 'text-white' : 'text-gray-800'} />
                 </div>
-              </div>
-            </div>
-            <h3 className="text-2xl sm:text-3xl font-bold mb-2 sm:mb-3">Pro Manager</h3>
-            <div className="bg-gray-800/60 p-3 sm:p-4 rounded-xl sm:rounded-2xl mb-6 sm:mb-8 border border-gray-700/50">
-              <p className="text-gray-300 text-xs sm:text-sm leading-relaxed">Ideal for growing teams needing full control and ongoing management support.</p>
-            </div>
-            <ul className="space-y-3 sm:space-y-4 mb-8 sm:mb-12 flex-1">
-              {['Unlimited Branch Access', 'Advanced Analytics', 'Custom Branding (No Watermark)', 'Multi-user Access'].map((f) => (
-                <li key={f} className="flex items-center gap-3 text-gray-200 text-sm sm:text-base">
-                  <Check size={16} className="text-gray-500 flex-shrink-0" /> {f}
-                </li>
-              ))}
-              <li className="flex items-center gap-3 text-green-400 font-medium text-sm sm:text-base">
-                <span className="text-lg leading-none">✧</span> Priority Support Included
-              </li>
-            </ul>
-            <div className="mt-auto">
-              <div className="text-3xl sm:text-4xl font-bold">GH₵100</div>
-              <div className="text-xs sm:text-sm text-gray-400 mt-1 font-medium mb-4">/ per month</div>
-              <button onClick={() => navigate('/signup')}
-                      className="bg-white text-black px-6 py-2.5 sm:py-3.5 rounded-full font-bold text-sm sm:text-base hover:bg-gray-200 transition-colors w-full">
-                Get Started Today
-              </button>
-              <a href="#contact" className="block text-center text-xs text-gray-400 hover:text-white transition-colors mt-2">or Book a Call</a>
-            </div>
-          </motion.div>
+                <h3 className="text-xl sm:text-2xl font-bold mb-2">{plan.name}</h3>
+                <div className={`p-3 sm:p-4 rounded-xl mb-5 sm:mb-6 ${
+                  isDark ? 'bg-gray-800/60 border border-gray-700/50' : 'bg-gray-50'
+                }`}>
+                  <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{plan.desc}</p>
+                </div>
+                <ul className="space-y-2.5 sm:space-y-3 mb-8 sm:mb-10 flex-1">
+                  {plan.features.map((f) => (
+                    <li key={f} className={`flex items-center gap-3 text-sm ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
+                      <Check size={15} className={`flex-shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} /> {f}
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-auto">
+                  <div className="text-3xl sm:text-4xl font-bold">{plan.price}</div>
+                  <div className="text-xs sm:text-sm text-gray-400 mt-1 font-medium mb-4">/ per month</div>
+                  <button onClick={() => navigate('/signup')}
+                    className={`px-6 py-2.5 sm:py-3 rounded-full font-bold text-sm sm:text-base w-full transition-colors ${
+                      isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'
+                    }`}>
+                    Get Started Today
+                  </button>
+                  <a href="#contact" className={`block text-center text-xs mt-2 transition-colors ${
+                    isDark ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-600'
+                  }`}>or Book a Call</a>
+                </div>
+              </motion.div>
+            );
+          })}
         </div>
 
         {/* Demo CTA under pricing cards */}
@@ -392,6 +403,52 @@ const Pricing = () => {
           <p className="text-gray-500 text-sm mb-4">Not sure which plan? Explore the full product first — no signup needed.</p>
           <TryDemoButton size="md" />
         </div>
+      </div>
+    </section>
+  );
+};
+
+// ─── Support ──────────────────────────────────────────────────────────────────
+const Support = () => {
+  const items = [
+    {
+      icon: <Phone size={28} className="text-white" />,
+      title: 'Direct Contact',
+      desc: 'Reach our team via phone, WhatsApp, or email whenever you need help with your account or daily operations.',
+    },
+    {
+      icon: <BookOpen size={28} className="text-white" />,
+      title: 'Guides & Docs',
+      desc: 'Clear, step-by-step documentation for every feature — stock setup, job cards, invoicing, portfolios, and more.',
+    },
+    {
+      icon: <GraduationCap size={28} className="text-white" />,
+      title: 'Product Training',
+      desc: 'Hands-on onboarding and training sessions to get you and your team up and running fast — at no extra cost.',
+    },
+  ];
+
+  return (
+    <section id="support" className="py-16 sm:py-20 md:py-24 bg-black">
+      <div className="container mx-auto px-4 sm:px-6">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}
+                    className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
+          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4">We're With You Every Step</h2>
+          <p className="text-gray-400 text-base sm:text-lg">From setup to daily operations — our support team has you covered.</p>
+        </motion.div>
+        <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                    className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
+          {items.map((item, i) => (
+            <motion.div key={i} variants={fadeInUp}
+                        className="border border-gray-800 rounded-xl sm:rounded-2xl p-6 sm:p-8 hover:border-gray-600 transition-colors">
+              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gray-900 rounded-xl flex items-center justify-center mb-4 sm:mb-6">
+                {item.icon}
+              </div>
+              <h3 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-3">{item.title}</h3>
+              <p className="text-gray-400 leading-relaxed text-sm sm:text-base">{item.desc}</p>
+            </motion.div>
+          ))}
+        </motion.div>
       </div>
     </section>
   );
@@ -479,6 +536,7 @@ export default function LandingPage() {
       <About />
       <Services />
       <Pricing />
+      <Support />
       <Contact />
       <Footer />
     </div>

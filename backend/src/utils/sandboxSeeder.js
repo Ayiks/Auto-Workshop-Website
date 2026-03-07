@@ -240,14 +240,16 @@ export async function seedSandbox(businessId, adminUserId) {
     )
   );
 
-  // 6. Customers
+  // 6. Customers — phones are derived from businessId to stay globally unique
+  // across multiple concurrent sandboxes (the phone column has a global unique constraint)
+  const bIdSlug = businessId.replace(/-/g, '').slice(0, 7);
   const customers = await Promise.all(
-    CLIENTS.map((c) =>
+    CLIENTS.map((c, idx) =>
       db.customer.create({
         data: {
           firstName: c.name.split(' ')[0],
           lastName: c.name.split(' ')[1] || null,
-          phone: c.phone,
+          phone: `+233${bIdSlug}${String(idx + 1).padStart(2, '0')}`,
           businessId,
         },
       })

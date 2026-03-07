@@ -13,7 +13,7 @@ export const sendVerificationEmail = async (email, fullName, verificationToken) 
   });
 
   // The link points to your React frontend, which will capture the token
-  const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
+  const verificationUrl = `${process.env.APP_URL}/verify-email?token=${verificationToken}`;
 
   const mailOptions = {
     from: `"Gray Manager" <${process.env.EMAIL_USER}>`, 

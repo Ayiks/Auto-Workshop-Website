@@ -23,6 +23,10 @@ import sandboxRoutes from './routes/sandbox.routes.js';
 
 const app = express();
 
+// Trust reverse proxy (nginx, Docker, etc.) so express-rate-limit
+// can read the real client IP from X-Forwarded-For
+app.set('trust proxy', 1);
+
 // ============================================
 // SECURITY & MIDDLEWARE
 // ============================================

@@ -68,10 +68,11 @@ export const createSandbox = asyncHandler(async (req, res) => {
   try {
     seedStats = await seedSandbox(business.id, adminUser.id);
   } catch (seedError) {
-    // If seeding fails, clean up the orphaned business+user and rethrow
+    // If seeding fails, clean up ALL orphaned data in FK-safe order then rethrow
     console.error('Sandbox seeding failed, rolling back:', seedError);
-    await prisma.user.delete({ where: { id: adminUser.id } }).catch(() => {});
-    await prisma.business.delete({ where: { id: business.id } }).catch(() => {});
+    await deleteSandboxData(business.id).catch((cleanupErr) => {
+      console.error('[SANDBOX] Rollback cleanup also failed:', cleanupErr.message);
+    });
     throw new AppError(
       'Failed to create sandbox environment. Please try again.',
       500,

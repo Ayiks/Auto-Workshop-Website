@@ -186,15 +186,18 @@ export const cleanupExpiredSandboxes = asyncHandler(async (req, res) => {
     select: { id: true, paymentGatewayId: true, name: true },
   });
 
-  const toDelete = expiredBusinesses.filter((b) => {
-    if (!b.paymentGatewayId) return true; // safety: delete if no expiry set
-    return now > new Date(b.paymentGatewayId);
-  });
+  const force = req.query.force === 'true';
+  const toDelete = force
+    ? expiredBusinesses
+    : expiredBusinesses.filter((b) => {
+        if (!b.paymentGatewayId) return true; // safety: delete if no expiry set
+        return now > new Date(b.paymentGatewayId);
+      });
 
   if (toDelete.length === 0) {
     return res.status(200).json({
       success: true,
-      message: 'No expired sandboxes found.',
+      message: force ? 'No sandbox businesses found.' : 'No expired sandboxes found.',
       deleted: 0,
     });
   }
@@ -215,7 +218,7 @@ export const cleanupExpiredSandboxes = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    message: `Cleanup complete. Deleted ${deletedCount} sandbox(es).`,
+    message: `Cleanup complete. Deleted ${deletedCount} sandbox(es).${force ? ' (forced)' : ''}`,
     deleted: deletedCount,
     errors: errors.length > 0 ? errors : undefined,
   });

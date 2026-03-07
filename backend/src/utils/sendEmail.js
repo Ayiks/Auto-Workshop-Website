@@ -7,13 +7,13 @@ export const sendVerificationEmail = async (email, fullName, verificationToken) 
     port: 465, // 465 is the standard secure port for Hostinger
     secure: true, // true for 465, false for other ports
     auth: {
-      user: process.env.EMAIL_USER,     // Your full Hostinger email (e.g., hello@yourdomain.com)
-      pass: process.env.EMAIL_PASSWORD, // Your Hostinger email password
+      user: process.env.EMAIL_USER,    
+      pass: process.env.EMAIL_PASSWORD, 
     },
   });
 
   // The link points to your React frontend, which will capture the token
-  const verificationUrl = `${process.env.APP_URL}/verify-email?token=${verificationToken}`;
+  const verificationUrl = `${process.env.CLIENT_URL}/verify-email?token=${verificationToken}`;
 
   const mailOptions = {
     from: `"Gray Manager" <${process.env.EMAIL_USER}>`, 

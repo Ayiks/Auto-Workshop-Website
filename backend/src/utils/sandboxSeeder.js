@@ -340,12 +340,13 @@ export async function seedSandbox(businessId, adminUserId) {
   // ---------------------------------------------------------------------------
   // 8. Invoices + Payments for completed jobs
   // ---------------------------------------------------------------------------
+  const bizSlug = businessId.replace(/-/g, '').slice(0, 6).toUpperCase();
   let invoiceSeq = 1000;
 
   for (const { job, materialsCost, labourCost, totalCost, status } of createdJobs) {
     if (status !== 'completed') continue;
 
-    const invoiceNumber = `INV-DEMO-${invoiceSeq++}`;
+    const invoiceNumber = `INV-${bizSlug}-${invoiceSeq++}`;
     const paymentStatus = rand(['paid', 'paid', 'paid', 'partial', 'unpaid']);
     const amountPaid =
       paymentStatus === 'paid'
@@ -390,7 +391,7 @@ export async function seedSandbox(businessId, adminUserId) {
       // Create receipt for the payment
       await db.receipt.create({
         data: {
-          receiptNumber: `RCP-DEMO-${invoiceSeq}`,
+          receiptNumber: `RCP-${bizSlug}-${invoiceSeq}`,
           receiptType: 'payment',
           paymentId: payment.id,
           amount: amountPaid,

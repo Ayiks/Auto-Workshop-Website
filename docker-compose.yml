@@ -19,6 +19,7 @@ services:
       JWT_SECRET: ${JWT_SECRET}
       EMAIL_USER: ${EMAIL_USER}
       EMAIL_PASSWORD: ${EMAIL_PASSWORD}
+      CLIENT_URL: ${APP_URL}
     depends_on:
       - db
 

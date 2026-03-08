@@ -1,18 +1,18 @@
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
 // Helper function to generate invoice number
-const generateInvoiceNumber = async () => {
+const generateInvoiceNumber = async (db) => {
   const prefix = 'INV';
   const date = new Date();
   const year = date.getFullYear().toString().slice(-2);
   const month = (date.getMonth() + 1).toString().padStart(2, '0');
   const day = date.getDate().toString().padStart(2, '0');
-  
+
   // Get count of invoices today
   const startOfDay = new Date(date.setHours(0, 0, 0, 0));
   const endOfDay = new Date(date.setHours(23, 59, 59, 999));
-  
-  const count = await req.db.invoice.count({
+
+  const count = await db.invoice.count({
     where: {
       invoiceDate: {
         gte: startOfDay,
@@ -20,7 +20,7 @@ const generateInvoiceNumber = async () => {
       },
     },
   });
-  
+
   const sequence = (count + 1).toString().padStart(3, '0');
   return `${prefix}${year}${month}${day}${sequence}`;
 };
@@ -66,11 +66,10 @@ export const generateInvoice = asyncHandler(async (req, res) => {
     );
   }
 
-  // ALLOW invoicing if job is active or completed. 
-  // We only stop it if it's cancelled or already invoiced.
-  if (['cancelled', 'invoiced'].includes(job.status)) {
+  // Block invoicing only if job is cancelled
+  if (job.status === 'cancelled') {
     throw new AppError(
-      `Cannot generate invoice. Job status is ${job.status}`,
+      'Cannot generate invoice for a cancelled job',
       400,
       'INVALID_OPERATION'
     );
@@ -91,12 +90,13 @@ export const generateInvoice = asyncHandler(async (req, res) => {
     0
   );
   const labourCost = parseFloat(job.labourCost);
-  const totalAmount = materialsCost + labourCost;
+  const miscellaneousCost = parseFloat(job.miscellaneousCost || 0);
+  const totalAmount = materialsCost + labourCost + miscellaneousCost;
 
   // Create invoice in transaction
   const result = await req.db.$transaction(async (tx) => {
     // 1. Generate invoice number
-    const invoiceNumber = await generateInvoiceNumber();
+    const invoiceNumber = await generateInvoiceNumber(tx);
 
     // 2. Create invoice
     const invoice = await tx.invoice.create({
@@ -105,6 +105,7 @@ export const generateInvoice = asyncHandler(async (req, res) => {
         invoiceNumber,
         materialsCost,
         labourCost,
+        miscellaneousCost,
         totalAmount,
         amountPaid: 0,
         amountDue: totalAmount,
@@ -113,27 +114,7 @@ export const generateInvoice = asyncHandler(async (req, res) => {
       },
     });
 
-    // 3. Update job status to invoiced
-    await tx.job.update({
-      where: { id: parseInt(jobId) },
-      data: { status: 'invoiced' },
-    });
-
-    // 4. Deduct inventory materials (materials used in completed job)
-    for (const material of job.materials) {
-      if (!material.isExternal && material.materialId) {
-        await tx.material.update({
-          where: { id: material.materialId },
-          data: {
-            quantity: {
-              decrement: material.quantity,
-            },
-          },
-        });
-      }
-    }
-
-    // 5. Log audit
+    // 3. Log audit
     await tx.auditLog.create({
       data: {
         userId: req.user.id,
@@ -522,7 +503,6 @@ export const getInvoiceStats = asyncHandler(async (req, res) => {
 // @access  Private (Admin only)
 export const voidInvoice = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { reason } = req.body;
 
   const invoice = await req.db.invoice.findUnique({
     where: { id: parseInt(id) },

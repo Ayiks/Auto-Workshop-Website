@@ -18,6 +18,7 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
     problemType: job?.problemType || '',
     problemDescription: job?.problemDescription || '',
     labourCost: job?.labourCost || 0,
+    miscellaneousCost: job?.miscellaneousCost || 0,
   });
 
   const [materials, setMaterials] = useState(job?.materials || []);
@@ -85,9 +86,9 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
             }
           }
 
-          // Recalculate subtotal
+          // Recalculate subtotal (supports decimals)
           if (field === 'quantity' || field === 'unitPrice') {
-            updated.subtotal = parseFloat(updated.unitPrice || 0) * parseInt(updated.quantity || 0);
+            updated.subtotal = parseFloat(updated.unitPrice || 0) * parseFloat(updated.quantity || 0);
           }
 
           return updated;
@@ -98,7 +99,7 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
   };
 
   const materialsCost = materials.reduce((sum, m) => sum + parseFloat(m.subtotal || 0), 0);
-  const totalCost = materialsCost + parseFloat(formData.labourCost || 0);
+  const totalCost = materialsCost + parseFloat(formData.labourCost || 0) + parseFloat(formData.miscellaneousCost || 0);
 
   const validate = () => {
     const newErrors = {};
@@ -122,14 +123,6 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
         newErrors.materials = 'Material quantity must be greater than 0';
         break;
       }
-      // Check stock availability for inventory materials
-      if (!material.isExternal && material.materialId) {
-        const inventoryItem = inventoryMaterials.find(inv => inv.id === parseInt(material.materialId));
-        if (inventoryItem && parseInt(material.quantity) > inventoryItem.quantity) {
-          newErrors.materials = `${material.materialName} has only ${inventoryItem.quantity} units in stock`;
-          break;
-        }
-      }
     }
 
     setErrors(newErrors);
@@ -142,10 +135,11 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
       onSubmit({
         ...formData,
         labourCost: parseFloat(formData.labourCost),
+        miscellaneousCost: parseFloat(formData.miscellaneousCost || 0),
         materials: materials.map((m) => ({
           materialId: m.isExternal ? undefined : parseInt(m.materialId),
           materialName: m.materialName,
-          quantity: parseInt(m.quantity),
+          quantity: parseFloat(m.quantity),
           unitPrice: parseFloat(m.unitPrice),
           isExternal: m.isExternal,
         })),
@@ -408,22 +402,22 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
                       <div className="col-span-2">
                         <input
                           type="number"
+                          step="0.1"
                           value={material.quantity}
                           onChange={(e) => updateMaterial(material.id, 'quantity', e.target.value)}
-                          min="1"
                           placeholder="Qty"
                           className={inputClass(false)}
                         />
                       </div>
 
                       {/* Price */}
-                      <div className="col-span-2 relative">
-                        <span className="absolute left-2 top-2.5 text-gray-400 text-xs">₵</span>
+                      <div className="col-span-2 flex items-stretch border border-gray-300 rounded-lg overflow-hidden focus-within:ring-1 focus-within:ring-black focus-within:border-black bg-white">
+                        <span className="flex items-center px-2 text-gray-400 text-xs bg-gray-50 border-r border-gray-200 select-none">₵</span>
                         <input
                           type="number"
                           value={material.unitPrice}
                           onChange={(e) => updateMaterial(material.id, 'unitPrice', e.target.value)}
-                          className={`${inputClass(false)} pl-5`}
+                          className="flex-1 min-w-0 px-2 py-1.5 text-xs sm:text-sm bg-white focus:outline-none"
                           disabled={!material.isExternal && material.materialId}
                         />
                       </div>
@@ -479,6 +473,24 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
                         </div>
                     </div>
 
+                    {/* 3. Miscellaneous Input */}
+                    <div>
+                        <label className="block text-xs font-medium text-gray-700 mb-1 sm:mb-1.5">Miscellaneous</label>
+                        <div className="relative">
+                            <span className="absolute left-2 sm:left-3 top-2 sm:top-2.5 text-gray-500 text-xs sm:text-sm">GH₵</span>
+                            <input
+                                type="number"
+                                name="miscellaneousCost"
+                                value={formData.miscellaneousCost}
+                                onChange={handleChange}
+                                placeholder="0.00"
+                                min="0"
+                                className={`${inputClass(false)} pl-8 sm:pl-10 font-medium text-right`}
+                                disabled={isLoading}
+                            />
+                        </div>
+                    </div>
+
                     <div className="border-t border-gray-100 pt-3 sm:pt-4 mt-2">
                         <div className="flex justify-between items-end">
                             <span className="text-sm font-bold text-gray-900">Grand Total</span>
@@ -514,7 +526,7 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
             <div className="bg-gray-50 rounded-lg p-3 sm:p-4 border border-gray-100">
                 <p className="text-xs text-gray-500 leading-relaxed">
                     <span className="font-semibold text-gray-900 block mb-1">Note:</span>
-                    Materials selected from inventory will automatically deduct stock upon job completion. External materials require manual price entry.
+                    Materials are for reference and cost tracking only — stock is not deducted. External materials require manual price entry.
                 </p>
             </div>
 

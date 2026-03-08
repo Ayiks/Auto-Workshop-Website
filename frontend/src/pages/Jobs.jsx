@@ -15,15 +15,21 @@ import JobDetailsWithInvoice from '@components/features/jobs/JobDetailsWithInvoi
 
 // We keep colors ONLY for status/invoice states (Trends/Data)
 const STATUS_STYLES = {
-  pending: 'bg-amber-50 text-amber-700 border border-amber-200',
+  pending:     'bg-amber-50 text-amber-700 border border-amber-200',
+  active:      'bg-blue-50 text-blue-700 border border-blue-200',
   in_progress: 'bg-blue-50 text-blue-700 border border-blue-200',
-  completed: 'bg-green-50 text-green-700 border border-green-200',
+  completed:   'bg-green-50 text-green-700 border border-green-200',
+  invoiced:    'bg-purple-50 text-purple-700 border border-purple-200',
+  cancelled:   'bg-gray-100 text-gray-500 border border-gray-200',
 };
 
 const STATUS_LABELS = {
-  pending: 'Pending',
+  pending:     'Pending',
+  active:      'Active',
   in_progress: 'In Progress',
-  completed: 'Completed',
+  completed:   'Completed',
+  invoiced:    'Invoiced',
+  cancelled:   'Cancelled',
 };
 
 const INVOICE_STYLES = {
@@ -226,8 +232,8 @@ export default function Jobs() {
       header: 'Status',
       accessor: 'status',
       render: (row) => (
-        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[row.status]}`}>
-          {STATUS_LABELS[row.status]}
+        <span className={`px-2 py-1 rounded-full text-xs font-medium ${STATUS_STYLES[row.status] || 'bg-gray-100 text-gray-600 border border-gray-200'}`}>
+          {STATUS_LABELS[row.status] || row.status}
         </span>
       ),
     },
@@ -247,7 +253,7 @@ export default function Jobs() {
       header: 'Actions',
       render: (row) => (
         <div className="flex justify-end items-center gap-3">
-          {row.status === 'pending' && row.invoice && (
+          {row.status === 'pending' && (
             <button
               onClick={(e) => { e.stopPropagation(); handleUpdateStatus(row.id, 'in_progress'); }}
               className="text-xs font-medium text-gray-600 hover:text-black hover:underline transition-colors"
@@ -383,8 +389,11 @@ export default function Jobs() {
               >
                 <option value="all">All Status</option>
                 <option value="pending">Pending</option>
+                <option value="active">Active</option>
                 <option value="in_progress">In Progress</option>
                 <option value="completed">Completed</option>
+                <option value="invoiced">Invoiced</option>
+                <option value="cancelled">Cancelled</option>
               </select>
 
               <select

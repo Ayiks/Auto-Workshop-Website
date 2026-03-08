@@ -62,14 +62,15 @@ export default function JobDetailsWithInvoice({
   // --- CALCULATIONS ---
   const materialsCost = job.materials?.reduce((sum, m) => sum + parseFloat(m.subtotal), 0) || 0;
   const labourCost = parseFloat(job.labourCost || 0);
-  
-  const totalCost = job.invoice 
-    ? parseFloat(job.invoice.totalAmount) 
-    : materialsCost + labourCost;
+  const miscellaneousCost = parseFloat(job.miscellaneousCost || 0);
+
+  const totalCost = job.invoice
+    ? parseFloat(job.invoice.totalAmount)
+    : materialsCost + labourCost + miscellaneousCost;
 
   // --- FLAGS ---
   const hasInvoice = !!job.invoice;
-  const canGenerateInvoice = job.status === 'pending' && !hasInvoice;
+  const canGenerateInvoice = !hasInvoice && job.status !== 'cancelled';
   const canEdit = job.status === 'pending' && !hasInvoice;
   const canRecordPayment = hasInvoice && job.invoice.paymentStatus !== 'paid';
 
@@ -220,6 +221,10 @@ export default function JobDetailsWithInvoice({
                     <tr className="bg-blue-50/20">
                       <td className="py-1.5 sm:py-2 px-2 sm:px-4 font-medium text-blue-900" colSpan="2">Labour Charges</td>
                       <td className="py-1.5 sm:py-2 px-2 sm:px-4 text-right font-medium text-blue-900">GH₵{labourCost.toFixed(2)}</td>
+                    </tr>
+                    <tr className="bg-blue-50/20">
+                      <td className="py-1.5 sm:py-2 px-2 sm:px-4 font-medium text-blue-900" colSpan="2">Miscellaneous</td>
+                      <td className="py-1.5 sm:py-2 px-2 sm:px-4 text-right font-medium text-blue-900">GH₵{miscellaneousCost.toFixed(2)}</td>
                     </tr>
                   </tbody>
                  </table>

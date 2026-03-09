@@ -60,7 +60,7 @@ export default function Login() {
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg border border-slate-100">
         
         {/* Logo */}
-        <div className="mb-8 flex items-center justify-center gap-3">
+        {/* <div className="mb-8 flex items-center justify-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white shadow-md shadow-blue-200">
             <svg
               className="h-6 w-6"
@@ -79,7 +79,7 @@ export default function Login() {
           <h1 className="text-xl font-bold tracking-tight text-slate-900">
             Gray Manager
           </h1>
-        </div>
+        </div> */}
 
         <div className="mb-6 text-center">
           <h2 className="text-2xl font-bold text-slate-900">

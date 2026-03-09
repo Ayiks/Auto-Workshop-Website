@@ -7,6 +7,7 @@ import paymentRoutes from './payment.routes.js';
 import receiptRoutes from './receipt.routes.js';
 import expenseRoutes from './expenses.routes.js';
 import reportRoutes from './report.routes.js';
+import { sendContactEmail } from '../utils/sendEmail.js';
 
 
 /**
@@ -36,6 +37,21 @@ const configureRoutes = (app) => {
   app.use(`${API_VERSION}/receipts`, receiptRoutes);
   app.use(`${API_VERSION}/expenses`, expenseRoutes);
   app.use(`${API_VERSION}/reports`, reportRoutes);
+
+  // Public contact form
+  app.post(`${API_VERSION}/contact`, async (req, res) => {
+    const { fullName, email, message } = req.body;
+    if (!fullName || !email || !message) {
+      return res.status(400).json({ success: false, error: { message: 'All fields are required.' } });
+    }
+    try {
+      await sendContactEmail({ fullName, email, message });
+      res.status(200).json({ success: true, message: 'Message sent.' });
+    } catch (err) {
+      console.error('Contact email failed:', err.message);
+      res.status(500).json({ success: false, error: { message: 'Failed to send message. Please try again.' } });
+    }
+  });
 
   // 404 handler - must be last
   app.use('*', (req, res) => {

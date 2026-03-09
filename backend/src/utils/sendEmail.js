@@ -1,5 +1,37 @@
 import nodemailer from 'nodemailer';
 
+export const sendContactEmail = async ({ fullName, email, message }) => {
+  const transporter = nodemailer.createTransport({
+    host: 'smtp.hostinger.com',
+    port: 465,
+    secure: true,
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD,
+    },
+  });
+
+  await transporter.sendMail({
+    from: `"Graymanager Contact" <${process.env.EMAIL_USER}>`,
+    to: process.env.EMAIL_USER,
+    replyTo: email,
+    subject: `Contact Form: ${fullName}`,
+    html: `
+      <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111;">
+        <div style="background:#111827;padding:20px 28px;border-radius:8px 8px 0 0;">
+          <h2 style="color:#fff;margin:0;font-size:18px;">New Contact Form Submission</h2>
+        </div>
+        <div style="padding:24px 28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+          <p><strong>Name:</strong> ${fullName}</p>
+          <p><strong>Email:</strong> <a href="mailto:${email}">${email}</a></p>
+          <p><strong>Message:</strong></p>
+          <p style="background:#f9fafb;padding:12px 16px;border-radius:6px;border-left:3px solid #111827;">${message.replace(/\n/g, '<br>')}</p>
+        </div>
+      </div>
+    `,
+  });
+};
+
 const createTransporter = () =>
   nodemailer.createTransport({
     host: 'smtp.hostinger.com',

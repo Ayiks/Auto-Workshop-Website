@@ -32,6 +32,14 @@ const calculateTrend = (current, previous) => {
   return ((current - previous) / previous) * 100;
 };
 
+// Helper: Calculate job service revenue (labour + misc only), prorated by payment rate
+const calcJobRevenue = (invoices) => invoices.reduce((sum, inv) => {
+  const serviceTotal = parseFloat(inv.labourCost || 0) + parseFloat(inv.miscellaneousCost || 0);
+  const total = parseFloat(inv.totalAmount || 0);
+  const paymentRate = total > 0 ? Math.min(parseFloat(inv.amountPaid || 0) / total, 1) : 0;
+  return sum + (serviceTotal * paymentRate);
+}, 0);
+
 // @desc    Get Sales Report
 // @route   GET /api/reports/sales
 // @access  Private (requires 'reports:view' permission)
@@ -675,12 +683,16 @@ export const getRevenueReport = asyncHandler(async (req, res) => {
     });
   });
 
-  // Job revenue by type
+  // Job revenue by type (labour + misc only, prorated by payment rate)
   const invoices = await req.db.invoice.findMany({
     where: {
       invoiceDate: dateRange,
     },
-    include: {
+    select: {
+      labourCost: true,
+      miscellaneousCost: true,
+      totalAmount: true,
+      amountPaid: true,
       job: {
         select: { jobType: true },
       },
@@ -696,12 +708,15 @@ export const getRevenueReport = asyncHandler(async (req, res) => {
   let totalJobRevenue = 0;
 
   invoices.forEach(invoice => {
-    const amount = parseFloat(invoice.totalAmount);
+    const serviceTotal = parseFloat(invoice.labourCost || 0) + parseFloat(invoice.miscellaneousCost || 0);
+    const total = parseFloat(invoice.totalAmount || 0);
+    const paymentRate = total > 0 ? Math.min(parseFloat(invoice.amountPaid || 0) / total, 1) : 0;
+    const revenue = serviceTotal * paymentRate;
     const type = invoice.job.jobType;
     if (jobRevenue[type] !== undefined) {
-      jobRevenue[type] += amount;
+      jobRevenue[type] += revenue;
     }
-    totalJobRevenue += amount;
+    totalJobRevenue += revenue;
   });
 
   const totalRevenue = materialRevenue + boothRevenue + totalJobRevenue;
@@ -938,19 +953,19 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
     req.db.sale.count({ where: { status: 'completed', saleDate: { gte: currentMonthStart, lte: currentMonthEnd } } }),
     req.db.invoice.count({ where: { invoiceDate: { gte: currentMonthStart, lte: currentMonthEnd } } }),
     req.db.sale.aggregate({ where: { status: 'completed', saleDate: { gte: currentMonthStart, lte: currentMonthEnd } }, _sum: { totalAmount: true } }),
-    req.db.invoice.aggregate({ where: { invoiceDate: { gte: currentMonthStart, lte: currentMonthEnd } }, _sum: { totalAmount: true } }),
+    req.db.invoice.findMany({ where: { invoiceDate: { gte: currentMonthStart, lte: currentMonthEnd } }, select: { labourCost: true, miscellaneousCost: true, totalAmount: true, amountPaid: true } }),
 
     // Last Month
     req.db.sale.count({ where: { status: 'completed', saleDate: { gte: lastMonthStart, lte: lastMonthEnd } } }),
     req.db.invoice.count({ where: { invoiceDate: { gte: lastMonthStart, lte: lastMonthEnd } } }),
     req.db.sale.aggregate({ where: { status: 'completed', saleDate: { gte: lastMonthStart, lte: lastMonthEnd } }, _sum: { totalAmount: true } }),
-    req.db.invoice.aggregate({ where: { invoiceDate: { gte: lastMonthStart, lte: lastMonthEnd } }, _sum: { totalAmount: true } }),
+    req.db.invoice.findMany({ where: { invoiceDate: { gte: lastMonthStart, lte: lastMonthEnd } }, select: { labourCost: true, miscellaneousCost: true, totalAmount: true, amountPaid: true } }),
 
     // Daily Revenue Sums
     req.db.sale.aggregate({ where: { status: 'completed', saleDate: { gte: todayStart, lte: todayEnd } }, _sum: { totalAmount: true } }),
-    req.db.invoice.aggregate({ where: { invoiceDate: { gte: todayStart, lte: todayEnd } }, _sum: { totalAmount: true } }),
+    req.db.invoice.findMany({ where: { invoiceDate: { gte: todayStart, lte: todayEnd } }, select: { labourCost: true, miscellaneousCost: true, totalAmount: true, amountPaid: true } }),
     req.db.sale.aggregate({ where: { status: 'completed', saleDate: { gte: yesterdayStart, lte: yesterdayEnd } }, _sum: { totalAmount: true } }),
-    req.db.invoice.aggregate({ where: { invoiceDate: { gte: yesterdayStart, lte: yesterdayEnd } }, _sum: { totalAmount: true } }),
+    req.db.invoice.findMany({ where: { invoiceDate: { gte: yesterdayStart, lte: yesterdayEnd } }, select: { labourCost: true, miscellaneousCost: true, totalAmount: true, amountPaid: true } }),
 
     // Daily Counts (New)
     req.db.sale.count({ where: { status: 'completed', saleDate: { gte: todayStart, lte: todayEnd } } }),
@@ -966,22 +981,22 @@ export const getDashboardOverview = asyncHandler(async (req, res) => {
 
   // Monthly Values
   const valSalesRev = parseFloat(currentSalesRevenue._sum.totalAmount || 0);
-  const valJobRev = parseFloat(currentJobRevenue._sum.totalAmount || 0);
+  const valJobRev = calcJobRevenue(currentJobRevenue);
   const valTotalRev = valSalesRev + valJobRev;
-  
+
   // Daily Values
   const valTodaySales = parseFloat(todaySalesRev._sum.totalAmount || 0);
-  const valTodayJobs = parseFloat(todayJobsRev._sum.totalAmount || 0);
+  const valTodayJobs = calcJobRevenue(todayJobsRev);
   const valDailyTotal = valTodaySales + valTodayJobs;
 
-  const valYesterday = (parseFloat(yesterdaySalesRev._sum.totalAmount || 0) + parseFloat(yesterdayJobsRev._sum.totalAmount || 0));
+  const valYesterday = parseFloat(yesterdaySalesRev._sum.totalAmount || 0) + calcJobRevenue(yesterdayJobsRev);
 
   // Trends
   const trends = {
     salesCount: calculateTrend(currentSalesCount, lastMonthSalesCount),
     salesRev: calculateTrend(valSalesRev, parseFloat(lastMonthSalesRevenue._sum.totalAmount || 0)),
     jobCount: calculateTrend(currentJobCount, lastMonthJobCount),
-    jobRev: calculateTrend(valJobRev, parseFloat(lastMonthJobRevenue._sum.totalAmount || 0)),
+    jobRev: calculateTrend(valJobRev, calcJobRevenue(lastMonthJobRevenue)),
     dailyRev: calculateTrend(valDailyTotal, valYesterday)
   };
 
@@ -1067,15 +1082,15 @@ export const getTrends = asyncHandler(async (req, res) => {
     ranges.map(async ({ start, end, label }) => {
       const dateFilter = { gte: start, lte: end };
 
-      const [salesRev, jobsRev, salesCount, expensesAgg, plData] = await Promise.all([
+      const [salesRev, jobInvoices, salesCount, expensesAgg, plData] = await Promise.all([
         req.db.sale.aggregate({
           where: { status: 'completed', saleDate: dateFilter },
           _sum: { totalAmount: true },
           _count: true,
         }),
-        req.db.invoice.aggregate({
+        req.db.invoice.findMany({
           where: { invoiceDate: dateFilter },
-          _sum: { totalAmount: true },
+          select: { labourCost: true, miscellaneousCost: true, totalAmount: true, amountPaid: true },
         }),
         req.db.sale.count({
           where: { status: 'completed', saleDate: dateFilter },
@@ -1099,7 +1114,7 @@ export const getTrends = asyncHandler(async (req, res) => {
       ]);
 
       const salesRevenue = parseFloat(salesRev._sum.totalAmount || 0);
-      const jobsRevenue = parseFloat(jobsRev._sum.totalAmount || 0);
+      const jobsRevenue = calcJobRevenue(jobInvoices);
       const totalRevenue = salesRevenue + jobsRevenue;
       const expenses = parseFloat(expensesAgg._sum.amount || 0);
       const cogs = plData.reduce((sum, item) =>

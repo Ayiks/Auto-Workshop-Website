@@ -200,10 +200,12 @@ export const getJobReport = asyncHandler(async (req, res) => {
   });
 
   // Calculate job revenue by type
+  // Revenue = Labour + Miscellaneous only (materials are reference; bought at sales counter)
+  // Cash basis: prorated by payment rate (amountPaid / totalAmount)
   const revenueByType = {
-    mechanic: { revenue: 0, jobs: 0, materialsCost: 0, labourCost: 0 },
-    sprayer: { revenue: 0, jobs: 0, materialsCost: 0, labourCost: 0 },
-    bodyworks: { revenue: 0, jobs: 0, materialsCost: 0, labourCost: 0 },
+    mechanic:  { revenue: 0, jobs: 0, materialsCost: 0, labourCost: 0, miscellaneousCost: 0 },
+    sprayer:   { revenue: 0, jobs: 0, materialsCost: 0, labourCost: 0, miscellaneousCost: 0 },
+    bodyworks: { revenue: 0, jobs: 0, materialsCost: 0, labourCost: 0, miscellaneousCost: 0 },
   };
 
   let totalJobRevenue = 0;
@@ -211,20 +213,28 @@ export const getJobReport = asyncHandler(async (req, res) => {
   let totalOutstanding = 0;
   let totalMaterialsCost = 0;
   let totalLabourCost = 0;
+  let totalMiscellaneousCost = 0;
 
   invoices.forEach(invoice => {
     const type = invoice.job.jobType;
-    const revenue = parseFloat(invoice.totalAmount);
-    const paid = parseFloat(invoice.amountPaid);
-    const outstanding = parseFloat(invoice.amountDue);
+    const total = parseFloat(invoice.totalAmount || 0);
+    const paid = parseFloat(invoice.amountPaid || 0);
+    const outstanding = parseFloat(invoice.amountDue || 0);
     const materialsCost = parseFloat(invoice.materialsCost || 0);
     const labourCost = parseFloat(invoice.labourCost || 0);
+    const miscellaneousCost = parseFloat(invoice.miscellaneousCost || 0);
+
+    // Service revenue = labour + misc, prorated by how much has been paid
+    const serviceTotal = labourCost + miscellaneousCost;
+    const paymentRate = total > 0 ? Math.min(paid / total, 1) : 0;
+    const revenue = serviceTotal * paymentRate;
 
     if (revenueByType[type]) {
       revenueByType[type].revenue += revenue;
       revenueByType[type].jobs += 1;
       revenueByType[type].materialsCost += materialsCost;
       revenueByType[type].labourCost += labourCost;
+      revenueByType[type].miscellaneousCost += miscellaneousCost;
     }
 
     totalJobRevenue += revenue;
@@ -232,6 +242,7 @@ export const getJobReport = asyncHandler(async (req, res) => {
     totalOutstanding += outstanding;
     totalMaterialsCost += materialsCost;
     totalLabourCost += labourCost;
+    totalMiscellaneousCost += miscellaneousCost;
   });
 
   // Materials usage in jobs
@@ -287,11 +298,12 @@ export const getJobReport = asyncHandler(async (req, res) => {
     },
     data: {
       summary: {
-        totalJobRevenue,
-        totalPaid,
-        totalOutstanding,
+        totalJobRevenue,   // service revenue earned (labour+misc × payment rate)
+        totalPaid,         // total cash received
+        totalOutstanding,  // total amountDue remaining
         totalMaterialsCost,
         totalLabourCost,
+        totalMiscellaneousCost,
         totalJobs: invoices.length,
       },
       revenueByType,
@@ -448,14 +460,26 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
 
   const counterSalesRevenue = parseFloat(counterSales._sum.totalAmount || 0);
 
-  const jobInvoices = await req.db.invoice.aggregate({
-    where: {
-      invoiceDate: dateRange,
+  // Job revenue = Labour + Miscellaneous only (materials are reference; bought at sales counter)
+  // Cash basis: prorated by amountPaid / totalAmount per invoice
+  const jobInvoicesList = await req.db.invoice.findMany({
+    where: { invoiceDate: dateRange },
+    select: {
+      labourCost: true,
+      miscellaneousCost: true,
+      totalAmount: true,
+      amountPaid: true,
+      job: { select: { jobType: true } },
     },
-    _sum: { totalAmount: true },
   });
 
-  const jobRevenue = parseFloat(jobInvoices._sum.totalAmount || 0);
+  const jobRevenue = jobInvoicesList.reduce((sum, inv) => {
+    const serviceTotal = parseFloat(inv.labourCost || 0) + parseFloat(inv.miscellaneousCost || 0);
+    const total = parseFloat(inv.totalAmount || 0);
+    const paymentRate = total > 0 ? Math.min(parseFloat(inv.amountPaid || 0) / total, 1) : 0;
+    return sum + (serviceTotal * paymentRate);
+  }, 0);
+
   const grossRevenue = counterSalesRevenue + jobRevenue;
 
   // 2. Calculate ACTUAL COGS (Based on SALES/USAGE, not purchases)
@@ -481,29 +505,10 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
     });
   });
 
-  const jobsWithMaterials = await req.db.invoice.findMany({
-    where: {
-      invoiceDate: dateRange,
-    },
-    include: {
-      job: {
-        include: {
-          materials: {
-            where: { isExternal: false },
-          },
-        },
-      },
-    },
-  });
-
-  let jobMaterialsCOGS = 0;
-  jobsWithMaterials.forEach(invoice => {
-    invoice.job.materials.forEach(material => {
-      jobMaterialsCOGS += parseFloat(material.subtotal || 0);
-    });
-  });
-
-  const totalCOGS = materialCOGS + jobMaterialsCOGS;
+  // Job materials are reference-only (not deducted from inventory; bought at sales counter).
+  // Their cost is already captured in counter sales COGS — do not double-count here.
+  const jobMaterialsCOGS = 0;
+  const totalCOGS = materialCOGS;
 
   // 3. Calculate Gross Profit
   const grossProfit = grossRevenue - totalCOGS;
@@ -550,17 +555,15 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
     });
   });
 
-  // 7. Get job revenue breakdown (Existing logic...)
-  const invoicesWithJobs = await req.db.invoice.findMany({
-    where: { invoiceDate: dateRange },
-    include: { job: { select: { jobType: true } } },
-  });
-
+  // 7. Job revenue breakdown by type — reuse jobInvoicesList, same service revenue formula
   const jobRevenueByType = { mechanic: 0, sprayer: 0, bodyworks: 0 };
-  invoicesWithJobs.forEach(invoice => {
-    const type = invoice.job.jobType;
+  jobInvoicesList.forEach(inv => {
+    const type = inv.job.jobType;
     if (jobRevenueByType[type] !== undefined) {
-      jobRevenueByType[type] += parseFloat(invoice.totalAmount);
+      const serviceTotal = parseFloat(inv.labourCost || 0) + parseFloat(inv.miscellaneousCost || 0);
+      const total = parseFloat(inv.totalAmount || 0);
+      const paymentRate = total > 0 ? Math.min(parseFloat(inv.amountPaid || 0) / total, 1) : 0;
+      jobRevenueByType[type] += serviceTotal * paymentRate;
     }
   });
 
@@ -580,8 +583,9 @@ export const getProfitLoss = asyncHandler(async (req, res) => {
   const netProfitMargin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
   const materialGrossProfit = materialSalesRevenue - materialSalesCOGS;
   const materialGrossProfitMargin = materialSalesRevenue > 0 ? (materialGrossProfit / materialSalesRevenue) * 100 : 0;
-  const jobGrossProfit = jobRevenue - jobMaterialsCOGS;
-  const jobGrossProfitMargin = jobRevenue > 0 ? (jobGrossProfit / jobRevenue) * 100 : 0;
+  // Job gross profit = all service revenue (labour+misc are pure service, no material COGS)
+  const jobGrossProfit = jobRevenue;
+  const jobGrossProfitMargin = jobRevenue > 0 ? 100 : 0;
 
   res.status(200).json({
     success: true,

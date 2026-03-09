@@ -71,7 +71,7 @@ export default function JobDetailsWithInvoice({
   // --- FLAGS ---
   const hasInvoice = !!job.invoice;
   const canGenerateInvoice = !hasInvoice && job.status !== 'cancelled';
-  const canEdit = job.status === 'pending' && !hasInvoice;
+  const canEdit = job.status !== 'cancelled';
   const canRecordPayment = hasInvoice && job.invoice.paymentStatus !== 'paid';
 
   // Sort payments by date (newest first)

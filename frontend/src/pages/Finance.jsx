@@ -91,30 +91,28 @@ export default function Finance() {
     boothSales: salesData?.data?.breakdown?.booth?.revenue || 0,
   };
 
+  const _jobsSummary = jobsData?.data?.summary || {};
+  const _jobsPayment = jobsData?.data?.paymentStatusBreakdown || {};
+
   const jobs = {
-    totalJobs: jobsData?.data?.summary?.totalJobs || 0,
-    totalRevenue: jobsData?.data?.summary?.totalJobRevenue || 0,
-    totalMaterialsCost: jobsData?.data?.summary?.totalMaterialsCost || 0,
-    totalLabourCost: jobsData?.data?.summary?.totalLabourCost || 0,
-    averageJob:
-      (jobsData?.data?.summary?.totalJobRevenue || 0) /
-      (jobsData?.data?.summary?.totalJobs || 1),
-    totalOutstanding: jobsData?.data?.summary?.totalOutstanding || 0,
-    totalPaid: jobsData?.data?.summary?.totalPaid || 0,
-    unpaidJobs:
-      jobsData?.data?.data?.paymentStatusBreakdown?.unpaid?.count || 0,
-    unpaidAmount:
-      jobsData?.data?.data?.paymentStatusBreakdown?.unpaid?.amount || 0,
-    partialJobs:
-      jobsData?.data?.data?.paymentStatusBreakdown?.partial?.count || 0,
-    partialAmount:
-      jobsData?.data?.data?.paymentStatusBreakdown?.partial?.amountDue || 0,
-    paidJobs: jobsData?.data?.data?.paymentStatusBreakdown?.paid?.count || 0,
-    paidAmount: jobsData?.data?.data?.paymentStatusBreakdown?.paid?.amount || 0,
-    revenueByType: jobsData?.data?.data?.revenueByType,
-    materialUsage: jobsData?.data?.data?.materialUsage,
-    paymentStatusBreakdown: jobsData?.data?.data?.paymentStatusBreakdown,
-    recentJobs: jobsData?.data?.data?.recentJobs,
+    totalJobs:          _jobsSummary.totalJobs || 0,
+    totalRevenue:       _jobsSummary.totalJobRevenue || 0,    // service revenue earned (cash basis)
+    totalPaid:          _jobsSummary.totalPaid || 0,          // total cash received
+    totalOutstanding:   _jobsSummary.totalOutstanding || 0,   // total amountDue remaining
+    totalMaterialsCost: _jobsSummary.totalMaterialsCost || 0,
+    totalLabourCost:    _jobsSummary.totalLabourCost || 0,
+    totalMiscellaneous: _jobsSummary.totalMiscellaneousCost || 0,
+    averageJob: (_jobsSummary.totalJobRevenue || 0) / (_jobsSummary.totalJobs || 1),
+    unpaidJobs:    _jobsPayment.unpaid?.count || 0,
+    unpaidAmount:  _jobsPayment.unpaid?.amountDue || 0,   // outstanding balance on unpaid invoices
+    partialJobs:   _jobsPayment.partial?.count || 0,
+    partialAmount: _jobsPayment.partial?.amountDue || 0,  // remaining balance on partial invoices
+    paidJobs:      _jobsPayment.paid?.count || 0,
+    paidAmount:    _jobsPayment.paid?.amount || 0,        // totalAmount = amountPaid when fully paid
+    revenueByType:         jobsData?.data?.revenueByType,
+    materialUsage:         jobsData?.data?.materialUsage,
+    paymentStatusBreakdown: _jobsPayment,
+    recentJobs:            jobsData?.data?.recentJobs,
   };
 
   const expenses = {
@@ -784,7 +782,7 @@ function JobsTab({ jobs, dateRange }) {
         <StatCard
           title="Revenue"
           value={`GH₵${Number(jobs.totalRevenue).toLocaleString()}`}
-          subtitle="Invoiced"
+          subtitle="Service earned (paid)"
         />
         <StatCard
           title="Materials"

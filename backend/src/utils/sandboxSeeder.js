@@ -362,6 +362,7 @@ export async function seedSandbox(businessId, adminUserId) {
         invoiceNumber,
         materialsCost,
         labourCost,
+        miscellaneousCost: 0,
         totalAmount: totalCost,
         amountPaid,
         amountDue,

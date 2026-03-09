@@ -80,7 +80,7 @@ export default function JobDetailsWithInvoice({
     : [];
 
   const handleGenerateInvoice = () => {
-    if (window.confirm('Approve Job? This will generate an Invoice and deduct items from Inventory.')) {
+    if (window.confirm('Approve Job? This will generate an Invoice.')) {
       generateInvoiceMutation.mutate({ jobId: job.id });
     }
   };

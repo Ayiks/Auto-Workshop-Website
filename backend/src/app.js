@@ -6,12 +6,12 @@ import { errorHandler, notFound } from './middleware/errorHandler.js';
 
 // Import routes
 import authRoutes from './routes/auth.routes.js';
-import materialRoutes from './routes/materials.routes.js';  
-import saleRoutes from './routes/sales.routes.js';           
-import jobRoutes from './routes/jobs.routes.js';            
-import invoiceRoutes from './routes/invoices.routes.js';     
+import materialRoutes from './routes/materials.routes.js';
+import saleRoutes from './routes/sales.routes.js';
+import jobRoutes from './routes/jobs.routes.js';
+import invoiceRoutes from './routes/invoices.routes.js';
 import paymentRoutes from './routes/payment.routes.js';
-import expenseRoutes from './routes/expenses.routes.js';     
+import expenseRoutes from './routes/expenses.routes.js';
 import reportRoutes from './routes/report.routes.js';
 import receiptRoutes from './routes/receipt.routes.js';
 import bookingRoutes from './routes/bookings.routes.js';
@@ -20,6 +20,7 @@ import settingsRoutes from './routes/settings.routes.js';
 import serviceRoutes from './routes/service.routes.js';
 import customerRoutes from './routes/customer.routes.js';
 import sandboxRoutes from './routes/sandbox.routes.js';
+import { sendContactEmail } from './utils/sendEmail.js';
 
 const app = express();
 
@@ -93,6 +94,22 @@ app.use(`${API_PREFIX}/settings`, settingsRoutes);
 app.use(`${API_PREFIX}/services`, serviceRoutes);
 app.use(`${API_PREFIX}/customers`, customerRoutes);
 app.use(`${API_PREFIX}/sandboxes`, sandboxRoutes);
+
+// Public contact form
+app.post(`${API_PREFIX}/contact`, async (req, res) => {
+  const { fullName, email, message } = req.body;
+  if (!fullName || !email || !message) {
+    return res.status(400).json({ success: false, error: { message: 'All fields are required.' } });
+  }
+  try {
+    await sendContactEmail({ fullName, email, message });
+    res.status(200).json({ success: true, message: 'Message sent.' });
+  } catch (err) {
+    console.error('Contact email failed:', err.message);
+    res.status(500).json({ success: false, error: { message: 'Failed to send message. Please try again.' } });
+  }
+});
+
 // ============================================
 // ERROR HANDLING
 // ============================================

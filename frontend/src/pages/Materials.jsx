@@ -757,64 +757,39 @@ useEffect(() => {
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-gray-100">
             {/* Filter Bar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
-              <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full flex-1">
-                {/* Search */}
-                <div className="relative flex-1 max-w-sm">
-                  <input
-                    type="text"
-                    placeholder="Search inventory..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-9 pr-4 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white transition-all w-full"
-                  />
-                  <svg
-                    className="w-4 h-4 absolute left-3 top-2.5 text-gray-400"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
-                    />
-                  </svg>
-                </div>
-
-                {/* Status Filter */}
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+              {/* Search */}
+              <div className="relative flex-1 max-w-md">
+                <svg className="w-4 h-4 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+                <input
+                  type="text"
+                  placeholder="Search inventory..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white transition-all"
+                />
+              </div>
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-2">
                 <select
                   value={statusFilter}
                   onChange={(e) => setStatusFilter(e.target.value)}
-                  className="px-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white w-full sm:w-auto cursor-pointer"
+                  className="px-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white cursor-pointer"
                 >
                   <option value="all">All Status</option>
                   <option value="active">Active</option>
                   <option value="inactive">Inactive</option>
                 </select>
-
-                {/* Low Stock Toggle */}
                 <button
                   onClick={() => setShowLowStock(!showLowStock)}
-                  className={`flex items-center gap-2 px-3 py-2 border rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
-                    showLowStock
-                      ? "bg-red-50 border-red-100 text-red-600"
-                      : "bg-white border-gray-200 text-gray-600 hover:bg-gray-50"
+                  className={`flex items-center gap-1.5 px-3 py-2 border rounded-lg text-xs sm:text-sm font-medium transition-colors whitespace-nowrap ${
+                    showLowStock ? "bg-red-50 border-red-100 text-red-600" : "bg-gray-50 border-gray-200 text-gray-600 hover:bg-gray-100"
                   }`}
                 >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
-                    />
+                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                   </svg>
                   Low Stock
                 </button>
@@ -858,9 +833,17 @@ useEffect(() => {
               actionText="Add Material"
             />
           ) : (
-            <div className="overflow-hidden">
-              <Table columns={columns} data={filteredMaterials} />
-            </div>
+            <>
+              <div className="overflow-hidden">
+                <Table columns={columns} data={filteredMaterials} />
+              </div>
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
+                <span>Showing {filteredMaterials.length} items</span>
+                {inventoryStats.lowStockItems > 0 && (
+                  <span className="text-red-500 font-medium">{inventoryStats.lowStockItems} item{inventoryStats.lowStockItems !== 1 ? 's' : ''} need restock</span>
+                )}
+              </div>
+            </>
           )}
         </div>
       </div>

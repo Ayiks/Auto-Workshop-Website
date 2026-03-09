@@ -756,6 +756,11 @@ export const getExpenses = asyncHandler(async (req, res) => {
 
   const where = {};
 
+  // Non-admins only see expenses they recorded
+  if (req.user.role !== 'admin') {
+    where.recordedBy = req.user.id;
+  }
+
   if (type) where.type = type;
   if (category) where.category = category;
   if (source) where.source = source;
@@ -1087,6 +1092,11 @@ export const getExpenseStats = asyncHandler(async (req, res) => {
   const { startDate, endDate } = req.query;
 
   const where = {};
+
+  // Non-admins only see their own expense stats
+  if (req.user.role !== 'admin') {
+    where.recordedBy = req.user.id;
+  }
 
   if (startDate || endDate) {
     where.expenseDate = {};

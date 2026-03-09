@@ -150,8 +150,9 @@
 
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { QueryClientProvider } from '@tanstack/react-query';
 import { useAuthStore } from '@stores/authStore';
+import { queryClient } from './queryClient';
 
 // Components
 import ProtectedRoute from '@components/common/ProtectedRoute';
@@ -177,16 +178,6 @@ import BoothServices from '@pages/BoothServices';
 import DashboardLayout from '@components/layout/DashboardLayout';
 
 
-// Create Query Client
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-      retry: 1,
-      staleTime: 3 * 60 * 1000, // 3 minutes
-    },
-  },
-});
 
 function App() {
   const { initAuth, isLoading } = useAuthStore();

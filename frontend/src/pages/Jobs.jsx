@@ -52,6 +52,8 @@ export default function Jobs() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [invoiceFilter, setInvoiceFilter] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
@@ -154,7 +156,14 @@ export default function Jobs() {
     else if (invoiceFilter === 'invoiced') matchesInvoice = !!job.invoice;
     else if (['unpaid', 'partial', 'paid'].includes(invoiceFilter)) matchesInvoice = job.invoice && job.invoice.paymentStatus === invoiceFilter;
 
-    return matchesSearch && matchesInvoice;
+    let matchesDate = true;
+    if (dateFrom || dateTo) {
+      const jobDate = new Date(job.createdAt);
+      if (dateFrom && jobDate < new Date(dateFrom)) matchesDate = false;
+      if (dateTo && jobDate > new Date(dateTo + 'T23:59:59')) matchesDate = false;
+    }
+
+    return matchesSearch && matchesInvoice && matchesDate;
   });
 
   // Handlers
@@ -360,54 +369,67 @@ export default function Jobs() {
         </div>
 
         {/* Filters & Content Area */}
-        <div className="bg-white border border-gray-200 rounded-lg shadow-sm overflow-hidden">
-          {/* Controls Bar - Gray Background */}
-          <div className="p-4 sm:p-5 md:p-6 border-b border-gray-200 bg-gray-50 flex flex-col md:flex-row gap-3 sm:gap-4 md:gap-6 justify-between items-stretch md:items-center">
-            
-            {/* Search - Focus Black */}
-            <div className="relative flex-1 md:flex-none md:w-96">
-              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                <svg className="h-4 w-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+          {/* Filter Bar */}
+          <div className="p-4 sm:p-5 border-b border-gray-100">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+              {/* Search */}
+              <div className="relative flex-1 max-w-md">
+                <svg className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <input
+                  type="text"
+                  placeholder="Search jobs..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-9 pr-4 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white transition-all"
+                />
               </div>
-              <input
-                type="text"
-                className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md leading-5 bg-white placeholder-gray-500 focus:outline-none focus:ring-1 focus:ring-black focus:border-black text-xs sm:text-sm transition duration-150 ease-in-out"
-                placeholder="Search..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-
-            {/* Dropdowns - Focus Black */}
-            <div className="flex flex-col sm:flex-row gap-2 w-full md:w-auto">
-              <select
-                value={statusFilter}
-                onChange={(e) => setStatusFilter(e.target.value)}
-                className="block flex-1 sm:flex-none pl-3 pr-10 py-2 text-xs sm:text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-black focus:border-black rounded-md"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="active">Active</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="invoiced">Invoiced</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-
-              <select
-                value={invoiceFilter}
-                onChange={(e) => setInvoiceFilter(e.target.value)}
-                className="block flex-1 sm:flex-none pl-3 pr-10 py-2 text-xs sm:text-sm border border-gray-300 focus:outline-none focus:ring-1 focus:ring-black focus:border-black rounded-md"
-              >
-                <option value="all">All Invoices</option>
-                <option value="not_invoiced">No Invoice</option>
-                <option value="invoiced">Invoiced</option>
-                <option value="unpaid">Unpaid</option>
-                <option value="partial">Partial</option>
-                <option value="paid">Paid</option>
-              </select>
+              {/* Filters */}
+              <div className="flex flex-wrap items-center gap-2">
+                <input
+                  type="date"
+                  value={dateFrom}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="px-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white cursor-pointer"
+                />
+                <span className="text-gray-400 text-xs">—</span>
+                <input
+                  type="date"
+                  value={dateTo}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="px-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white cursor-pointer"
+                />
+                {(dateFrom || dateTo) && (
+                  <button onClick={() => { setDateFrom(''); setDateTo(''); }} className="text-xs text-gray-400 hover:text-gray-700 transition-colors px-1">
+                    ✕
+                  </button>
+                )}
+                <select
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value)}
+                  className="px-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white cursor-pointer"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="active">Active</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="invoiced">Invoiced</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+                <select
+                  value={invoiceFilter}
+                  onChange={(e) => setInvoiceFilter(e.target.value)}
+                  className="px-3 py-2 text-xs sm:text-sm border border-gray-200 rounded-lg focus:ring-1 focus:ring-gray-900 focus:border-gray-900 bg-gray-50 focus:bg-white cursor-pointer"
+                >
+                  <option value="all">All Invoices</option>
+                  <option value="not_invoiced">No Invoice</option>
+                  <option value="invoiced">Invoiced</option>
+                  <option value="unpaid">Unpaid</option>
+                  <option value="partial">Partial</option>
+                  <option value="paid">Paid</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -422,7 +444,12 @@ export default function Jobs() {
               />
             </div>
           ) : (
-            <Table columns={columns} data={filteredJobs} />
+            <>
+              <Table columns={columns} data={filteredJobs} />
+              <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex items-center justify-between text-xs text-gray-500">
+                <span>Showing {filteredJobs.length} of {jobs.length} jobs</span>
+              </div>
+            </>
           )}
         </div>
       </div>

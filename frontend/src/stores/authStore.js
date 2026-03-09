@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { authApi } from '@api/auth';
 import { sandboxApi } from '@api/sandbox';
+import { queryClient } from '../queryClient';
 
 export const useAuthStore = create((set, get) => ({
   user: null,
@@ -148,6 +149,9 @@ export const useAuthStore = create((set, get) => ({
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       localStorage.removeItem('sandboxExpiresAt');
+
+      // Clear all React Query cached data so the next user sees fresh data
+      queryClient.clear();
 
       set({
         token: null,

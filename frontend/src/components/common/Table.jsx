@@ -23,18 +23,18 @@ export default function Table({ columns, data, isLoading, emptyMessage = 'No dat
             {columns.map((column, index) => (
               <th
                 key={index}
-                className="px-3 sm:px-6 py-2 sm:py-3 text-left text-xs text-gray-500 uppercase tracking-wider"
+                className="px-3 sm:px-6 py-2 sm:py-3 text-left text-[11px] font-bold text-gray-500 uppercase tracking-wider"
               >
                 {column.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
+        <tbody className="bg-white divide-y divide-gray-100">
           {data.map((row, rowIndex) => (
-            <tr key={rowIndex} className="hover:bg-gray-50 transition">
+            <tr key={rowIndex} className="hover:bg-gray-50 transition-colors group">
               {columns.map((column, colIndex) => (
-                <td key={colIndex} className="px-3 sm:px-6 py-3 sm:py-4 whitespace-nowrap text-xs sm:text-sm text-gray-900">
+                <td key={colIndex} className="px-3 sm:px-6 py-3 sm:py-4 text-xs sm:text-sm text-gray-900">
                   {column.render ? column.render(row) : row[column.accessor]}
                 </td>
               ))}

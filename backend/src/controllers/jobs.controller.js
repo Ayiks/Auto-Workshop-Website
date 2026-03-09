@@ -156,12 +156,6 @@ export const updateJob = asyncHandler(async (req, res) => {
     throw new AppError('Not authorized to edit this job', 403, 'PERMISSION_DENIED');
   if (req.allowedJobType && existingJob.jobType !== req.allowedJobType)
     throw new AppError(`You can only edit ${req.allowedJobType} jobs`, 403, 'PERMISSION_DENIED');
-  // Allow status-only updates even when invoiced; block financial/material edits
-  const isStatusOnlyUpdate = status && !materials && labourCost === undefined && miscellaneousCost === undefined
-    && !clientName && !clientPhone && !vehicleMake && !vehicleModel && !vehicleRegNumber && !problemType;
-  if (existingJob.invoice && !isStatusOnlyUpdate)
-    throw new AppError('Cannot edit job that has been invoiced', 400, 'INVALID_OPERATION');
-
   const validStatuses = ['pending', 'in_progress', 'completed', 'invoiced'];
   if (status && !validStatuses.includes(status))
     throw new AppError('Invalid status', 400, 'VALIDATION_ERROR');
@@ -216,6 +210,21 @@ export const updateJob = asyncHandler(async (req, res) => {
         user: { select: { fullName: true, username: true } },
       },
     });
+    // Sync invoice costs if one exists
+    if (existingJob.invoice) {
+      const newTotalAmount = finalMaterialsCost + finalLabourCost + finalMiscCost;
+      const amountPaid = parseFloat(existingJob.invoice.amountPaid || 0);
+      await tx.invoice.update({
+        where: { id: existingJob.invoice.id },
+        data: {
+          materialsCost: finalMaterialsCost,
+          labourCost: finalLabourCost,
+          miscellaneousCost: finalMiscCost,
+          totalAmount: newTotalAmount,
+          amountDue: Math.max(0, newTotalAmount - amountPaid),
+        },
+      });
+    }
     await tx.auditLog.create({
       data: { userId: req.user.id, action: 'UPDATE', entity: 'Job', entityId: updated.id,
         description: `Updated job #${updated.id}` },
@@ -238,7 +247,6 @@ export const addJobMaterial = asyncHandler(async (req, res) => {
   if (!job) throw new AppError('Job not found', 404, 'NOT_FOUND');
   if (req.isOwnResource && job.assignedTo !== req.user.id)
     throw new AppError('Not authorized to edit this job', 403, 'PERMISSION_DENIED');
-  if (job.invoice) throw new AppError('Cannot add materials to invoiced job', 400, 'INVALID_OPERATION');
   let validatedMaterialId = null;
   if (!isExternal) {
     if (!materialId) throw new AppError('Inventory materials must have materialId', 400, 'VALIDATION_ERROR');
@@ -253,8 +261,16 @@ export const addJobMaterial = asyncHandler(async (req, res) => {
       data: { jobId: parseInt(id), materialId: validatedMaterialId, materialName: materialName.trim(), quantity: qty, unitPrice: price, subtotal, isExternal },
     });
     const currentMaterialsCost = job.materials.reduce((sum, m) => sum + parseFloat(m.subtotal), 0);
-    const newTotalCost = currentMaterialsCost + subtotal + parseFloat(job.labourCost) + parseFloat(job.miscellaneousCost || 0);
+    const newMaterialsCost = currentMaterialsCost + subtotal;
+    const newTotalCost = newMaterialsCost + parseFloat(job.labourCost) + parseFloat(job.miscellaneousCost || 0);
     await tx.job.update({ where: { id: parseInt(id) }, data: { totalCost: newTotalCost } });
+    if (job.invoice) {
+      const amountPaid = parseFloat(job.invoice.amountPaid || 0);
+      await tx.invoice.update({
+        where: { id: job.invoice.id },
+        data: { materialsCost: newMaterialsCost, totalAmount: newTotalCost, amountDue: Math.max(0, newTotalCost - amountPaid) },
+      });
+    }
     await tx.auditLog.create({
       data: { userId: req.user.id, action: 'UPDATE', entity: 'Job', entityId: parseInt(id),
         description: `Added material "${materialName}" to job #${id}` },
@@ -272,7 +288,6 @@ export const removeJobMaterial = asyncHandler(async (req, res) => {
   if (!job) throw new AppError('Job not found', 404, 'NOT_FOUND');
   if (req.isOwnResource && job.assignedTo !== req.user.id)
     throw new AppError('Not authorized to edit this job', 403, 'PERMISSION_DENIED');
-  if (job.invoice) throw new AppError('Cannot remove materials from invoiced job', 400, 'INVALID_OPERATION');
   const jobMaterial = await req.db.jobMaterial.findUnique({ where: { id: parseInt(materialId) } });
   if (!jobMaterial || jobMaterial.jobId !== parseInt(id))
     throw new AppError('Material not found in this job', 404, 'NOT_FOUND');
@@ -282,6 +297,13 @@ export const removeJobMaterial = asyncHandler(async (req, res) => {
     const materialsCost = remaining.reduce((sum, m) => sum + parseFloat(m.subtotal), 0);
     const newTotalCost = materialsCost + parseFloat(job.labourCost) + parseFloat(job.miscellaneousCost || 0);
     await tx.job.update({ where: { id: parseInt(id) }, data: { totalCost: newTotalCost } });
+    if (job.invoice) {
+      const amountPaid = parseFloat(job.invoice.amountPaid || 0);
+      await tx.invoice.update({
+        where: { id: job.invoice.id },
+        data: { materialsCost, totalAmount: newTotalCost, amountDue: Math.max(0, newTotalCost - amountPaid) },
+      });
+    }
     await tx.auditLog.create({
       data: { userId: req.user.id, action: 'UPDATE', entity: 'Job', entityId: parseInt(id),
         description: `Removed material "${jobMaterial.materialName}" from job #${id}` },

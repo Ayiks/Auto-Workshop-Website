@@ -547,7 +547,7 @@ export const addPayment = asyncHandler(async (req, res) => {
 // @access  Private (requires 'sales:view' or 'sales:viewOwn' permission)
 export const getSales = asyncHandler(async (req, res) => {
   // 1. EXTRACT 'paymentStatus' FROM QUERY
-  let { status, startDate, endDate, paymentMethod, paymentStatus, itemType, soldBy, page = 1, limit = 10 } = req.query;
+  let { status, startDate, endDate, paymentMethod, paymentStatus, itemType, soldBy, search, page = 1, limit = 10 } = req.query;
 
   const pageNumber = parseInt(page);
   const limitNumber = parseInt(limit);
@@ -555,16 +555,12 @@ export const getSales = asyncHandler(async (req, res) => {
 
   const where = {};
 
-  // Security Override for Non-Admins
+  // Security Override for Non-Admins: restrict to today and own sales only
   if (req.user.role !== 'admin') {
     const today = new Date();
     startDate = new Date(today.setHours(0, 0, 0, 0)).toISOString();
     endDate = new Date(today.setHours(23, 59, 59, 999)).toISOString();
-    
-    // Enforce own-sales only if applicable
-    if (req.isOwnResource) {
-      where.soldBy = req.user.id;
-    }
+    where.soldBy = req.user.id;
   }
   
 if (status) where.status = status;
@@ -599,7 +595,17 @@ if (status) where.status = status;
 
   // If user only has viewOwn permission, filter to their sales
   if (req.isOwnResource) where.soldBy = req.user.id;
- 
+
+  // Search by customer name, phone, receipt number, or sale item product name
+  if (search) {
+    where.OR = [
+      { customerName: { contains: search, mode: 'insensitive' } },
+      { customerPhone: { contains: search, mode: 'insensitive' } },
+      { receipt: { receiptNumber: { contains: search, mode: 'insensitive' } } },
+      { items: { some: { materialName: { contains: search, mode: 'insensitive' } } } },
+      { items: { some: { service: { name: { contains: search, mode: 'insensitive' } } } } },
+    ];
+  }
 
   // 3. UPDATE TRANSACTION (Added 'statusStats' as the 5th item)
   const [sales, totalCount, revenueAgg, paymentStats, statusStats] = await req.db.$transaction([
@@ -837,16 +843,12 @@ export const getSalesStats = asyncHandler(async (req, res) => {
   let { startDate, endDate } = req.query;
   const where = { status: 'completed' };
 
-  // SECURITY OVERRIDE: If not admin, strictly limit to TODAY
+  // SECURITY OVERRIDE: If not admin, strictly limit to TODAY and own sales only
   if (req.user.role !== 'admin') {
     const today = new Date();
     startDate = new Date(today.setHours(0, 0, 0, 0)).toISOString();
     endDate = new Date(today.setHours(23, 59, 59, 999)).toISOString();
-
-    // If the user's permission only allows them to view their OWN resources, enforce it
-    if (req.isOwnResource) {
-      where.soldBy = req.user.id;
-    }
+    where.soldBy = req.user.id;
   }
 
 

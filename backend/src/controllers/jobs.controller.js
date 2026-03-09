@@ -100,7 +100,8 @@ export const getJobs = asyncHandler(async (req, res) => {
     if (endDate) { const e = new Date(endDate); e.setHours(23,59,59,999); where.createdAt.lte = e; }
   }
   if (assignedTo) where.assignedTo = parseInt(assignedTo);
-  if (req.isOwnResource) where.assignedTo = req.user.id;
+  if (req.user.role !== 'admin') where.assignedTo = req.user.id;
+  else if (req.isOwnResource) where.assignedTo = req.user.id;
   const jobs = await req.db.job.findMany({
     where,
     include: {

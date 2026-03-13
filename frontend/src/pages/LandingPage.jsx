@@ -1,7 +1,7 @@
 // src/pages/LandingPage.jsx
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, useInView } from 'framer-motion';
 import { useResponsive } from '@hooks/useResponsive';
 import { useAuthStore } from '@stores/authStore';
 import {
@@ -10,20 +10,39 @@ import {
   Phone, Mail, ArrowRight, FlaskConical, Loader2,
   BookOpen, GraduationCap, Package, Camera, Smartphone, Bell,
   DollarSign, CheckCircle, AlertTriangle, Clock,
+  TrendingUp, Users, ShieldCheck, Zap, Star,
+  ChevronRight, PlayCircle, Palette, Droplets,
+  ClipboardList, Receipt, UserCog, MailCheck,
+  CalendarCheck, BarChart2, Eye,
 } from 'lucide-react';
 
-// ─── Animation variants ───────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   Animation variants
+   ═══════════════════════════════════════════════════════════════════════════ */
 const fadeInUp = {
-  hidden:  { opacity: 0, y: 60 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
+  hidden:  { opacity: 0, y: 40 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } },
+};
+const fadeInLeft = {
+  hidden:  { opacity: 0, x: -40 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } },
+};
+const fadeInRight = {
+  hidden:  { opacity: 0, x: 40 },
+  visible: { opacity: 1, x: 0, transition: { duration: 0.55, ease: [0.25, 0.46, 0.45, 0.94] } },
 };
 const staggerContainer = {
   hidden:  { opacity: 0 },
-  visible: { opacity: 1, transition: { staggerChildren: 0.2 } },
+  visible: { opacity: 1, transition: { staggerChildren: 0.12 } },
+};
+const scaleIn = {
+  hidden:  { opacity: 0, scale: 0.92 },
+  visible: { opacity: 1, scale: 1, transition: { duration: 0.5, ease: 'easeOut' } },
 };
 
-// ─── Shared "Try Live Demo" button ───────────────────────────────────────────
-// Reused in Header (mobile menu), Hero, and below Pricing.
+/* ═══════════════════════════════════════════════════════════════════════════
+   Shared "Try Live Demo" button
+   ═══════════════════════════════════════════════════════════════════════════ */
 function TryDemoButton({ size = 'md', fullWidthMobile = false, variant = 'dark' }) {
   const navigate       = useNavigate();
   const loginAsSandbox = useAuthStore((s) => s.loginAsSandbox);
@@ -44,8 +63,10 @@ function TryDemoButton({ size = 'md', fullWidthMobile = false, variant = 'dark' 
 
   const padClass = size === 'lg' ? 'px-7 py-3.5 text-base' : size === 'sm' ? 'px-4 py-2 text-xs' : 'px-5 py-2.5 text-sm';
 
-  const btnClass = variant === 'light'
-    ? 'border border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white'
+  const btnClass = variant === 'outline-dark'
+    ? 'border-2 border-gray-900 text-gray-900 hover:bg-gray-900 hover:text-white'
+    : variant === 'light'
+    ? 'border border-gray-300 text-gray-700 hover:border-gray-900 hover:text-gray-900 bg-white'
     : 'border border-gray-600 text-white hover:border-white hover:bg-white/5';
 
   return (
@@ -70,24 +91,51 @@ function TryDemoButton({ size = 'md', fullWidthMobile = false, variant = 'dark' 
 
       {error
         ? <p className="text-red-500 text-xs text-center max-w-xs">{error}</p>
-        : <p className={`text-xs ${variant === 'light' ? 'text-gray-400' : 'text-gray-500'}`}>No signup · Pre-filled data · Expires in 24h</p>
+        : <p className={`text-xs ${variant === 'light' || variant === 'outline-dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+            No signup · Pre-filled data · Expires in 24h
+          </p>
       }
     </div>
   );
 }
 
-// ─── Header ───────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   Animated counter hook
+   ═══════════════════════════════════════════════════════════════════════════ */
+function useCountUp(end, duration = 1800) {
+  const [count, setCount] = useState(0);
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, margin: '-50px' });
+
+  useEffect(() => {
+    if (!inView) return;
+    let start = 0;
+    const startTime = performance.now();
+    const step = (now) => {
+      const progress = Math.min((now - startTime) / duration, 1);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      setCount(Math.floor(eased * end));
+      if (progress < 1) requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  }, [inView, end, duration]);
+
+  return { count, ref };
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HEADER
+   ═══════════════════════════════════════════════════════════════════════════ */
 const Header = () => {
   const [isOpen,    setIsOpen]    = useState(false);
   const [scrolled,  setScrolled]  = useState(false);
   const [activeId,  setActiveId]  = useState('hero');
   const navigate = useNavigate();
-  const { isMobile } = useResponsive();
 
   const navLinks = [
     { name: 'Home',     href: '#hero',     id: 'hero'     },
-    { name: 'About',    href: '#about',    id: 'about'    },
-    { name: 'Features', href: '#services', id: 'services' },
+    { name: 'Features', href: '#features', id: 'features' },
+    { name: 'How It Works', href: '#how-it-works', id: 'how-it-works' },
     { name: 'Pricing',  href: '#pricing',  id: 'pricing'  },
     { name: 'Support',  href: '#support',  id: 'support'  },
     { name: 'Contact',  href: '#contact',  id: 'contact'  },
@@ -102,7 +150,6 @@ const Header = () => {
   useEffect(() => {
     const sectionIds = navLinks.map((l) => l.id);
     const observers = [];
-
     sectionIds.forEach((id) => {
       const el = document.getElementById(id);
       if (!el) return;
@@ -113,56 +160,71 @@ const Header = () => {
       obs.observe(el);
       observers.push(obs);
     });
-
     return () => observers.forEach((o) => o.disconnect());
   }, []);
 
   return (
     <nav className={`fixed w-full z-50 transition-all duration-300 ${
       scrolled
-        ? 'bg-black/90 backdrop-blur-md shadow-lg py-3 sm:py-4 border-b border-gray-800'
-        : 'bg-transparent py-4 sm:py-6'
+        ? 'bg-white/95 backdrop-blur-md shadow-sm py-3 border-b border-gray-100'
+        : 'bg-transparent py-5'
     }`}>
-      <div className="container mx-auto px-4 sm:px-6 flex justify-between items-center">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex justify-between items-center">
         {/* Logo */}
-        <a href="#hero" className="text-xl sm:text-2xl font-bold tracking-tighter flex items-center gap-2 text-white">
-          <div className="w-7 h-7 sm:w-8 sm:h-8 bg-white rounded-lg flex items-center justify-center">
-            <span className="text-black font-bold text-xs sm:text-sm">G</span>
+        <a href="#hero" className="flex items-center gap-2.5 group">
+          <div className={`w-8 h-8 rounded-lg flex items-center justify-center transition-colors ${
+            scrolled ? 'bg-gray-900' : 'bg-white'
+          }`}>
+            <span className={`font-extrabold text-sm ${scrolled ? 'text-white' : 'text-gray-900'}`}>G</span>
           </div>
-          <span className="hidden sm:inline">Graymanager</span>
+          <span className={`font-bold text-lg tracking-tight hidden sm:inline transition-colors ${
+            scrolled ? 'text-gray-900' : 'text-white'
+          }`}>
+            Graymanager
+          </span>
         </a>
 
         {/* Desktop nav */}
-        <div className="hidden md:flex items-center space-x-6 lg:space-x-8">
+        <div className="hidden lg:flex items-center gap-1">
           {navLinks.map((link) => {
             const isActive = activeId === link.id;
             return (
               <a key={link.name} href={link.href}
-                 className={`relative font-medium transition-colors text-xs sm:text-sm tracking-wide pb-0.5 ${
-                   isActive ? 'text-white' : 'text-gray-400 hover:text-white'
+                 className={`relative px-3 py-2 rounded-full text-[13px] font-medium transition-all ${
+                   scrolled
+                     ? isActive ? 'text-gray-900 bg-gray-100' : 'text-gray-500 hover:text-gray-900 hover:bg-gray-50'
+                     : isActive ? 'text-white bg-white/15' : 'text-gray-300 hover:text-white hover:bg-white/10'
                  }`}>
                 {link.name}
-                {isActive && (
-                  <span className="absolute -bottom-1 left-0 w-full h-px bg-white rounded-full" />
-                )}
               </a>
             );
           })}
-          <div className="flex items-center gap-3 ml-4">
-            <button onClick={() => navigate('/login')}
-                    className="text-gray-300 hover:text-white font-medium transition-colors text-xs sm:text-sm">
-              Login
-            </button>
-            <button onClick={() => navigate('/signup')}
-                    className="bg-white text-black px-4 sm:px-5 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold hover:bg-gray-200 transition-colors shadow-[0_0_15px_rgba(255,255,255,0.2)]">
-              Start for free
-            </button>
-          </div>
+        </div>
+
+        {/* Desktop CTA */}
+        <div className="hidden lg:flex items-center gap-3">
+          <button onClick={() => navigate('/login')}
+                  className={`text-sm font-medium transition-colors ${
+                    scrolled ? 'text-gray-600 hover:text-gray-900' : 'text-gray-300 hover:text-white'
+                  }`}>
+            Log in
+          </button>
+          <button onClick={() => navigate('/signup')}
+                  className={`px-5 py-2.5 rounded-full text-sm font-bold transition-all ${
+                    scrolled
+                      ? 'bg-gray-900 text-white hover:bg-gray-800 shadow-sm'
+                      : 'bg-white text-gray-900 hover:bg-gray-100 shadow-[0_0_20px_rgba(255,255,255,0.15)]'
+                  }`}>
+            Start Free
+          </button>
         </div>
 
         {/* Mobile hamburger */}
-        <button className="md:hidden text-white p-1" onClick={() => setIsOpen(!isOpen)}>
-          {isOpen ? <X size={24} /> : <Menu size={24} />}
+        <button className="lg:hidden p-2 rounded-lg" onClick={() => setIsOpen(!isOpen)}>
+          {isOpen
+            ? <X size={22} className={scrolled ? 'text-gray-900' : 'text-white'} />
+            : <Menu size={22} className={scrolled ? 'text-gray-900' : 'text-white'} />
+          }
         </button>
       </div>
 
@@ -172,34 +234,32 @@ const Header = () => {
           <motion.div
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
-            exit={{   opacity: 0, height: 0 }}
-            className="md:hidden bg-[#0a0a0a] border-b border-gray-800 overflow-hidden"
+            exit={{ opacity: 0, height: 0 }}
+            className="lg:hidden bg-white border-b border-gray-100 shadow-lg overflow-hidden"
           >
-            <div className="flex flex-col px-4 sm:px-6 py-4 sm:py-6 space-y-3 sm:space-y-4">
+            <div className="flex flex-col px-4 py-5 space-y-1">
               {navLinks.map((link) => {
                 const isActive = activeId === link.id;
                 return (
                   <a key={link.name} href={link.href} onClick={() => setIsOpen(false)}
-                     className={`flex items-center justify-between font-medium text-base sm:text-lg border-b border-gray-800 pb-2 sm:pb-3 transition-colors ${
-                       isActive ? 'text-white' : 'text-gray-400'
+                     className={`px-4 py-3 rounded-xl text-[15px] font-medium transition-colors ${
+                       isActive ? 'text-gray-900 bg-gray-50' : 'text-gray-500'
                      }`}>
                     {link.name}
-                    {isActive && <span className="w-1.5 h-1.5 rounded-full bg-white" />}
                   </a>
                 );
               })}
-              <div className="flex flex-col gap-2 pt-3">
+              <div className="flex flex-col gap-2.5 pt-4 border-t border-gray-100 mt-2">
                 <button onClick={() => navigate('/login')}
-                        className="bg-transparent border border-gray-700 text-white py-2.5 rounded-xl font-semibold w-full text-sm">
-                  Login
+                        className="bg-gray-50 text-gray-900 py-3 rounded-xl font-semibold w-full text-sm">
+                  Log in
                 </button>
                 <button onClick={() => navigate('/signup')}
-                        className="bg-white text-black py-2.5 rounded-xl font-bold w-full text-sm">
-                  Start for free
+                        className="bg-gray-900 text-white py-3 rounded-xl font-bold w-full text-sm">
+                  Start Free
                 </button>
-                {/* Demo button in mobile menu */}
                 <div className="pt-1">
-                  <TryDemoButton size="md" fullWidthMobile />
+                  <TryDemoButton size="md" fullWidthMobile variant="outline-dark" />
                 </div>
               </div>
             </div>
@@ -210,142 +270,481 @@ const Header = () => {
   );
 };
 
-// ─── Hero ─────────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   HERO  — Inspired by Autoflow's benefit checklist + product screenshot
+   ═══════════════════════════════════════════════════════════════════════════ */
 const Hero = () => {
   const navigate = useNavigate();
 
+  const benefits = [
+    { icon: <Package size={16} />,    text: 'Track every tin, thinner & primer in real time' },
+    { icon: <ClipboardList size={16} />, text: 'Digital job cards from panel prep to final delivery' },
+    { icon: <Camera size={16} />,     text: 'Sprayer portfolios that build credibility over time' },
+    { icon: <MailCheck size={16} />,  text: 'Auto-notify customers at every job stage' },
+  ];
+
   return (
     <section id="hero"
-      className="relative pt-10 pb-12 sm:pt-32 sm:pb-16 md:pt-40 md:pb-20 lg:pt-48 lg:pb-32 overflow-hidden bg-black flex flex-col items-center">
-      {/* Ambient glow */}
-      <div className="absolute top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2
-                      w-[300px] h-[300px] sm:w-[500px] sm:h-[500px] lg:w-[600px] lg:h-[600px]
-                      bg-gray-600/20 blur-[140px] rounded-full z-0 pointer-events-none" />
-
-      <div className="container mx-auto px-4 sm:px-6 relative z-10 text-center">
-        <motion.div initial="hidden" animate="visible" variants={fadeInUp} className="max-w-4xl mx-auto">
-          <h1 className="font-display text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold text-white mb-4 sm:mb-6 leading-tight tracking-tight">
-            Run Your Paint Shop. <br className="hidden sm:block" />
-            Track Stock. <span className="text-gray-400">Showcase Every Job.</span>
-          </h1>
-          <p className="text-base sm:text-lg md:text-xl text-gray-400 mb-8 sm:mb-10 max-w-4xl mx-auto leading-relaxed px-2">
-            The complete management platform for auto paint professionals, sprayers, paint
-            material suppliers, and mechanic shops, from stock tracking to sprayer portfolios to job cards. Works on any device,
-            built for Africa's auto paint industry.
-          </p>
-
-          {/* ── CTA row ── */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12 md:mb-20 lg:mb-24 px-2">
-            <motion.button
-              onClick={() => navigate('/signup')}
-              whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-              className="bg-white text-black px-6 sm:px-8 py-3 sm:py-3.5 rounded-full font-bold text-sm sm:text-base hover:bg-gray-200 transition-colors shadow-[0_0_20px_rgba(255,255,255,0.15)]"
-            >
-              Start for free
-            </motion.button>
-
-            {/* ── Try Demo ── */}
-            <TryDemoButton size="lg" />
-          </div>
-        </motion.div>
-
-        {/* Dashboard preview mockup */}
-        <motion.div
-          initial={{ opacity: 0, y: 100 }} animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.8, delay: 0.3, ease: 'easeOut' }}
-          className="relative max-w-5xl mx-auto z-20 px-2 sm:px-4"
-        >
-          <div className="rounded-t-xl sm:rounded-t-3xl bg-gray-900 border border-gray-800 border-b-0 p-2 sm:p-4 flex items-center gap-2">
-            <div className="w-2.5 h-2.5 rounded-full bg-gray-700" />
-            <div className="w-2.5 h-2.5 rounded-full bg-gray-700" />
-            <div className="w-2.5 h-2.5 rounded-full bg-gray-700" />
-          </div>
-          <div className="border border-gray-800 rounded-b-xl sm:rounded-b-3xl bg-[#0a0a0a] shadow-2xl overflow-hidden p-1 sm:p-4">
-            <img
-              src="/images/hero-banner.png"
-              alt="Graymanager Dashboard Preview"
-              className="w-full h-auto rounded-lg sm:rounded-xl border border-gray-800/50 shadow-inner"
-            />
-          </div>
-          <div className="absolute -bottom-1 left-0 w-full h-24 bg-gradient-to-t from-black to-transparent pointer-events-none z-30" />
-        </motion.div>
+      className="relative min-h-screen flex items-center overflow-hidden bg-gray-950">
+      {/* Background gradient mesh */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 right-0 w-[800px] h-[800px] bg-gradient-to-bl from-emerald-600/10 via-transparent to-transparent rounded-full blur-3xl" />
+        <div className="absolute bottom-0 left-0 w-[600px] h-[600px] bg-gradient-to-tr from-gray-700/20 via-transparent to-transparent rounded-full blur-3xl" />
+        {/* Subtle grid pattern */}
+        <div className="absolute inset-0 opacity-[0.03]"
+             style={{ backgroundImage: 'radial-gradient(circle, white 1px, transparent 1px)', backgroundSize: '40px 40px' }} />
       </div>
-    </section>
-  );
-};
 
-// ─── About ────────────────────────────────────────────────────────────────────
-const About = () => {
-  const highlights = [
-    { icon: <Package    className="text-black" size={32} />, title: 'Paint & Materials Stock',  desc: 'Track every tin, thinner, primer, and hardener in real time. Get low-stock alerts before you run out.' },
-    { icon: <Camera     className="text-black" size={32} />, title: 'Sprayer Portfolio & Jobs', desc: 'Every sprayer logs and showcases their completed jobs, builds credibility and tracks performance over time.' },
-    { icon: <Smartphone className="text-black" size={32} />, title: 'Works on Any Device',      desc: 'Use your own phone, tablet, or laptop. No special hardware required, access your business from anywhere.' },
-  ];
-  return (
-    <section id="about" className="py-16 sm:py-20 md:py-24 bg-gray-50">
-      <div className="container mx-auto px-4 sm:px-6">
-        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}
-                    className="text-center max-w-3xl mx-auto mb-12 sm:mb-16">
-          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-3 sm:mb-4">Built for the Auto Paint & Mechanic Industry</h2>
-          <p className="text-slate-600 text-base sm:text-lg px-2">For professional sprayers, paint material suppliers, and collision repair shops. Graymanager keeps everything organized.</p>
-        </motion.div>
-        <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                    className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 md:gap-10">
-          {highlights.map((item, i) => (
-            <motion.div key={i} variants={fadeInUp}
-                        className="bg-white p-6 sm:p-8 rounded-xl sm:rounded-2xl shadow-sm hover:shadow-xl transition-shadow border border-slate-100">
-              <div className="bg-gray-100 w-14 h-14 sm:w-16 sm:h-16 rounded-xl flex items-center justify-center mb-4 sm:mb-6">{item.icon}</div>
-              <h3 className="text-lg sm:text-xl font-bold text-slate-900 mb-2 sm:mb-3">{item.title}</h3>
-              <p className="text-slate-600 leading-relaxed text-sm sm:text-base">{item.desc}</p>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-    </section>
-  );
-};
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-28 sm:pt-32 pb-16 sm:pb-20 w-full">
+        <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+          {/* Left — Copy */}
+          <motion.div initial="hidden" animate="visible" variants={staggerContainer}>
+            {/* <motion.div variants={fadeInUp} className="mb-6">
+              <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold tracking-wide">
+                Built for Africa's Auto Paint Industry
+              </span>
+            </motion.div> */}
 
-// ─── Services ─────────────────────────────────────────────────────────────────
-const Services = () => {
-  const features = [
-    { title: 'Paint Stock Control',      desc: 'Track tins, thinners, primers, hardeners, and accessories down to the last unit.' },
-    { title: 'Job Cards',                desc: 'Digital job cards for every spray and refinishing job. From panel prep to final delivery.' },
-    { title: 'Spray Booth Booking',      desc: 'Schedule and manage spray booth slots to eliminate downtime and clashes.' },
-    { title: 'Sprayer Portfolio',        desc: 'Each sprayer builds a portfolio of completed jobs with photos and full client history.' },
-    { title: 'Custom Receipts',          desc: 'Branded receipts and professional invoices delivered via WhatsApp or email in seconds.' },
-    { title: 'Team & Role Access',       desc: 'Set custom permissions for sprayers, managers, cashiers, and sales staff.' },
-    { title: 'Customer Job Notifications', desc: 'Automatically email your customers when their job status changes right from intake to completion.' },
-  ];
-  return (
-    <section id="services" className="py-16 sm:py-20 md:py-24 bg-white">
-      <div className="container mx-auto px-4 sm:px-6">
-        <div className="mb-12 sm:mb-16">
-          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-2 sm:mb-4">Powerful Features</h2>
-          <p className="text-slate-600 text-base sm:text-lg">Everything you need to run a professional auto paint business.</p>
-        </div>
-        <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-5 sm:gap-6 md:gap-8">
-          {features.map((f, i) => (
-            <motion.div key={i} initial={{ opacity: 0, scale: 0.95 }} whileInView={{ opacity: 1, scale: 1 }}
-                        viewport={{ once: true }} transition={{ delay: i * 0.1 }}
-                        className="p-5 sm:p-6 border border-slate-200 rounded-lg sm:rounded-xl hover:border-black hover:bg-slate-50 transition-all group">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-black transition-colors">
-                  <Check className="text-slate-600 group-hover:text-white" size={20} />
+            <motion.h1 variants={fadeInUp}
+              className="text-3xl sm:text-4xl md:text-[2.75rem] lg:text-5xl font-extrabold text-white leading-[1.1] tracking-tight mb-6">
+              Run Your Paint Shop.<br />
+              <span className="text-gray-400">Track Stock. Showcase&nbsp;Every&nbsp;Job.</span>
+            </motion.h1>
+
+            <motion.p variants={fadeInUp}
+              className="text-gray-400 text-base sm:text-lg leading-relaxed mb-8 max-w-lg">
+              The complete management platform for auto paint professionals, sprayers, paint material suppliers,
+              and mechanic shops. Works on any device.
+            </motion.p>
+
+            {/* Benefit checklist — Autoflow style */}
+            <motion.div variants={fadeInUp} className="space-y-3 mb-10">
+              {benefits.map((b, i) => (
+                <div key={i} className="flex items-center gap-3">
+                  <span className="w-8 h-8 rounded-lg bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 flex-shrink-0">
+                    {b.icon}
+                  </span>
+                  <span className="text-gray-300 text-sm">{b.text}</span>
                 </div>
-                <h3 className="text-base sm:text-lg font-bold text-slate-900">{f.title}</h3>
-              </div>
-              <p className="text-slate-600 text-sm sm:text-base">{f.desc}</p>
+              ))}
             </motion.div>
-          ))}
+
+            {/* CTA row */}
+            <motion.div variants={fadeInUp} className="flex flex-col sm:flex-row gap-4 items-start">
+              <button
+                onClick={() => navigate('/signup')}
+                className="bg-white text-gray-900 px-7 py-3.5 rounded-full font-bold text-sm hover:bg-gray-100 transition-all shadow-[0_0_30px_rgba(255,255,255,0.1)] flex items-center gap-2"
+              >
+                Start for free <ArrowRight size={16} />
+              </button>
+              <TryDemoButton size="lg" />
+            </motion.div>
+          </motion.div>
+
+          {/* Right — Product screenshot */}
+          <motion.div
+            initial={{ opacity: 0, y: 60, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.8, delay: 0.3, ease: [0.25, 0.46, 0.45, 0.94] }}
+            className="relative"
+          >
+            {/* Browser frame */}
+            <div className="rounded-2xl bg-gray-900/80 border border-gray-700/50 shadow-2xl shadow-black/40 overflow-hidden backdrop-blur-sm">
+              <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-800/60">
+                <div className="flex gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full bg-gray-700" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-gray-700" />
+                  <div className="w-2.5 h-2.5 rounded-full bg-gray-700" />
+                </div>
+                <div className="flex-1 flex justify-center">
+                  <div className="bg-gray-800 rounded-md px-4 py-1 text-gray-500 text-[11px] font-mono">
+                    app.graymanager.com
+                  </div>
+                </div>
+              </div>
+              <div className="p-1 sm:p-2">
+                <img
+                  src="/images/hero-banner.png"
+                  alt="Graymanager Dashboard Preview"
+                  className="w-full h-auto rounded-lg"
+                />
+              </div>
+            </div>
+            {/* Glow */}
+            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-3/4 h-12 bg-emerald-500/10 blur-3xl rounded-full pointer-events-none" />
+          </motion.div>
+        </div>
+      </div>
+
+      {/* Bottom fade */}
+      <div className="absolute bottom-0 left-0 w-full h-24 bg-gradient-to-t from-gray-950 to-transparent pointer-events-none z-20" />
+    </section>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATS BAR — Inspired by AutoLeap's metrics section
+   ═══════════════════════════════════════════════════════════════════════════ */
+const StatsBar = () => {
+  const stats = [
+    { end: 500,  suffix: '+',  label: 'Jobs Tracked',       icon: <ClipboardList size={20} /> },
+    { end: 98,   suffix: '%',  label: 'Uptime Reliability',  icon: <ShieldCheck size={20} /> },
+    { end: 30,   suffix: 'sec', label: 'Avg Receipt Time',   icon: <Zap size={20} /> },
+    { end: 4,    suffix: '.8★', label: 'User Satisfaction',  icon: <Star size={20} /> },
+  ];
+
+  return (
+    <section className="relative z-30 -mt-12 sm:-mt-14">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.5 }}
+          className="bg-white rounded-2xl shadow-xl shadow-gray-200/60 border border-gray-100 p-6 sm:p-8"
+        >
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-8">
+            {stats.map((s, i) => {
+              const { count, ref } = useCountUp(s.end);
+              return (
+                <div key={i} ref={ref} className="text-center">
+                  <div className="w-10 h-10 rounded-xl bg-gray-50 border border-gray-100 flex items-center justify-center mx-auto mb-3 text-gray-600">
+                    {s.icon}
+                  </div>
+                  <div className="text-2xl sm:text-3xl font-extrabold text-gray-900 tracking-tight">
+                    {count}{s.suffix}
+                  </div>
+                  <div className="text-xs sm:text-sm text-gray-500 mt-1 font-medium">{s.label}</div>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      </div>
+    </section>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FEATURES  — Tabbed showcase inspired by AutoLeap
+   ═══════════════════════════════════════════════════════════════════════════ */
+const Features = () => {
+  const [activeTab, setActiveTab] = useState(0);
+
+  const tabs = [
+    {
+      label: 'Stock & Sales',
+      icon: <Package size={18} />,
+      title: 'Paint Stock Control & Sales',
+      desc: 'Track every tin, thinner, primer, hardener, and accessory down to the last unit. Record sales instantly and get low-stock alerts before you run out.',
+      points: [
+        'Real-time inventory with automatic deduction on sale',
+        'Low-stock alerts and reorder suggestions',
+        'Sales history with daily, weekly, and monthly breakdowns',
+      ],
+    },
+    {
+      label: 'Job Cards',
+      icon: <ClipboardList size={18} />,
+      title: 'Digital Job Cards & Tracking',
+      desc: 'Create professional digital job cards for every spray and refinishing job. Track progress from panel prep to final delivery.',
+      points: [
+        'Full job lifecycle from intake to completion',
+        'Attach photos, notes, and material lists to every job',
+        'Automatic customer notifications at each stage',
+      ],
+    },
+    {
+      label: 'Portfolios',
+      icon: <Camera size={18} />,
+      title: 'Sprayer Portfolio & Booth Booking',
+      desc: 'Every sprayer logs and showcases their completed jobs, building credibility and tracking performance. Schedule spray booth slots to eliminate downtime.',
+      points: [
+        'Photo gallery of completed jobs per sprayer',
+        'Performance tracking and job history',
+        'Spray booth calendar to prevent clashes',
+      ],
+    },
+    {
+      label: 'Finance',
+      icon: <Receipt size={18} />,
+      title: 'Receipts, Invoices & Expenses',
+      desc: 'Generate branded receipts and professional invoices in seconds. Track every expense and get clear financial reports.',
+      points: [
+        'Custom-branded receipts sent via WhatsApp or email',
+        'Professional invoices with payment tracking',
+        'Expense tracking with detailed categorization',
+      ],
+    },
+    {
+      label: 'Team',
+      icon: <UserCog size={18} />,
+      title: 'Team & Role Access Control',
+      desc: 'Set custom permissions for sprayers, managers, cashiers, and sales staff. Everyone sees exactly what they need.',
+      points: [
+        'Role-based access for every team member',
+        'Activity logs and accountability tracking',
+        'Multi-branch support for growing businesses',
+      ],
+    },
+  ];
+
+  const active = tabs[activeTab];
+
+  return (
+    <section id="features" className="py-20 sm:py-28 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}
+                    className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
+          <span className="inline-block text-xs font-bold text-emerald-600 tracking-widest uppercase mb-3">
+            Powerful Features
+          </span>
+          <h2 className="text-3xl sm:text-4xl md:text-[2.5rem] font-extrabold text-gray-900 leading-tight tracking-tight mb-4">
+            Everything You Need to Run<br className="hidden sm:block" /> a Professional Auto Paint Business
+          </h2>
+          <p className="text-gray-500 text-base sm:text-lg">
+            From stock tracking to sprayer portfolios to team management — all in one platform.
+          </p>
+        </motion.div>
+
+        {/* Tab bar */}
+        <div className="flex justify-start sm:justify-center mb-10 sm:mb-14 overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 scrollbar-none">
+          <div className="flex gap-2 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 min-w-max">
+            {tabs.map((tab, i) => (
+              <button
+                key={i}
+                onClick={() => setActiveTab(i)}
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm font-semibold transition-all whitespace-nowrap ${
+                  activeTab === i
+                    ? 'bg-gray-900 text-white shadow-md'
+                    : 'text-gray-500 hover:text-gray-900 hover:bg-white'
+                }`}
+              >
+                {tab.icon} {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Tab content */}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={activeTab}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            transition={{ duration: 0.3 }}
+            className="grid md:grid-cols-2 gap-10 md:gap-16 items-center"
+          >
+            {/* Text side */}
+            <div>
+              <h3 className="text-2xl sm:text-3xl font-extrabold text-gray-900 mb-4 leading-tight">
+                {active.title}
+              </h3>
+              <p className="text-gray-500 text-base leading-relaxed mb-8">
+                {active.desc}
+              </p>
+              <ul className="space-y-4">
+                {active.points.map((point, i) => (
+                  <li key={i} className="flex items-start gap-3">
+                    <span className="w-6 h-6 rounded-full bg-emerald-50 border border-emerald-100 flex items-center justify-center flex-shrink-0 mt-0.5">
+                      <Check size={13} className="text-emerald-600" />
+                    </span>
+                    <span className="text-gray-700 text-sm leading-relaxed">{point}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8">
+                <button
+                  onClick={() => window.location.href = '#pricing'}
+                  className="inline-flex items-center gap-2 text-sm font-bold text-gray-900 hover:text-emerald-600 transition-colors group"
+                >
+                  Get started with this feature
+                  <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              </div>
+            </div>
+
+            {/* Visual side — Feature card mockup */}
+            <div className="bg-gray-50 rounded-2xl border border-gray-100 p-6 sm:p-8 min-h-[320px] flex flex-col justify-center">
+              <div className="w-14 h-14 rounded-2xl bg-gray-900 flex items-center justify-center mb-6 text-white shadow-lg">
+                {active.icon && React.cloneElement(tabs[activeTab].icon, { size: 24 })}
+              </div>
+              <div className="space-y-3">
+                {active.points.map((point, i) => (
+                  <motion.div
+                    key={i}
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: i * 0.1 }}
+                    className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm flex items-center gap-3"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center flex-shrink-0">
+                      <Check size={14} className="text-emerald-600" />
+                    </div>
+                    <span className="text-sm text-gray-700 font-medium">{point}</span>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+    </section>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTIFICATIONS  — Customer updates section (kept and improved)
+   ═══════════════════════════════════════════════════════════════════════════ */
+const Notifications = () => {
+  const alerts = [
+    { Icon: CheckCircle, label: 'Job Started',  sub: 'Toyota Camry — work has begun',      time: 'Just now',   accent: 'bg-emerald-500' },
+    { Icon: Wrench,      label: 'In Progress',  sub: 'Honda Accord — bodywork underway',   time: '10 min ago', accent: 'bg-blue-500'    },
+    { Icon: CheckCircle, label: 'Job Ready',    sub: 'Kia Picanto — ready for collection', time: '1 hr ago',   accent: 'bg-emerald-500' },
+    { Icon: DollarSign,  label: 'Invoice Sent', sub: 'Client: Kwame Asante — GH₵1,200',   time: '2 hrs ago',  accent: 'bg-amber-500'   },
+  ];
+
+  return (
+    <section className="py-20 sm:py-28 bg-gray-50 border-t border-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid md:grid-cols-2 gap-12 md:gap-20 items-center">
+          {/* Text side */}
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInLeft}>
+            <span className="inline-block text-xs font-bold text-emerald-600 tracking-widest uppercase mb-3">
+              Customer Notifications
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4 leading-tight">
+              Keep Your Customers<br />
+              <span className="text-gray-400">In the Loop. Automatically.</span>
+            </h2>
+            <p className="text-gray-500 text-base sm:text-lg mb-8 leading-relaxed">
+              Automatically email your customers at every stage of their job, from when work starts
+              to when their vehicle is ready for collection. No manual follow-up needed.
+            </p>
+            <ul className="space-y-3">
+              {[
+                'Email sent when a job is created',
+                'Notification when work begins',
+                'Alert when the job is ready for pickup',
+                'Invoice emailed on job completion',
+              ].map((item) => (
+                <li key={item} className="flex items-center gap-3 text-sm text-gray-700">
+                  <span className="w-5 h-5 rounded-full bg-gray-900 flex items-center justify-center flex-shrink-0">
+                    <Check size={11} className="text-white" />
+                  </span>
+                  {item}
+                </li>
+              ))}
+            </ul>
+          </motion.div>
+
+          {/* Notification feed mockup */}
+          <motion.div
+            initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInRight}
+            className="bg-gray-900 rounded-2xl border border-gray-800 p-5 sm:p-6 shadow-2xl"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-white text-sm font-bold">Customer Updates</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+            </div>
+            <div className="space-y-2.5">
+              {alerts.map((a, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 10 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.08 }}
+                  className="flex items-start gap-3 bg-white/5 border border-white/[0.06] rounded-xl px-4 py-3 hover:bg-white/[0.08] transition-colors"
+                >
+                  <span className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${a.accent}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-white text-xs font-semibold">{a.label}</p>
+                    <p className="text-gray-400 text-[11px] mt-0.5 truncate">{a.sub}</p>
+                  </div>
+                  <span className="text-gray-600 text-[10px] whitespace-nowrap mt-0.5">{a.time}</span>
+                </motion.div>
+              ))}
+            </div>
+            <p className="text-gray-600 text-[10px] text-center pt-3 mt-2 border-t border-gray-800">
+              Delivered automatically via email
+            </p>
+          </motion.div>
         </div>
       </div>
     </section>
   );
 };
 
-// ─── Pricing ──────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOW IT WORKS  — 3 steps, inspired by both Autoflow & AutoLeap
+   ═══════════════════════════════════════════════════════════════════════════ */
+const HowItWorks = () => {
+  const steps = [
+    {
+      num: '01',
+      title: 'Sign Up & Set Up',
+      desc: 'Create your account in under 2 minutes. Add your business details, team members, and paint inventory.',
+      icon: <Zap size={24} />,
+    },
+    {
+      num: '02',
+      title: 'Your Team Gets Trained',
+      desc: 'We walk your team through every feature — stock tracking, job cards, invoicing — so everyone is confident from day one.',
+      icon: <GraduationCap size={24} />,
+    },
+    {
+      num: '03',
+      title: 'Go Live & Grow',
+      desc: 'Start managing your shop like a pro. Track jobs, generate receipts, and grow your business with real data.',
+      icon: <TrendingUp size={24} />,
+    },
+  ];
+
+  return (
+    <section id="how-it-works" className="py-20 sm:py-28 bg-gray-950">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}
+                    className="text-center max-w-2xl mx-auto mb-14 sm:mb-20">
+          <span className="inline-block text-xs font-bold text-emerald-400 tracking-widest uppercase mb-3">
+            Get Started in 3 Steps
+          </span>
+          <h2 className="text-3xl sm:text-4xl md:text-[2.5rem] font-extrabold text-white leading-tight tracking-tight mb-4">
+            Go Live in Less Than 24 Hours
+          </h2>
+          <p className="text-gray-400 text-base sm:text-lg">
+            Whether you're switching from pen and paper or upgrading from spreadsheets, getting started is quick and seamless.
+          </p>
+        </motion.div>
+
+        <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }}
+                    className="grid sm:grid-cols-3 gap-6 sm:gap-8 relative">
+          {/* Connector line (desktop) */}
+          <div className="hidden sm:block absolute top-16 left-[16.67%] right-[16.67%] h-px bg-gradient-to-r from-gray-800 via-gray-700 to-gray-800" />
+
+          {steps.map((step, i) => (
+            <motion.div key={i} variants={fadeInUp} className="relative text-center">
+              <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center mx-auto mb-6 text-emerald-400 relative z-10">
+                {step.icon}
+              </div>
+              <span className="text-[11px] font-bold text-emerald-400 tracking-widest uppercase mb-2 block">
+                Step {step.num}
+              </span>
+              <h3 className="text-xl font-bold text-white mb-3">{step.title}</h3>
+              <p className="text-gray-400 text-sm leading-relaxed max-w-xs mx-auto">{step.desc}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </section>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PRICING
+   ═══════════════════════════════════════════════════════════════════════════ */
 const Pricing = () => {
-  const { isMobile } = useResponsive();
   const navigate = useNavigate();
 
   const plans = [
@@ -374,115 +773,134 @@ const Pricing = () => {
   ];
 
   return (
-    <section id="pricing" className="py-16 sm:py-20 md:py-24 bg-[#f8f9fa]">
-      <div className="container mx-auto px-4 sm:px-6">
-        <div className="text-center mb-12 sm:mb-16">
-          <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-gray-900 mb-3 sm:mb-4 tracking-tight">Simple, Honest Pricing</h2>
+    <section id="pricing" className="py-20 sm:py-28 bg-white">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}
+                    className="text-center mb-14 sm:mb-16">
+          <span className="inline-block text-xs font-bold text-emerald-600 tracking-widest uppercase mb-3">
+            Simple Pricing
+          </span>
+          <h2 className="text-3xl sm:text-4xl md:text-[2.5rem] font-extrabold text-gray-900 tracking-tight mb-4">
+            Simple, Honest Pricing
+          </h2>
           <p className="text-gray-500 text-base sm:text-lg">No contracts, no hidden fees. Cancel anytime.</p>
-        </div>
+        </motion.div>
 
-        <div className="grid md:grid-cols-3 gap-5 sm:gap-6 max-w-6xl mx-auto">
+        <div className="grid md:grid-cols-3 gap-5 sm:gap-6 max-w-5xl mx-auto">
           {plans.map((plan, i) => {
             const isDark    = plan.style === 'dark';
             const isPremium = plan.style === 'premium';
             return (
-              <motion.div key={i} whileHover={{ y: -5 }}
-                className={`relative p-6 sm:p-8 rounded-2xl md:rounded-[2rem] flex flex-col ${
-                  isDark    ? 'bg-[#111111] text-white shadow-2xl' :
-                  isPremium ? 'bg-white border-2 border-gray-900 text-gray-900 shadow-sm' :
-                              'bg-white border border-gray-200 text-gray-900 shadow-sm'
-                }`}>
+              <motion.div key={i}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: i * 0.1 }}
+                whileHover={{ y: -4 }}
+                className={`relative p-7 sm:p-8 rounded-2xl flex flex-col transition-shadow ${
+                  isDark    ? 'bg-gray-900 text-white shadow-2xl shadow-gray-900/30 ring-1 ring-gray-800' :
+                  isPremium ? 'bg-white border-2 border-gray-900 text-gray-900 shadow-lg' :
+                              'bg-white border border-gray-200 text-gray-900 shadow-sm hover:shadow-lg'
+                }`}
+              >
                 {plan.badge && (
                   <div className="absolute -top-3.5 left-1/2 -translate-x-1/2">
-                    <span className="bg-white text-black text-xs font-bold px-4 py-1.5 rounded-full border border-gray-200 shadow-sm whitespace-nowrap">
+                    <span className="bg-emerald-500 text-white text-[11px] font-bold px-4 py-1.5 rounded-full shadow-md whitespace-nowrap">
                       {plan.badge}
                     </span>
                   </div>
                 )}
-                <div className={`w-10 h-10 sm:w-12 sm:h-12 rounded-full flex items-center justify-center mb-4 sm:mb-5 ${
-                  isDark ? 'bg-gray-800' : 'border border-gray-200'
-                }`}>
-                  <Wrench size={isMobile ? 16 : 18} className={isDark ? 'text-white' : 'text-gray-800'} />
-                </div>
+
                 <h3 className="text-xl sm:text-2xl font-bold mb-2">{plan.name}</h3>
-                <div className={`p-3 sm:p-4 rounded-xl mb-5 sm:mb-6 ${
-                  isDark ? 'bg-gray-800/60 border border-gray-700/50' : 'bg-gray-50'
-                }`}>
-                  <p className={`text-xs sm:text-sm leading-relaxed ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>{plan.desc}</p>
+                <p className={`text-sm leading-relaxed mb-6 ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                  {plan.desc}
+                </p>
+
+                <div className="mb-6">
+                  <span className="text-4xl font-extrabold">{plan.price}</span>
+                  <span className={`text-sm ml-1 ${isDark ? 'text-gray-500' : 'text-gray-400'}`}>/ month</span>
                 </div>
-                <ul className="space-y-2.5 sm:space-y-3 mb-8 sm:mb-10 flex-1">
+
+                <ul className="space-y-3 mb-8 flex-1">
                   {plan.features.map((f) => (
-                    <li key={f} className={`flex items-center gap-3 text-sm ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
-                      <Check size={15} className={`flex-shrink-0 ${isDark ? 'text-gray-500' : 'text-gray-400'}`} /> {f}
+                    <li key={f} className={`flex items-center gap-3 text-sm ${isDark ? 'text-gray-300' : 'text-gray-600'}`}>
+                      <Check size={15} className={`flex-shrink-0 ${isDark ? 'text-emerald-400' : 'text-emerald-500'}`} /> {f}
                     </li>
                   ))}
                 </ul>
-                <div className="mt-auto">
-                  <div className="text-3xl sm:text-4xl font-bold">{plan.price}</div>
-                  <div className="text-xs sm:text-sm text-gray-400 mt-1 font-medium mb-4">/ per month</div>
-                  <button onClick={() => navigate('/signup')}
-                    className={`px-6 py-2.5 sm:py-3 rounded-full font-bold text-sm sm:text-base w-full transition-colors ${
-                      isDark ? 'bg-white text-black hover:bg-gray-200' : 'bg-black text-white hover:bg-gray-800'
-                    }`}>
-                    Get Started Today
-                  </button>
-                  <a href="#contact" className={`block text-center text-xs mt-2 transition-colors ${
-                    isDark ? 'text-gray-400 hover:text-white' : 'text-gray-400 hover:text-gray-600'
-                  }`}>or Book a Call</a>
-                </div>
+
+                <button onClick={() => navigate('/signup')}
+                  className={`px-6 py-3 rounded-xl font-bold text-sm w-full transition-all ${
+                    isDark
+                      ? 'bg-white text-gray-900 hover:bg-gray-100'
+                      : 'bg-gray-900 text-white hover:bg-gray-800'
+                  }`}
+                >
+                  Get Started
+                </button>
               </motion.div>
             );
           })}
         </div>
 
-        {/* Demo CTA under pricing cards */}
-        <div className="text-center mt-10 sm:mt-12">
-          <p className="text-gray-500 text-sm mb-4">Not sure which plan? Explore the full product first no signup needed.</p>
-          <TryDemoButton size="md" variant="light" />
+        {/* Demo CTA under pricing */}
+        <div className="text-center mt-12">
+          <p className="text-gray-500 text-sm mb-4">Not sure which plan? Explore the full product first — no signup needed.</p>
+          <TryDemoButton size="md" variant="outline-dark" />
         </div>
       </div>
     </section>
   );
 };
 
-// ─── Support ──────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   SUPPORT
+   ═══════════════════════════════════════════════════════════════════════════ */
 const Support = () => {
   const items = [
     {
-      icon: <Phone size={28} className="text-white" />,
+      icon: <Phone size={24} />,
       title: 'Direct Contact',
       desc: 'Reach our team via phone, WhatsApp, or email whenever you need help with your account or daily operations.',
     },
     {
-      icon: <BookOpen size={28} className="text-white" />,
+      icon: <BookOpen size={24} />,
       title: 'Guides & Docs',
-      desc: 'Clear, step-by-step documentation for every feature from stock setup, job cards, invoicing, portfolios, and more.',
+      desc: 'Clear, step-by-step documentation for every feature — stock setup, job cards, invoicing, portfolios, and more.',
     },
     {
-      icon: <GraduationCap size={28} className="text-white" />,
+      icon: <GraduationCap size={24} />,
       title: 'Product Training',
-      desc: 'Hands-on onboarding and training sessions to get you and your team up and running fast, at no extra cost.',
+      desc: 'Hands-on onboarding and training sessions for you and your team at no extra cost.',
     },
   ];
 
   return (
-    <section id="support" className="py-16 sm:py-20 md:py-24 bg-black">
-      <div className="container mx-auto px-4 sm:px-6">
+    <section id="support" className="py-20 sm:py-28 bg-gray-50 border-t border-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}
-                    className="text-center max-w-2xl mx-auto mb-12 sm:mb-16">
-          <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-white mb-3 sm:mb-4">We're With You Every Step</h2>
-          <p className="text-gray-400 text-base sm:text-lg">From setup to daily operations, our support team has you covered.</p>
+                    className="text-center max-w-2xl mx-auto mb-14">
+          <span className="inline-block text-xs font-bold text-emerald-600 tracking-widest uppercase mb-3">
+            Always Here to Help
+          </span>
+          <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
+            We're With You Every Step
+          </h2>
+          <p className="text-gray-500 text-base sm:text-lg">
+            From setup to daily operations, our support team has you covered.
+          </p>
         </motion.div>
+
         <motion.div variants={staggerContainer} initial="hidden" whileInView="visible" viewport={{ once: true }}
-                    className="grid sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8">
+                    className="grid sm:grid-cols-3 gap-6 sm:gap-8">
           {items.map((item, i) => (
             <motion.div key={i} variants={fadeInUp}
-                        className="border border-gray-800 rounded-xl sm:rounded-2xl p-6 sm:p-8 hover:border-gray-600 transition-colors">
-              <div className="w-12 h-12 sm:w-14 sm:h-14 bg-gray-900 rounded-xl flex items-center justify-center mb-4 sm:mb-6">
+                        className="bg-white p-7 sm:p-8 rounded-2xl border border-gray-100 shadow-sm hover:shadow-lg transition-shadow group">
+              <div className="w-12 h-12 bg-gray-900 rounded-xl flex items-center justify-center mb-6 text-white group-hover:bg-emerald-600 transition-colors">
                 {item.icon}
               </div>
-              <h3 className="text-lg sm:text-xl font-bold text-white mb-2 sm:mb-3">{item.title}</h3>
-              <p className="text-gray-400 leading-relaxed text-sm sm:text-base">{item.desc}</p>
+              <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3">{item.title}</h3>
+              <p className="text-gray-500 leading-relaxed text-sm">{item.desc}</p>
             </motion.div>
           ))}
         </motion.div>
@@ -491,109 +909,28 @@ const Support = () => {
   );
 };
 
-// ─── Notifications ────────────────────────────────────────────────────────────
-const Notifications = () => {
-  const alerts = [
-    { Icon: CheckCircle, label: 'Job Started',  sub: 'Toyota Camry — work has begun',      time: 'Just now',   color: 'text-white',    bg: 'bg-white/10' },
-    { Icon: Wrench,      label: 'In Progress',  sub: 'Honda Accord — bodywork underway',   time: '10 min ago', color: 'text-gray-300', bg: 'bg-white/5'  },
-    { Icon: CheckCircle, label: 'Job Ready',    sub: 'Kia Picanto — ready for collection', time: '1 hr ago',   color: 'text-gray-300', bg: 'bg-white/5'  },
-    { Icon: DollarSign,  label: 'Invoice Sent', sub: 'Client: Kwame Asante — GH₵1,200',   time: '2 hrs ago',  color: 'text-gray-400', bg: 'bg-white/5'  },
-  ];
-
-  return (
-    <section className="py-16 sm:py-20 md:py-24 bg-[#f8f9fa] border-t border-gray-200">
-      <div className="container mx-auto px-4 sm:px-6">
-        <div className="grid md:grid-cols-2 gap-12 md:gap-16 items-center max-w-5xl mx-auto">
-
-          {/* Text side */}
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}>
-            {/* <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-100 border border-gray-200 text-gray-600 text-xs font-bold tracking-widest uppercase mb-6">
-              <Bell size={12} />
-              Customer Notifications
-            </div> */}
-            <h2 className="font-display text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-4 leading-tight">
-              Keep Your Customers<br />
-              <span className="text-slate-400">In the Loop.</span>
-            </h2>
-            <p className="text-slate-600 text-base sm:text-lg mb-8 leading-relaxed">
-              Automatically email your customers at every stage of their job, from when work starts to when their vehicle is ready for collection. No manual follow-up needed.
-            </p>
-            <ul className="space-y-3">
-              {[
-                'Email sent when a job is created',
-                'Notification when work begins',
-                'Alert when the job is ready for pickup',
-                'Invoice emailed on job completion',
-              ].map((item) => (
-                <li key={item} className="flex items-center gap-3 text-sm text-slate-700">
-                  <span className="w-5 h-5 rounded-full bg-slate-900 flex items-center justify-center flex-shrink-0">
-                    <Check size={11} className="text-white" />
-                  </span>
-                  {item}
-                </li>
-              ))}
-            </ul>
-          </motion.div>
-
-          {/* Notification feed mockup */}
-          <motion.div
-            initial={{ opacity: 0, x: 40 }} whileInView={{ opacity: 1, x: 0 }}
-            viewport={{ once: true }} transition={{ duration: 0.7, ease: 'easeOut' }}
-            className="bg-[#111] rounded-2xl border border-gray-800 p-5 space-y-3 shadow-2xl"
-          >
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-white text-sm font-semibold">Customer Updates</span>
-              {/* <span className="w-2 h-2 rounded-full bg-green-400 animate-pulse" /> */}
-            </div>
-            {alerts.map((a, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }} transition={{ delay: i * 0.1 }}
-                className="flex items-start gap-3 bg-white/5 border border-white/[0.08] rounded-xl px-4 py-3"
-              >
-                <span className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5 ${a.bg}`}>
-                  <a.Icon size={14} className={a.color} />
-                </span>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-xs font-semibold ${a.color}`}>{a.label}</p>
-                  <p className="text-gray-400 text-[11px] mt-0.5 truncate">{a.sub}</p>
-                </div>
-                <span className="text-gray-600 text-[10px] whitespace-nowrap mt-0.5">{a.time}</span>
-              </motion.div>
-            ))}
-            <p className="text-gray-600 text-[10px] text-center pt-1">Delivered via email</p>
-          </motion.div>
-
-        </div>
-      </div>
-    </section>
-  );
-};
-
-// ─── MobileApp ────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   MOBILE APP  — Coming soon section
+   ═══════════════════════════════════════════════════════════════════════════ */
 const MobileApp = () => (
-  <section className="py-16 sm:py-20 md:py-24 bg-[#060606] overflow-hidden border-t border-gray-900">
-    <div className="container mx-auto px-4 sm:px-6">
+  <section className="py-20 sm:py-28 bg-gray-950 overflow-hidden">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div className="relative max-w-5xl mx-auto">
         {/* Ambient glow */}
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-white/[0.04] blur-[120px] rounded-full pointer-events-none" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] bg-emerald-500/5 blur-[120px] rounded-full pointer-events-none" />
 
         <div className="relative grid md:grid-cols-2 gap-12 md:gap-16 items-center">
-
-          {/* ── Text side ── */}
-          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}>
-            <span className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[11px] font-bold tracking-widest uppercase mb-6">
-              {/* <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" /> */}
+          {/* Text side */}
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInLeft}>
+            <span className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-400/10 border border-amber-400/20 text-amber-400 text-[11px] font-bold tracking-widest uppercase mb-6">
               Coming Soon
             </span>
-
-            <h2 className="font-display text-3xl sm:text-4xl md:text-5xl font-bold text-white mb-4 leading-tight tracking-tight">
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white mb-4 leading-tight tracking-tight">
               Graymanager<br />
               <span className="text-gray-500">in Your Pocket</span>
             </h2>
             <p className="text-gray-400 text-base sm:text-lg mb-10 leading-relaxed max-w-md">
-              The full power of Graymanager, stock tracking, job cards, invoicing, and team management coming natively to iOS and Android.
+              The full power of Graymanager — stock tracking, job cards, invoicing, and team management — coming natively to iOS and Android.
             </p>
 
             {/* Store badges */}
@@ -633,11 +970,10 @@ const MobileApp = () => (
                 </span>
               </div>
             </div>
-
             <p className="text-gray-600 text-xs">We'll notify you the moment it launches.</p>
           </motion.div>
 
-          {/* ── Phone mockup ── */}
+          {/* Phone mockup */}
           <motion.div
             initial={{ opacity: 0, y: 50 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -646,17 +982,12 @@ const MobileApp = () => (
             className="flex justify-center md:justify-end"
           >
             <div className="relative w-52 sm:w-60">
-              {/* Phone shell */}
               <div className="relative w-full aspect-[9/19.5] bg-gray-950 rounded-[2.8rem] border-2 border-gray-800 shadow-[0_40px_80px_rgba(0,0,0,0.8)] overflow-hidden">
-                {/* Dynamic island */}
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 w-24 h-6 bg-black rounded-full z-10 flex items-center justify-center gap-2">
                   <div className="w-2 h-2 rounded-full bg-gray-800" />
                   <div className="w-3.5 h-3.5 rounded-full bg-gray-900 border border-gray-700" />
                 </div>
-
-                {/* Screen */}
                 <div className="absolute inset-0 bg-[#0d0d0d] flex flex-col pt-14 px-4 pb-6">
-                  {/* App header */}
                   <div className="flex items-center gap-2.5 mb-5">
                     <div className="w-8 h-8 bg-white rounded-lg flex items-center justify-center flex-shrink-0">
                       <span className="text-black font-extrabold text-sm">G</span>
@@ -666,8 +997,6 @@ const MobileApp = () => (
                       <div className="text-gray-600 text-[9px] mt-0.5">Good morning, Isaac</div>
                     </div>
                   </div>
-
-                  {/* Stats cards */}
                   <div className="grid grid-cols-2 gap-2 mb-4">
                     {[
                       { label: 'Sales Today', value: 'GH₵480' },
@@ -679,18 +1008,14 @@ const MobileApp = () => (
                       </div>
                     ))}
                   </div>
-
-                  {/* Activity bars */}
                   <div className="bg-gray-900 rounded-xl p-3 border border-gray-800 mb-3">
                     <div className="text-gray-500 text-[8px] mb-2.5">Weekly Sales</div>
                     <div className="flex items-end gap-1.5 h-10">
                       {[40, 65, 50, 80, 55, 90, 70].map((h, i) => (
-                        <div key={i} className="flex-1 rounded-sm bg-gray-700" style={{ height: `${h}%` }} />
+                        <div key={i} className="flex-1 rounded-sm bg-emerald-600/60" style={{ height: `${h}%` }} />
                       ))}
                     </div>
                   </div>
-
-                  {/* Bottom items */}
                   <div className="space-y-1.5">
                     {[{ label: 'Low Stock Alert', sub: '2 items' }, { label: 'Invoice #1042', sub: 'Unpaid' }].map((item) => (
                       <div key={item.label} className="flex items-center justify-between bg-gray-900 rounded-lg px-2.5 py-2 border border-gray-800">
@@ -699,35 +1024,30 @@ const MobileApp = () => (
                       </div>
                     ))}
                   </div>
-
-                  {/* Coming soon overlay */}
                   <div className="absolute inset-x-0 bottom-0 h-20 bg-gradient-to-t from-[#0d0d0d] via-[#0d0d0d]/80 to-transparent flex items-end justify-center pb-4">
                     <span className="text-amber-400 text-[9px] font-extrabold tracking-widest uppercase">Coming Soon</span>
                   </div>
                 </div>
               </div>
-
-              {/* Glow under phone */}
-              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-36 h-10 bg-white/10 blur-3xl rounded-full" />
-
-              {/* Side buttons */}
+              <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-36 h-10 bg-emerald-500/10 blur-3xl rounded-full" />
               <div className="absolute top-20 -right-1 w-1 h-8 bg-gray-700 rounded-r-sm" />
               <div className="absolute top-16 -left-1 w-1 h-6 bg-gray-700 rounded-l-sm" />
               <div className="absolute top-24 -left-1 w-1 h-6 bg-gray-700 rounded-l-sm" />
             </div>
           </motion.div>
-
         </div>
       </div>
     </div>
   </section>
 );
 
-// ─── Contact ──────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   CONTACT
+   ═══════════════════════════════════════════════════════════════════════════ */
 const Contact = () => {
   const { isMobile } = useResponsive();
   const [form, setForm]       = useState({ fullName: '', email: '', message: '' });
-  const [status, setStatus]   = useState('idle'); // idle | sending | success | error
+  const [status, setStatus]   = useState('idle');
   const [errMsg, setErrMsg]   = useState('');
 
   const handleChange = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
@@ -753,65 +1073,72 @@ const Contact = () => {
   };
 
   return (
-    <section id="contact" className="py-16 sm:py-20 md:py-24 bg-white border-t border-gray-200">
-      <div className="container mx-auto px-4 sm:px-6">
-        <div className="grid sm:grid-cols-2 gap-10 sm:gap-12 md:gap-16 items-start sm:items-center">
-          <motion.div initial={{ opacity: 0, x: -50 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}>
-            <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold text-slate-900 mb-4 sm:mb-6">Get in Touch</h2>
-            <p className="text-slate-600 mb-6 sm:mb-8 text-base md:text-lg leading-relaxed">Whether you run a small spraying booth or a massive collision repair center, we're here to help you set up and scale.</p>
-            <div className="space-y-4 sm:space-y-6">
+    <section id="contact" className="py-20 sm:py-28 bg-white border-t border-gray-100">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid md:grid-cols-2 gap-12 md:gap-20 items-start">
+          <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInLeft}>
+            <span className="inline-block text-xs font-bold text-emerald-600 tracking-widest uppercase mb-3">
+              Get in Touch
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-gray-900 mb-4">
+              Let's Talk About<br />Your Business
+            </h2>
+            <p className="text-gray-500 mb-8 text-base leading-relaxed">
+              Whether you run a small spraying booth or a massive collision repair center, we're here to help you set up and scale.
+            </p>
+            <div className="space-y-5">
               {[
                 { Icon: Phone,  label: 'Call Us',  value: '+233 (0) 24 123 4567' },
                 { Icon: Mail,   label: 'Email Us', value: 'info@graymanager.com'  },
-                { Icon: MapPin, label: 'Visit HQ', value: 'coming soon'            },
+                { Icon: MapPin, label: 'Visit HQ', value: 'Coming soon'            },
               ].map(({ Icon, label, value }) => (
-                <div key={label} className="flex items-start sm:items-center gap-3 sm:gap-4">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gray-100 rounded-lg flex items-center justify-center text-black flex-shrink-0">
-                    <Icon size={isMobile ? 20 : 24} />
+                <div key={label} className="flex items-center gap-4">
+                  <div className="w-11 h-11 bg-gray-50 border border-gray-100 rounded-xl flex items-center justify-center text-gray-600 flex-shrink-0">
+                    <Icon size={20} />
                   </div>
                   <div>
-                    <div className="font-bold text-slate-900 text-sm sm:text-base">{label}</div>
-                    <div className="text-slate-600 text-xs sm:text-base">{value}</div>
+                    <div className="font-bold text-gray-900 text-sm">{label}</div>
+                    <div className="text-gray-500 text-sm">{value}</div>
                   </div>
                 </div>
               ))}
             </div>
           </motion.div>
 
-          <motion.form onSubmit={handleSubmit} initial={{ opacity: 0, x: 50 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
-                       className="bg-gray-50 p-6 sm:p-8 rounded-lg sm:rounded-2xl border border-gray-200 w-full">
-            <div className="mb-5 sm:mb-6">
-              <label className="block text-slate-700 font-semibold mb-2 text-sm sm:text-base">Full Name</label>
+          <motion.form onSubmit={handleSubmit} initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInRight}
+                       className="bg-gray-50 p-6 sm:p-8 rounded-2xl border border-gray-100">
+            <div className="mb-5">
+              <label className="block text-gray-700 font-semibold mb-2 text-sm">Full Name</label>
               <input name="fullName" type="text" value={form.fullName} onChange={handleChange} required
-                     className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black text-sm sm:text-base bg-white"
+                     className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white transition-shadow"
                      placeholder="John Smith" />
             </div>
-            <div className="mb-5 sm:mb-6">
-              <label className="block text-slate-700 font-semibold mb-2 text-sm sm:text-base">Email Address</label>
+            <div className="mb-5">
+              <label className="block text-gray-700 font-semibold mb-2 text-sm">Email Address</label>
               <input name="email" type="email" value={form.email} onChange={handleChange} required
-                     className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black text-sm sm:text-base bg-white"
+                     className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white transition-shadow"
                      placeholder="john@example.com" />
             </div>
-            <div className="mb-5 sm:mb-6">
-              <label className="block text-slate-700 font-semibold mb-2 text-sm sm:text-base">Message</label>
-              <textarea name="message" rows={isMobile ? 3 : 4} value={form.message} onChange={handleChange} required
-                        className="w-full px-3 sm:px-4 py-2 sm:py-3 rounded-lg border border-gray-300 focus:outline-none focus:ring-2 focus:ring-black text-sm sm:text-base bg-white"
+            <div className="mb-5">
+              <label className="block text-gray-700 font-semibold mb-2 text-sm">Message</label>
+              <textarea name="message" rows={4} value={form.message} onChange={handleChange} required
+                        className="w-full px-4 py-3 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-900 focus:border-transparent text-sm bg-white transition-shadow"
                         placeholder="I'm interested in the Pro plan..." />
             </div>
 
             {status === 'success' && (
-              <p className="text-green-700 bg-green-50 border border-green-200 rounded-lg px-4 py-2.5 text-sm mb-4">
+              <p className="text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl px-4 py-3 text-sm mb-4">
                 Message sent! We'll get back to you soon.
               </p>
             )}
             {status === 'error' && (
-              <p className="text-red-700 bg-red-50 border border-red-200 rounded-lg px-4 py-2.5 text-sm mb-4">
+              <p className="text-red-700 bg-red-50 border border-red-200 rounded-xl px-4 py-3 text-sm mb-4">
                 {errMsg}
               </p>
             )}
 
             <button type="submit" disabled={status === 'sending'}
-                    className="w-full bg-black text-white py-2.5 sm:py-3 rounded-lg font-bold hover:bg-gray-800 transition-colors text-sm sm:text-base disabled:opacity-60 disabled:cursor-not-allowed">
+                    className="w-full bg-gray-900 text-white py-3 rounded-xl font-bold hover:bg-gray-800 transition-colors text-sm disabled:opacity-60 disabled:cursor-not-allowed">
               {status === 'sending' ? 'Sending…' : 'Send Message'}
             </button>
           </motion.form>
@@ -821,38 +1148,80 @@ const Contact = () => {
   );
 };
 
-// ─── Footer ───────────────────────────────────────────────────────────────────
-const Footer = () => (
-  <footer className="bg-black text-gray-400 py-8 sm:py-10 md:py-12 border-t border-gray-900">
-    <div className="container mx-auto px-4 sm:px-6 flex flex-col md:flex-row justify-between items-center gap-3 sm:gap-4 md:gap-0">
-      <div className="flex items-center gap-2">
-        <div className="w-5 h-5 sm:w-6 sm:h-6 bg-white rounded flex items-center justify-center">
-          <span className="text-black font-bold text-xs">G</span>
-        </div>
-        <span className="text-white font-bold tracking-tight text-sm sm:text-base">Graymanager</span>
+/* ═══════════════════════════════════════════════════════════════════════════
+   CTA BANNER — Before footer, inspired by Autoflow's "Book a Demo" banner
+   ═══════════════════════════════════════════════════════════════════════════ */
+const CtaBanner = () => {
+  const navigate = useNavigate();
+
+  return (
+    <section className="py-16 sm:py-20 bg-gray-900">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
+        <motion.div initial="hidden" whileInView="visible" viewport={{ once: true }} variants={fadeInUp}>
+          <h2 className="text-2xl sm:text-3xl md:text-4xl font-extrabold text-white mb-4 tracking-tight">
+            Ready to Transform Your Auto Paint Business?
+          </h2>
+          <p className="text-gray-400 text-base sm:text-lg mb-8 max-w-2xl mx-auto">
+            Join paint shops and sprayers across Ghana who are already managing smarter with Graymanager.
+          </p>
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <button onClick={() => navigate('/signup')}
+              className="bg-white text-gray-900 px-8 py-3.5 rounded-full font-bold text-sm hover:bg-gray-100 transition-all flex items-center gap-2 shadow-lg"
+            >
+              Start for free <ArrowRight size={16} />
+            </button>
+            <TryDemoButton size="lg" />
+          </div>
+        </motion.div>
       </div>
-      <p className="text-xs sm:text-sm text-center">&copy; {new Date().getFullYear()} Graymanager. All rights reserved.</p>
-      <div className="flex gap-4 sm:gap-6 text-xs sm:text-sm">
-        <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
-        <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+    </section>
+  );
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   FOOTER
+   ═══════════════════════════════════════════════════════════════════════════ */
+const Footer = () => (
+  <footer className="bg-gray-950 text-gray-400 py-10 sm:py-14 border-t border-gray-900">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 bg-white rounded-lg flex items-center justify-center">
+            <span className="text-black font-extrabold text-xs">G</span>
+          </div>
+          <span className="text-white font-bold tracking-tight">Graymanager</span>
+        </div>
+
+        <p className="text-xs sm:text-sm text-center text-gray-500">
+          &copy; {new Date().getFullYear()} Graymanager. All rights reserved.
+        </p>
+
+        <div className="flex gap-6 text-xs sm:text-sm">
+          <a href="#" className="hover:text-white transition-colors">Privacy Policy</a>
+          <a href="#" className="hover:text-white transition-colors">Terms of Service</a>
+        </div>
       </div>
     </div>
   </footer>
 );
 
-// ─── Page ─────────────────────────────────────────────────────────────────────
+/* ═══════════════════════════════════════════════════════════════════════════
+   PAGE ASSEMBLY
+   ═══════════════════════════════════════════════════════════════════════════ */
 export default function LandingPage() {
   return (
-    <div className="font-geist text-slate-900 bg-white">
+    <div className="text-gray-900 bg-white antialiased">
       <Header />
       <Hero />
-      <About />
-      <Services />
+      <StatsBar />
+      <Features />
+      <Notifications />
+      <HowItWorks />
       <Pricing />
       <Support />
-      <Notifications />
       <MobileApp />
       <Contact />
+      <CtaBanner />
       <Footer />
     </div>
   );

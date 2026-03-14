@@ -37,6 +37,8 @@ model Business {
   sales            Sale[]
   services         Service[]
   users            User[]
+  vehicles         Vehicle[]
+  reminders        Reminder[]
 
   @@map("businesses")
 }
@@ -69,20 +71,25 @@ model User {
 }
 
 model Customer {
-  id         Int      @id @default(autoincrement())
-  firstName  String
-  lastName   String?
-  email      String?
-  phone      String   @unique
-  address    String?
-  notes      String?
-  isActive   Boolean  @default(true)
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
-  businessId String   @map("business_id")
-  business   Business @relation(fields: [businessId], references: [id])
-  sales      Sale[]
+  id               Int       @id @default(autoincrement())
+  firstName        String
+  lastName         String?
+  email            String?
+  phone            String
+  address          String?
+  notes            String?
+  isActive         Boolean   @default(true)
+  preferredContact String?   @map("preferred_contact") @db.VarChar(20)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  businessId       String    @map("business_id")
+  business         Business  @relation(fields: [businessId], references: [id])
+  sales            Sale[]
+  vehicles         Vehicle[]
+  jobs             Job[]
+  reminders        Reminder[]
 
+  @@unique([phone, businessId])
   @@map("customers")
 }
 
@@ -235,6 +242,7 @@ model Job {
   vehicleMake        String?       @map("vehicle_make") @db.VarChar(50)
   vehicleModel       String?       @map("vehicle_model") @db.VarChar(50)
   vehicleRegNumber   String?       @map("vehicle_reg_number") @db.VarChar(20)
+  odometer           Int?          @map("odometer")
   problemType        String        @map("problem_type") @db.VarChar(100)
   problemDescription String        @map("problem_description")
   labourCost         Decimal       @default(0) @map("labour_cost") @db.Decimal(10, 2)
@@ -245,12 +253,39 @@ model Job {
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
   businessId         String        @map("business_id")
+  customerId         Int?          @map("customer_id")
+  vehicleId          Int?          @map("vehicle_id")
   invoice            Invoice?
   materials          JobMaterial[]
   user               User          @relation(fields: [assignedTo], references: [id])
   business           Business      @relation(fields: [businessId], references: [id])
+  customer           Customer?     @relation(fields: [customerId], references: [id])
+  vehicle            Vehicle?      @relation(fields: [vehicleId], references: [id])
+  reminders          Reminder[]
 
   @@map("jobs")
+}
+
+model Vehicle {
+  id        Int      @id @default(autoincrement())
+  customerId Int     @map("customer_id")
+  make      String?  @db.VarChar(50)
+  model     String?  @db.VarChar(50)
+  year      Int?
+  regNumber String?  @map("reg_number") @db.VarChar(20)
+  color     String?  @db.VarChar(30)
+  vin       String?  @db.VarChar(50)
+  mileage   Int?
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+  businessId String  @map("business_id")
+  customer  Customer @relation(fields: [customerId], references: [id])
+  business  Business @relation(fields: [businessId], references: [id])
+  jobs      Job[]
+
+  @@unique([regNumber, businessId])
+  @@map("vehicles")
 }
 
 model JobMaterial {
@@ -401,6 +436,25 @@ model AuditLog {
   business    Business @relation(fields: [businessId], references: [id])
 
   @@map("audit_logs")
+}
+
+model Reminder {
+  id           Int       @id @default(autoincrement())
+  businessId   String    @map("business_id")
+  customerId   Int       @map("customer_id")
+  jobId        Int?      @map("job_id")
+  type         String    @db.VarChar(30)
+  channel      String    @default("email") @db.VarChar(20)
+  status       String    @default("pending") @db.VarChar(20)
+  scheduledFor DateTime  @map("scheduled_for")
+  sentAt       DateTime? @map("sent_at")
+  message      String?   @db.Text
+  createdAt    DateTime  @default(now()) @map("created_at")
+  business     Business  @relation(fields: [businessId], references: [id])
+  customer     Customer  @relation(fields: [customerId], references: [id])
+  job          Job?      @relation(fields: [jobId], references: [id])
+
+  @@map("reminders")
 }
 
 enum Role {

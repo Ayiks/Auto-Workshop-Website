@@ -3,6 +3,7 @@ import { useQuery } from '@tanstack/react-query';
 import { materialsApi } from '@api/materials';
 import { useAuthStore } from '@stores/authStore';
 import Button from '@components/common/Button';
+import CustomerSelect from '@components/common/CustomerSelect';
 
 export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
   const { user } = useAuthStore();
@@ -15,6 +16,7 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
     vehicleMake: job?.vehicleMake || '',
     vehicleModel: job?.vehicleModel || '',
     vehicleRegNumber: job?.vehicleRegNumber || '',
+    odometer: job?.odometer || '',
     problemType: job?.problemType || '',
     problemDescription: job?.problemDescription || '',
     labourCost: job?.labourCost || 0,
@@ -23,6 +25,10 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
 
   const [materials, setMaterials] = useState(job?.materials || []);
   const [errors, setErrors] = useState({});
+  // Tracks the CustomerSelect selection (for icon styling and edit-mode sync)
+  const [customerSelectValue, setCustomerSelectValue] = useState(
+    job ? { name: job.clientName || '', type: job.customerId ? 'registered' : 'walking' } : null
+  );
 
   // Fetch inventory materials
   const { data: materialsData } = useQuery({
@@ -38,6 +44,30 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
     if (errors[name]) {
       setErrors({ ...errors, [name]: null });
     }
+  };
+
+  const handleCustomerSelect = (selected) => {
+    setCustomerSelectValue(selected);
+    if (!selected) {
+      setFormData(prev => ({ ...prev, clientName: '' }));
+      return;
+    }
+    if (selected.type === 'registered') {
+      setFormData(prev => ({
+        ...prev,
+        clientName: selected.name,
+        clientPhone: selected.phone || prev.clientPhone,
+        clientEmail: selected.email || prev.clientEmail,
+        // Only auto-fill vehicle fields if they are currently empty
+        vehicleRegNumber: prev.vehicleRegNumber || selected.vehicles?.[0]?.regNumber || '',
+        vehicleMake: prev.vehicleMake || selected.vehicles?.[0]?.make || '',
+        vehicleModel: prev.vehicleModel || selected.vehicles?.[0]?.model || '',
+      }));
+    } else {
+      // Walking / unregistered customer — just track the name
+      setFormData(prev => ({ ...prev, clientName: selected.name }));
+    }
+    if (errors.clientName) setErrors(prev => ({ ...prev, clientName: null }));
   };
 
   const addMaterial = () => {
@@ -162,22 +192,27 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
           {/* 1. Job Type */}
           <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-5 shadow-sm">
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 sm:mb-3">Job Type</label>
-            <div className="grid grid-cols-3 gap-2 sm:gap-3">
-              {['mechanic', 'sprayer', 'bodyworks'].map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  onClick={() => setFormData({ ...formData, jobType: type })}
-                  className={`px-4 py-3 rounded-md text-sm font-medium transition-all ${
-                    formData.jobType === type
-                      ? 'bg-black text-white border border-black shadow-md'
-                      : 'bg-white text-gray-600 border border-gray-200 hover:border-gray-400'
-                  }`}
-                  disabled={isLoading}
-                >
-                  {type === 'bodyworks' ? 'Body Works' : type.charAt(0).toUpperCase() + type.slice(1)}
-                </button>
-              ))}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
+              {['mechanic', 'sprayer', 'bodyworks', 'other'].map((type) => {
+                const allowed = isJobTypeAllowed(user?.role, type);
+                return (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => allowed && setFormData({ ...formData, jobType: type })}
+                    className={`px-4 py-3 rounded-md text-sm font-medium transition-all ${
+                      formData.jobType === type
+                        ? 'bg-black text-white border border-black shadow-md'
+                        : allowed
+                        ? 'bg-white text-gray-600 border border-gray-200 hover:border-gray-400'
+                        : 'bg-gray-50 text-gray-300 border border-gray-100 cursor-not-allowed'
+                    }`}
+                    disabled={isLoading || !allowed}
+                  >
+                    {type === 'bodyworks' ? 'Body Works' : type.charAt(0).toUpperCase() + type.slice(1)}
+                  </button>
+                );
+              })}
             </div>
           </div>
 
@@ -192,15 +227,10 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
               </h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                 <div>
-                  <label className="block text-xs font-medium text-gray-700 mb-1">Name *</label>
-                  <input
-                    type="text"
-                    name="clientName"
-                    value={formData.clientName}
-                    onChange={handleChange}
-                    className={inputClass(errors.clientName)}
-                    placeholder="e.g. John Doe"
-                    disabled={isLoading}
+                  <CustomerSelect
+                    value={customerSelectValue}
+                    onChange={handleCustomerSelect}
+                    label="Name *"
                   />
                   {errors.clientName && <p className="text-xs text-red-500 mt-1">{errors.clientName}</p>}
                 </div>
@@ -240,7 +270,7 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
                 <svg className="w-3.5 sm:w-4 h-3.5 sm:h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                 Vehicle Information
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Make</label>
                   <input
@@ -274,6 +304,19 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
                     onChange={handleChange}
                     className={inputClass(false)}
                     placeholder="e.g. GR-2345-24"
+                    disabled={isLoading}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Mileage (km)</label>
+                  <input
+                    type="number"
+                    name="odometer"
+                    value={formData.odometer}
+                    onChange={handleChange}
+                    className={inputClass(false)}
+                    placeholder="e.g. 85000"
+                    min="0"
                     disabled={isLoading}
                   />
                 </div>
@@ -544,4 +587,11 @@ function getDefaultJobType(role) {
     bodyworks: 'bodyworks',
   };
   return roleMap[role] || 'mechanic';
+}
+
+function isJobTypeAllowed(role, type) {
+  if (!role || role === 'admin') return true;
+  const myType = { mechanic: 'mechanic', sprayer: 'sprayer', bodyworks: 'bodyworks' }[role];
+  if (!myType) return true; // sales or other roles without a job type mapping can pick any
+  return type === myType || type === 'other';
 }

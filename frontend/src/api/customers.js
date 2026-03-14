@@ -6,6 +6,12 @@ export const customersApi = {
     return response.data;
   },
 
+  // Get a single customer with vehicles
+  getCustomer: async (id) => {
+    const response = await api.get(`/customers/${id}`);
+    return response.data;
+  },
+
   // Create a new customer
   createCustomer: async (data) => {
     const response = await api.post('/customers', data);

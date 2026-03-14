@@ -8,7 +8,8 @@ export default function CustomerForm({ initialData, onSubmit, onCancel, isLoadin
     phone: '',
     email: '',
     address: '',
-    notes: ''
+    notes: '',
+    preferredContact: 'email',
   });
 
   useEffect(() => {
@@ -99,6 +100,20 @@ export default function CustomerForm({ initialData, onSubmit, onCancel, isLoadin
           value={formData.notes || ''}
           onChange={handleChange}
         />
+      </div>
+
+      <div>
+        <label className="block text-xs sm:text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">Preferred Contact</label>
+        <select
+          name="preferredContact"
+          className="block w-full rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 text-xs sm:text-sm shadow-sm focus:border-gray-900 focus:ring-gray-900 transition-shadow"
+          value={formData.preferredContact || 'email'}
+          onChange={handleChange}
+        >
+          <option value="email">Email</option>
+          <option value="sms">SMS</option>
+          <option value="whatsapp">WhatsApp</option>
+        </select>
       </div>
 
       <div className="flex justify-end gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-gray-100">

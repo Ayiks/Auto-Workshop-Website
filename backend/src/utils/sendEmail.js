@@ -206,3 +206,43 @@ export const sendJobCompletedEmail = async (job, businessName) => {
     // Non-fatal — do not throw
   }
 };
+
+// ─── Reminder Email ───────────────────────────────────────────────────────────
+export const sendReminderEmail = async (to, { customerName, message, type, businessName }) => {
+  if (!to) return;
+  const transporter = createTransporter();
+
+  const subjectMap = {
+    post_job: `How was your recent service at ${businessName}?`,
+    service_due: `Your vehicle is due for service at ${businessName}`,
+    invoice_overdue: `Payment reminder from ${businessName}`,
+    manual: `Message from ${businessName}`,
+  };
+  const subject = subjectMap[type] || subjectMap.manual;
+
+  try {
+    await transporter.sendMail({
+      from: `"${businessName || 'Gray Manager'}" <${process.env.EMAIL_USER}>`,
+      to,
+      subject,
+      html: `
+        <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111;">
+          <div style="background:#111827;padding:24px 28px;border-radius:8px 8px 0 0;">
+            <h2 style="color:#fff;margin:0;font-size:20px;">${businessName || 'Gray Manager'}</h2>
+          </div>
+          <div style="padding:24px 28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
+            <p style="font-size:15px;">Dear <strong>${customerName}</strong>,</p>
+            <p style="font-size:14px;color:#374151;">${message ? message.replace(/\n/g, '<br>') : subject}</p>
+            <p style="margin-top:24px;font-size:12px;color:#9ca3af;">
+              ${businessName || 'Gray Manager'} · Auto Workshop Management
+            </p>
+          </div>
+        </div>
+      `,
+    });
+    console.log(`Reminder email sent to ${to}`);
+  } catch (err) {
+    console.error('Failed to send reminder email:', err.message);
+    // Non-fatal — do not throw
+  }
+};

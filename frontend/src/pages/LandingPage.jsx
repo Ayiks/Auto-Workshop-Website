@@ -646,7 +646,6 @@ const Notifications = () => {
           >
             <div className="flex items-center justify-between mb-4">
               <span className="text-white text-sm font-bold">Customer Updates</span>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
             </div>
             <div className="space-y-2.5">
               {alerts.map((a, i) => (

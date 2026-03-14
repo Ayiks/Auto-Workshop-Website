@@ -212,7 +212,6 @@ function App() {
           <Route path="/setup-workspace" element={<SetupWorkspace />} />
 
           {/* Protected Routes */}
-          {/* <Route path="/setup-workspace" element={<ProtectedRoute><SetupWorkspace /></ProtectedRoute>} /> */}
           <Route
             path="/app"
             element={

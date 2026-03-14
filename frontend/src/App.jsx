@@ -174,6 +174,8 @@ import Finance from '@/pages/Finance';
 import Expenses from '@pages/Expenses';
 import Users from '@pages/Users';
 import Settings from '@pages/Settings';
+import Customers from '@pages/Customers';
+import CustomerDetail from '@pages/CustomerDetail';
 import BoothServices from '@pages/BoothServices';
 import DashboardLayout from '@components/layout/DashboardLayout';
 
@@ -229,6 +231,8 @@ function App() {
             <Route path='finance' element={<Finance />} />
             <Route path="expenses" element={<Expenses />} />
             <Route path="users" element={<Users />} />
+            <Route path="customers" element={<Customers />} />
+            <Route path="customers/:id" element={<CustomerDetail />} />
             <Route path="settings" element={<Settings />} />
             <Route path="booth" element={<BoothServices />} />
             

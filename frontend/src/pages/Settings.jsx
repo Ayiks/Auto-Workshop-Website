@@ -6,16 +6,14 @@ import Card from '@components/common/Card';
 import BusinessSettings from '@components/features/settings/BusinessSettings';
 import ProfileSettings from '@components/features/settings/ProfileSettings';
 import ServiceSettings from '@components/features/settings/ServiceSettings';
-import CustomersManager from '@components/features/settings/CustomersManager';
 import UnitsManager from '@components/features/settings/UnitsManager';
-import { Users, User, Building2, Wrench, Scale } from 'lucide-react';
+import { User, Building2, Wrench, Scale } from 'lucide-react';
 
 const TABS = [
   { id: 'profile', label: 'My Profile', icon: <User className="w-4 h-4" /> },
   { id: 'business', label: 'Business Profile', adminOnly: true, icon: <Building2 className="w-4 h-4" /> },
   { id: 'services', label: 'Service Pricing', adminOnly: true, icon: <Wrench className="w-4 h-4" /> },
-  {id: 'units', label: 'Units of Measure', adminOnly: true, icon: <Scale className="w-4 h-4" /> },
-  { id: 'customers', label: 'Customer Base', adminOnly: false, icon: <Users className="w-4 h-4" /> },
+  { id: 'units', label: 'Units of Measure', adminOnly: true, icon: <Scale className="w-4 h-4" /> },
 ];
 
 export default function Settings() {
@@ -65,7 +63,6 @@ export default function Settings() {
           {activeTab === 'business' && <BusinessSettings />}
           {activeTab === 'services' && <ServiceSettings />}
           {activeTab === 'units' && <UnitsManager />}
-          {activeTab === 'customers' && <CustomersManager />}
         </div>
       </div>
     </div>

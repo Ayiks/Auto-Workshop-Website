@@ -19,6 +19,8 @@ import userRoutes from './routes/user.routes.js';
 import settingsRoutes from './routes/settings.routes.js';
 import serviceRoutes from './routes/service.routes.js';
 import customerRoutes from './routes/customer.routes.js';
+import vehicleRoutes from './routes/vehicles.routes.js';
+import reminderRoutes from './routes/reminders.routes.js';
 import sandboxRoutes from './routes/sandbox.routes.js';
 import { sendContactEmail } from './utils/sendEmail.js';
 
@@ -93,6 +95,8 @@ app.use(`${API_PREFIX}/users`, userRoutes);
 app.use(`${API_PREFIX}/settings`, settingsRoutes);
 app.use(`${API_PREFIX}/services`, serviceRoutes);
 app.use(`${API_PREFIX}/customers`, customerRoutes);
+app.use(`${API_PREFIX}/vehicles`, vehicleRoutes);
+app.use(`${API_PREFIX}/reminders`, reminderRoutes);
 app.use(`${API_PREFIX}/sandboxes`, sandboxRoutes);
 
 // Public contact form

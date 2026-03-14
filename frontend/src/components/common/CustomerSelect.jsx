@@ -70,13 +70,15 @@ export default function CustomerSelect({ value, onChange, label = "Customer" }) 
     const fullName = `${customer.firstName} ${customer.lastName || ''}`.trim();
     setSearchTerm(fullName);
     setIsOpen(false);
-    
-    // Notify Parent: Registered Customer
+
+    // Notify Parent: Registered Customer (include email + vehicles for auto-fill)
     onChange({
       type: 'registered',
       id: customer.id,
       name: fullName,
-      phone: customer.phone
+      phone: customer.phone,
+      email: customer.email || null,
+      vehicles: customer.vehicles || [],
     });
   };
 

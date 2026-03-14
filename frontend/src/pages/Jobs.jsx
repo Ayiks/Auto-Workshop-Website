@@ -58,6 +58,7 @@ export default function Jobs() {
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedJob, setSelectedJob] = useState(null);
+  const [profilePrompt, setProfilePrompt] = useState(null); // { customerId }
 
   const userJobType = 
     user?.role === 'mechanic' ? 'mechanic' :
@@ -92,11 +93,16 @@ export default function Jobs() {
   // Mutations
   const createMutation = useMutation({
     mutationFn: jobsApi.createJob,
-    onSuccess: () => {
+    onSuccess: (response) => {
       queryClient.invalidateQueries(['jobs']);
       queryClient.invalidateQueries(['jobs-stats']);
       setShowCreateModal(false);
-      alert('Job created successfully!');
+      const customerId = response?.data?.customerId;
+      if (customerId && (user?.role === 'admin' || user?.role === 'sales')) {
+        setProfilePrompt({ customerId });
+      } else {
+        alert('Job created successfully!');
+      }
     },
     onError: (e) => alert(e.response?.data?.error || 'Failed to create job'),
   });
@@ -341,6 +347,32 @@ export default function Jobs() {
           </div>
         </div>
       </div>
+
+      {/* Profile completion prompt banner */}
+      {profilePrompt && (
+        <div className="bg-amber-50 border-b border-amber-200">
+          <div className={`max-w-7xl mx-auto ${RESPONSIVE_SPACING.container} py-3 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2`}>
+            <p className="text-sm text-amber-800">
+              <span className="font-semibold">Job created.</span> Customer record saved — complete their vehicle profile for better tracking.
+            </p>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              <a
+                href="/settings?tab=customers"
+                className="text-xs font-semibold text-amber-900 underline hover:no-underline"
+              >
+                Go to Customers
+              </a>
+              <button
+                onClick={() => setProfilePrompt(null)}
+                className="text-xs text-amber-600 hover:text-amber-900 transition-colors"
+                aria-label="Dismiss"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className={`max-w-7xl mx-auto ${RESPONSIVE_SPACING.section} space-y-8`}>
         

@@ -6,18 +6,18 @@ import { sendJobCreatedEmail, sendJobCompletedEmail } from '../utils/sendEmail.j
 export const createJob = asyncHandler(async (req, res) => {
   const {
     jobType, clientName, clientPhone, clientEmail,
-    vehicleMake, vehicleModel, vehicleRegNumber,
+    vehicleMake, vehicleModel, vehicleRegNumber, odometer,
     problemType, problemDescription,
     labourCost = 0, miscellaneousCost = 0, materials = [],
   } = req.body;
 
-  if (!jobType || !['mechanic', 'sprayer', 'bodyworks'].includes(jobType))
-    throw new AppError('Invalid job type. Must be mechanic, sprayer, or bodyworks', 400, 'VALIDATION_ERROR');
+  if (!jobType || !['mechanic', 'sprayer', 'bodyworks', 'other'].includes(jobType))
+    throw new AppError('Invalid job type. Must be mechanic, sprayer, bodyworks, or other', 400, 'VALIDATION_ERROR');
   if (!clientName || !clientPhone)
     throw new AppError('Please provide client name and phone number', 400, 'VALIDATION_ERROR');
   if (!problemType)
     throw new AppError('Please provide problem type', 400, 'VALIDATION_ERROR');
-  if (req.allowedJobType && req.allowedJobType !== jobType)
+  if (req.allowedJobType && req.allowedJobType !== jobType && jobType !== 'other')
     throw new AppError('You can only create ' + req.allowedJobType + ' jobs', 403, 'PERMISSION_DENIED');
 
   let materialsCostTotal = 0;
@@ -57,6 +57,7 @@ export const createJob = asyncHandler(async (req, res) => {
         clientEmail: clientEmail?.trim() || null,
         vehicleMake: vehicleMake?.trim() || null, vehicleModel: vehicleModel?.trim() || null,
         vehicleRegNumber: vehicleRegNumber?.trim() || null,
+        odometer: odometer ? parseInt(odometer, 10) : null,
         problemType: problemType.trim(), problemDescription: (problemDescription || '').trim(),
         labourCost: parseFloat(labourCost), miscellaneousCost: parseFloat(miscellaneousCost),
         totalCost, assignedTo: req.user.id, status: 'pending',
@@ -65,11 +66,74 @@ export const createJob = asyncHandler(async (req, res) => {
     for (const m of validatedMaterials) {
       await tx.jobMaterial.create({ data: { jobId: job.id, ...m } });
     }
+
+    // Auto-upsert Customer and Vehicle records from job data
+    let customerId = null;
+    let vehicleId = null;
+    const phone = clientPhone.trim();
+    const upsertedCustomer = await tx.customer.upsert({
+      where: { phone_businessId: { phone, businessId: req.user.businessId } },
+      update: {
+        ...(clientEmail?.trim() && { email: clientEmail.trim() }),
+      },
+      create: {
+        firstName: clientName.trim().split(' ')[0],
+        lastName: clientName.trim().split(' ').slice(1).join(' ') || null,
+        phone,
+        email: clientEmail?.trim() || null,
+        businessId: req.user.businessId,
+      },
+    });
+    customerId = upsertedCustomer.id;
+
+    if (vehicleRegNumber?.trim()) {
+      const regNumber = vehicleRegNumber.trim();
+      // Use findFirst + update/create instead of upsert — the partial unique index
+      // (WHERE reg_number IS NOT NULL) cannot be used as an ON CONFLICT target by Prisma.
+      const existingVehicle = await tx.vehicle.findFirst({
+        where: { regNumber, businessId: req.user.businessId },
+      });
+      const odometerInt = odometer ? parseInt(odometer, 10) : null;
+      if (existingVehicle) {
+        const updated = await tx.vehicle.update({
+          where: { id: existingVehicle.id },
+          data: {
+            ...(vehicleMake?.trim() && { make: vehicleMake.trim() }),
+            ...(vehicleModel?.trim() && { model: vehicleModel.trim() }),
+            // Sync mileage if the new reading is higher than what's on record
+            ...(odometerInt && (!existingVehicle.mileage || odometerInt > existingVehicle.mileage) && { mileage: odometerInt }),
+          },
+        });
+        vehicleId = updated.id;
+      } else {
+        const created = await tx.vehicle.create({
+          data: {
+            customerId,
+            make: vehicleMake?.trim() || null,
+            model: vehicleModel?.trim() || null,
+            regNumber,
+            businessId: req.user.businessId,
+          },
+        });
+        // Sync mileage via raw SQL (Prisma client not yet regenerated for this field)
+        if (odometerInt) {
+          await tx.$executeRawUnsafe(
+            `UPDATE vehicles SET mileage = $1 WHERE id = $2`,
+            odometerInt,
+            created.id
+          );
+        }
+        vehicleId = created.id;
+      }
+    }
+
+    await tx.job.update({ where: { id: job.id }, data: { customerId, vehicleId } });
+
     await tx.auditLog.create({
       data: { userId: req.user.id, action: 'CREATE', entity: 'Job', entityId: job.id,
         description: 'Created ' + jobType + ' job #' + job.id + ' for ' + clientName + '. Total: GHc' + totalCost },
     });
-    return job;
+    return { ...job, customerId, vehicleId };
   });
 
   const completeJob = await req.db.job.findUnique({
@@ -89,9 +153,9 @@ export const createJob = asyncHandler(async (req, res) => {
 // @desc    Get all jobs
 // @route   GET /api/jobs
 export const getJobs = asyncHandler(async (req, res) => {
-  const { status, jobType, startDate, endDate, assignedTo } = req.query;
+  const { status, jobType, startDate, endDate, assignedTo, customerId } = req.query;
   const where = {};
-  if (req.allowedJobType) where.jobType = req.allowedJobType;
+  if (req.allowedJobType) where.jobType = { in: [req.allowedJobType, 'other'] };
   else if (jobType) where.jobType = jobType;
   if (status) where.status = status;
   if (startDate || endDate) {
@@ -100,8 +164,14 @@ export const getJobs = asyncHandler(async (req, res) => {
     if (endDate) { const e = new Date(endDate); e.setHours(23,59,59,999); where.createdAt.lte = e; }
   }
   if (assignedTo) where.assignedTo = parseInt(assignedTo);
-  if (req.user.role !== 'admin') where.assignedTo = req.user.id;
-  else if (req.isOwnResource) where.assignedTo = req.user.id;
+  if (customerId) {
+    where.customerId = parseInt(customerId);
+    // When viewing a customer's job history, skip per-user restriction for admin/manager
+    if (!['admin', 'manager'].includes(req.user.role)) where.assignedTo = req.user.id;
+  } else {
+    if (req.user.role !== 'admin') where.assignedTo = req.user.id;
+    else if (req.isOwnResource) where.assignedTo = req.user.id;
+  }
   const jobs = await req.db.job.findMany({
     where,
     include: {
@@ -136,7 +206,7 @@ export const getJob = asyncHandler(async (req, res) => {
   if (!job) throw new AppError('Job not found', 404, 'NOT_FOUND');
   if (req.isOwnResource && job.assignedTo !== req.user.id)
     throw new AppError('Not authorized to view this job', 403, 'PERMISSION_DENIED');
-  if (req.allowedJobType && job.jobType !== req.allowedJobType)
+  if (req.allowedJobType && job.jobType !== req.allowedJobType && job.jobType !== 'other')
     throw new AppError(`You can only view ${req.allowedJobType} jobs`, 403, 'PERMISSION_DENIED');
   res.status(200).json({ success: true, data: job });
 });
@@ -154,7 +224,7 @@ export const updateJob = asyncHandler(async (req, res) => {
   if (!existingJob) throw new AppError('Job not found', 404, 'NOT_FOUND');
   if (req.isOwnResource && existingJob.assignedTo !== req.user.id)
     throw new AppError('Not authorized to edit this job', 403, 'PERMISSION_DENIED');
-  if (req.allowedJobType && existingJob.jobType !== req.allowedJobType)
+  if (req.allowedJobType && existingJob.jobType !== req.allowedJobType && existingJob.jobType !== 'other')
     throw new AppError(`You can only edit ${req.allowedJobType} jobs`, 403, 'PERMISSION_DENIED');
   const validStatuses = ['pending', 'in_progress', 'completed', 'invoiced'];
   if (status && !validStatuses.includes(status))
@@ -363,7 +433,7 @@ export const deleteJob = asyncHandler(async (req, res) => {
 export const getJobStats = asyncHandler(async (req, res) => {
   const { startDate, endDate, jobType } = req.query;
   const where = {};
-  if (req.allowedJobType) where.jobType = req.allowedJobType;
+  if (req.allowedJobType) where.jobType = { in: [req.allowedJobType, 'other'] };
   else if (jobType) where.jobType = jobType;
   if (startDate || endDate) {
     where.createdAt = {};

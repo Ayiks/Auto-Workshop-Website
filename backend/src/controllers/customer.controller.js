@@ -22,12 +22,32 @@ export const getCustomers = asyncHandler(async (req, res) => {
   const customers = await req.db.customer.findMany({
     where: whereClause,
     orderBy: { createdAt: 'desc' },
+    include: {
+      vehicles: {
+        where: { isActive: true },
+        select: { id: true, make: true, model: true, year: true, regNumber: true },
+      },
+      jobs: {
+        select: { id: true, createdAt: true },
+        orderBy: { createdAt: 'desc' },
+        take: 1,
+      },
+      _count: { select: { jobs: true } },
+    },
   });
+
+  const data = customers.map(c => ({
+    ...c,
+    isProfileComplete: c.vehicles.length > 0,
+    jobCount: c._count.jobs,
+    lastVisit: c.jobs[0]?.createdAt || null,
+    _count: undefined,
+  }));
 
   res.status(200).json({
     success: true,
-    count: customers.length,
-    data: customers,
+    count: data.length,
+    data,
   });
 });
 
@@ -43,6 +63,7 @@ export const getCustomer = asyncHandler(async (req, res) => {
       isActive: true,
       businessId: req.user.businessId, // prevent cross-tenant access
     },
+    include: { vehicles: { where: { isActive: true }, orderBy: { createdAt: 'desc' } } },
   });
 
   if (!customer) {
@@ -59,7 +80,7 @@ export const getCustomer = asyncHandler(async (req, res) => {
 // @route   POST /api/customers
 // @access  Private
 export const createCustomer = asyncHandler(async (req, res) => {
-  const { firstName, lastName, phone, email, address, notes } = req.body;
+  const { firstName, lastName, phone, email, address, notes, preferredContact } = req.body;
 
   if (!firstName || !phone) {
     throw new AppError('First name and phone number are required', 400, 'VALIDATION_ERROR');
@@ -83,6 +104,7 @@ export const createCustomer = asyncHandler(async (req, res) => {
       email,
       address,
       notes,
+      preferredContact: preferredContact || null,
       businessId: req.user.businessId,
     },
   });
@@ -109,7 +131,7 @@ export const createCustomer = asyncHandler(async (req, res) => {
 // @access  Private
 export const updateCustomer = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { firstName, lastName, phone, email, address, notes } = req.body;
+  const { firstName, lastName, phone, email, address, notes, preferredContact } = req.body;
 
   // verify ownership before updating
   const existing = await req.db.customer.findFirst({
@@ -136,7 +158,7 @@ export const updateCustomer = asyncHandler(async (req, res) => {
 
   const customer = await req.db.customer.update({
     where: { id: parseInt(id) },
-    data: { firstName, lastName, phone, email, address, notes },
+    data: { firstName, lastName, phone, email, address, notes, preferredContact: preferredContact ?? undefined },
   });
 
   await req.db.auditLog.create({

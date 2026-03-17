@@ -132,6 +132,12 @@ updateUnit: async (id, data) => {
 deleteUnit: async (id) => {
   const response = await apiClient.delete(`/settings/units/${id}`);
   return response;
-}
+},
+
+// Initiate WhatsApp Business number registration via Arkesel
+registerWhatsApp: async () => {
+  const response = await apiClient.post('/settings/messaging/register-whatsapp');
+  return response;
+},
 }
 export default settingsApi;

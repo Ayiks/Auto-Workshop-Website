@@ -1,5 +1,21 @@
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
+const CURRENT_YEAR = () => new Date().getFullYear();
+
+const validateVehicleFields = ({ year, mileage } = {}) => {
+  if (year !== undefined && year !== null && year !== '') {
+    const y = parseInt(year, 10);
+    if (isNaN(y) || y < 1886 || y > CURRENT_YEAR()) {
+      throw new AppError(`Vehicle year must be between 1886 and ${CURRENT_YEAR()}`, 400, 'VALIDATION_ERROR');
+    }
+  }
+  if (mileage !== undefined && mileage !== null && mileage !== '') {
+    if (parseInt(mileage, 10) < 0) {
+      throw new AppError('Mileage cannot be negative', 400, 'VALIDATION_ERROR');
+    }
+  }
+};
+
 // @desc    Get vehicles for a customer
 // @route   GET /api/vehicles?customerId=:id
 export const getVehicles = asyncHandler(async (req, res) => {
@@ -41,6 +57,8 @@ export const createVehicle = asyncHandler(async (req, res) => {
     where: { id: parseInt(customerId), businessId: req.user.businessId },
   });
   if (!customer) throw new AppError('Customer not found', 404, 'NOT_FOUND');
+
+  validateVehicleFields({ year, mileage });
 
   if (regNumber?.trim()) {
     const existing = await req.db.vehicle.findFirst({
@@ -95,6 +113,8 @@ export const updateVehicle = asyncHandler(async (req, res) => {
     where: { id: parseInt(id), businessId: req.user.businessId },
   });
   if (!existing) throw new AppError('Vehicle not found', 404, 'NOT_FOUND');
+
+  validateVehicleFields({ year, mileage });
 
   if (regNumber?.trim() && regNumber.trim() !== existing.regNumber) {
     const conflict = await req.db.vehicle.findFirst({

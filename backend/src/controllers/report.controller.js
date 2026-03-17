@@ -66,7 +66,7 @@ export const getSalesReport = asyncHandler(async (req, res) => {
             select: { name: true },
           },
           service: {
-            select: { type: true },
+            select: { type: true, name: true, category: true },
           },
         },
       },
@@ -100,7 +100,11 @@ export const getSalesReport = asyncHandler(async (req, res) => {
         boothItems.push({
           saleId: sale.id,
           saleDate: sale.saleDate,
+          serviceName: item.service?.name || null,
+          category: item.service?.category || null,
+          type: item.service?.type || null,
           price: item.unitPrice,
+          subtotal: item.subtotal,
         });
       }
     });

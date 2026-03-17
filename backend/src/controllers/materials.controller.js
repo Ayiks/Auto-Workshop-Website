@@ -1,4 +1,6 @@
+import { randomUUID } from 'crypto';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
+import { notifyVendor } from '../utils/notifyVendor.js';
 
 // @desc    Get all materials
 // @route   GET /api/materials
@@ -445,14 +447,12 @@ export const getLowStockMaterials = asyncHandler(async (req, res) => {
 // @access  Private (requires 'materials:reorder' permission)
 export const reorderMaterial = asyncHandler(async (req, res) => {
   const { id } = req.params;
-  const { quantityOrdered, unitCost, notes, unitId } = req.body;
+  const { quantityOrdered, unitCost, notes, unitId, vendorId } = req.body;
 
-  // 1. Basic Validation
   if (!quantityOrdered || quantityOrdered <= 0) {
     throw new AppError('Quantity ordered must be greater than 0', 400);
   }
 
-  // 2. Fetch Material & Units
   const material = await req.db.material.findUnique({
     where: { id: parseInt(id) },
     include: { alternateUnits: true },
@@ -461,34 +461,18 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
   if (!material) throw new AppError('Material not found', 404);
   if (!material.isActive) throw new AppError('Cannot reorder inactive material', 400);
 
-  // 3. --- UNIT & COST LOGIC ---
-  let purchaseQty = parseFloat(quantityOrdered); // e.g., 5 (Drums)
+  let purchaseQty = parseFloat(quantityOrdered);
   let conversionFactor = 1;
-  let finalUnitId = null; // Default to Base Unit (null)
+  let finalUnitId = null;
 
-  // Handle Alternate Unit Selection
   if (unitId) {
-    // If unitId is provided, check if it's an alternate unit
-    // Note: If unitId matches the material's main unit ID (from GlobalUnits), 
-    // we treat it as base unit (factor 1). 
-    // But usually, alternateUnits array contains the specific conversion rules.
-    
     const selectedUnit = material.alternateUnits.find(u => u.unitId === parseInt(unitId));
-    
     if (selectedUnit) {
       finalUnitId = selectedUnit.unitId;
-      conversionFactor = parseFloat(selectedUnit.factor); // e.g., 200
+      conversionFactor = parseFloat(selectedUnit.factor);
     }
-    // If not found in alternateUnits, we assume it's the Base Unit (if IDs match) or throw error
   }
 
-  // Calculate STOCK to add (Base Units)
-  // e.g., 5 Drums * 200 = 1000 Liters
-  const stockToAdd = purchaseQty * conversionFactor;
-
-  // Calculate COSTS
-  // purchaseUnitCost: What did we pay for ONE Drum? ($500)
-  // If user didn't provide cost, estimate it: BaseCost ($2.50) * Factor (200) = $500
   let purchaseUnitCost;
   if (unitCost) {
     purchaseUnitCost = parseFloat(unitCost);
@@ -498,67 +482,76 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
 
   const totalCost = purchaseQty * purchaseUnitCost;
 
-  // Calculate New Base Cost (Weighted Average is better, but here we update to latest price)
-  // e.g., $500 / 200 = $2.50 per Liter
-  const newBaseUnitCost = purchaseUnitCost / conversionFactor;
+  // Load vendor for notification (if provided)
+  let vendor = null;
+  if (vendorId) {
+    vendor = await req.db.vendor.findFirst({
+      where: { id: parseInt(vendorId), businessId: req.user.businessId },
+    });
+  }
 
-  // 4. Transaction
+  const orderId = randomUUID();
+
   const result = await req.db.$transaction(async (tx) => {
-    // A. Create Reorder Record (Log exactly what the User typed)
     const reorder = await tx.materialReorder.create({
       data: {
         materialId: material.id,
         materialName: material.name,
-        materialUnitId: finalUnitId, // Link to "Drum"
-        quantityOrdered: purchaseQty, // Record "5"
-        unitCost: purchaseUnitCost,   // Record "$500"
-        totalCost: totalCost,
+        materialUnitId: finalUnitId,
+        quantityOrdered: purchaseQty,
+        unitCost: purchaseUnitCost,
+        totalCost,
         reorderedBy: req.user.id,
         notes,
+        status: 'pending',
+        vendorId: vendor?.id || null,
+        businessId: req.user.businessId,
+        orderId,
       },
     });
 
-    // B. Update Material Stock (Convert to Base Units)
-    const updatedMaterial = await tx.material.update({
-      where: { id: material.id },
-      data: {
-        quantity: { increment: stockToAdd }, // Add 1000 Liters
-        unitCost: newBaseUnitCost,           // Update Base Cost to $2.50
-      },
-    });
-
-    // C. Audit Log
     await tx.auditLog.create({
       data: {
         userId: req.user.id,
         action: 'REORDER',
         entity: 'Material',
         entityId: material.id,
-        description: `Reordered ${purchaseQty} ${finalUnitId ? 'Alt Units' : 'Base Units'} of ${material.name}. Added ${stockToAdd} base units to stock.`,
+        description: `Order placed for ${purchaseQty} of ${material.name}. Awaiting receipt.`,
       },
     });
 
-    return { reorder, updatedMaterial };
+    return reorder;
   });
+
+  // Notify vendor (non-blocking)
+  if (vendor) {
+    const business = await req.db.business.findUnique({ where: { id: req.user.businessId }, select: { name: true } });
+    notifyVendor(vendor, {
+      items: [{ materialName: material.name, quantityOrdered: purchaseQty, unit: finalUnitId ? 'units' : material.baseUnit, unitCost: purchaseUnitCost }],
+      totalCost,
+      businessName: business?.name || 'The workshop',
+      orderedBy: req.user.fullName || req.user.username,
+      businessId: req.user.businessId,
+    }).catch(() => {});
+  }
 
   res.status(201).json({
     success: true,
-    message: 'Material reordered successfully',
+    message: 'Restock order placed. Stock will update when goods are received.',
     data: result,
   });
 });
 
-// @desc    Bulk Reorder materials
+// @desc    Bulk Reorder materials (places orders — stock deferred until receipt)
 // @route   POST /api/materials/bulk-reorder
 // @access  Private
 export const bulkReorderMaterials = asyncHandler(async (req, res) => {
-  const { items } = req.body;
+  const { items, vendorId, notes: orderNotes } = req.body;
 
   if (!Array.isArray(items) || items.length === 0) {
     throw new AppError('No items provided for reorder', 400);
   }
 
-  // 1. Fetch all materials upfront
   const itemIds = items.map(item => parseInt(item.id));
   const materials = await req.db.material.findMany({
     where: { id: { in: itemIds } },
@@ -567,7 +560,16 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
 
   const materialMap = new Map(materials.map(m => [m.id, m]));
 
-  // 2. Transaction
+  // Load vendor if provided
+  let vendor = null;
+  if (vendorId) {
+    vendor = await req.db.vendor.findFirst({
+      where: { id: parseInt(vendorId), businessId: req.user.businessId },
+    });
+  }
+
+  const orderId = randomUUID();
+
   const results = await req.db.$transaction(async (tx) => {
     const processedItems = [];
 
@@ -578,12 +580,10 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
       if (!material) throw new AppError(`Material ID ${materialId} not found`, 404);
       if (!material.isActive) throw new AppError(`Material ${material.name} is inactive`, 400);
 
-      // --- LOGIC START ---
       let purchaseQty = parseFloat(item.quantityOrdered);
       let conversionFactor = 1;
       let finalUnitId = null;
 
-      // Find Unit Factor
       if (item.unitId) {
         const selectedUnit = material.alternateUnits.find(u => u.unitId === parseInt(item.unitId));
         if (selectedUnit) {
@@ -592,71 +592,236 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
         }
       }
 
-      // Calculate Stock to Add
-      const stockToAdd = purchaseQty * conversionFactor;
-
-      if (isNaN(stockToAdd) || stockToAdd <= 0) {
+      if (isNaN(purchaseQty) || purchaseQty <= 0) {
         throw new AppError(`Invalid quantity for ${material.name}`, 400);
       }
 
-      // Calculate Costs
       let purchaseUnitCost;
       if (item.unitCost) {
         purchaseUnitCost = parseFloat(item.unitCost);
       } else {
         purchaseUnitCost = parseFloat(material.unitCost) * conversionFactor;
       }
-      
-      const totalCost = purchaseUnitCost * purchaseQty;
-      const newBaseUnitCost = purchaseUnitCost / conversionFactor;
 
-      // A. Create Log
-      await tx.materialReorder.create({
+      const totalCost = purchaseUnitCost * purchaseQty;
+
+      const reorder = await tx.materialReorder.create({
         data: {
           materialId: material.id,
           materialName: material.name,
           materialUnitId: finalUnitId,
-          quantityOrdered: purchaseQty, // Store "5"
-          unitCost: purchaseUnitCost,   // Store "$500"
-          totalCost: totalCost,
+          quantityOrdered: purchaseQty,
+          unitCost: purchaseUnitCost,
+          totalCost,
           reorderedBy: req.user.id,
-          notes: item.notes || 'Bulk Reorder',
+          notes: item.notes || orderNotes || null,
+          status: 'pending',
+          vendorId: vendor?.id || null,
+          businessId: req.user.businessId,
+          orderId,
         },
       });
 
-      // B. Update Stock
-      await tx.material.update({
-        where: { id: material.id },
-        data: {
-          quantity: { increment: stockToAdd }, // Add 1000
-          unitCost: newBaseUnitCost,           // Update to $2.50
-        },
-      });
-
-      processedItems.push({ 
-        materialName: material.name, 
-        addedStock: stockToAdd,
-        totalCost 
+      processedItems.push({
+        reorderId: reorder.id,
+        materialName: material.name,
+        quantityOrdered: purchaseQty,
+        unit: finalUnitId ? 'units' : material.baseUnit,
+        unitCost: purchaseUnitCost,
+        totalCost,
       });
     }
 
-    // Single Audit Log for Bulk Action
     await tx.auditLog.create({
       data: {
         userId: req.user.id,
         action: 'BULK_REORDER',
         entity: 'Material',
-        description: `Bulk reordered ${processedItems.length} items.`,
+        description: `Restock order placed for ${processedItems.length} item(s). Awaiting receipt.`,
       },
     });
 
     return processedItems;
   });
 
+  // Notify vendor (non-blocking)
+  if (vendor) {
+    const business = await req.db.business.findUnique({ where: { id: req.user.businessId }, select: { name: true } });
+    const grandTotal = results.reduce((sum, i) => sum + i.totalCost, 0);
+    notifyVendor(vendor, {
+      items: results,
+      totalCost: grandTotal,
+      businessName: business?.name || 'The workshop',
+      orderedBy: req.user.fullName || req.user.username,
+      businessId: req.user.businessId,
+    }).catch(() => {});
+  }
+
   res.status(201).json({
     success: true,
-    message: `Successfully restocked ${results.length} materials`,
+    message: `Restock order placed for ${results.length} item(s). Stock will update when goods are received.`,
     data: results,
+  });
+});
+
+// @desc    Get all restock orders for the business (grouped by orderId)
+// @route   GET /api/materials/restock-orders
+// @access  Private
+export const getRestockOrders = asyncHandler(async (req, res) => {
+  const { status } = req.query;
+
+  // Always fetch all records — we group in JS and filter groups by status
+  const lineItems = await req.db.materialReorder.findMany({
+    where: { businessId: req.user.businessId },
+    orderBy: { reorderDate: 'desc' },
+    include: {
+      material: { select: { name: true, baseUnit: true } },
+      materialUnit: { select: { name: true } },
+      vendor: { select: { id: true, companyName: true, contactName: true } },
+      user: { select: { fullName: true, username: true } },
+      receivedUser: { select: { fullName: true, username: true } },
+    },
+  });
+
+  // Group by orderId; records without orderId (legacy) each form their own group
+  const groupMap = new Map();
+  for (const item of lineItems) {
+    const key = item.orderId || `__legacy__${item.id}`;
+    if (!groupMap.has(key)) {
+      groupMap.set(key, {
+        orderId: item.orderId || null,
+        reorderDate: item.reorderDate,
+        vendor: item.vendor,
+        user: item.user,
+        notes: item.notes,
+        businessId: item.businessId,
+        items: [],
+        totalCost: 0,
+        // Will be computed below
+        status: 'received',
+        receivedDate: item.receivedDate,
+        receivedUser: item.receivedUser,
+      });
+    }
+    const group = groupMap.get(key);
+    group.items.push(item);
+    group.totalCost += parseFloat(item.totalCost);
+    // If ANY item is still pending, the whole order is pending
+    if (item.status === 'pending') {
+      group.status = 'pending';
+      group.receivedDate = null;
+      group.receivedUser = null;
+    }
+    // Track latest reorderDate for display
+    if (item.reorderDate > group.reorderDate) {
+      group.reorderDate = item.reorderDate;
+    }
+  }
+
+  let groups = Array.from(groupMap.values());
+
+  // Apply status filter at group level
+  if (status && status !== 'all') {
+    groups = groups.filter(g => g.status === status);
+  }
+
+  // Sort newest first
+  groups.sort((a, b) => new Date(b.reorderDate) - new Date(a.reorderDate));
+
+  res.status(200).json({ success: true, data: groups });
+});
+
+// @desc    Mark all items in a restock order as received — updates stock, logs expenses
+// @route   POST /api/materials/restock-orders/:orderId/receive
+// @access  Private
+export const receiveRestockOrder = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+
+  // Find all pending line items for this order
+  const lineItems = await req.db.materialReorder.findMany({
+    where: { orderId, businessId: req.user.businessId, status: 'pending' },
+    include: { material: { include: { alternateUnits: true } } },
+  });
+
+  if (lineItems.length === 0) {
+    throw new AppError('No pending items found for this order', 404);
+  }
+
+  const receivedAt = new Date();
+
+  const result = await req.db.$transaction(async (tx) => {
+    const processed = [];
+
+    for (const order of lineItems) {
+      // Recalculate conversion factor
+      let conversionFactor = 1;
+      let newBaseUnitCost = parseFloat(order.unitCost);
+
+      if (order.materialUnitId) {
+        const selectedUnit = order.material.alternateUnits.find(u => u.unitId === order.materialUnitId);
+        if (selectedUnit) {
+          conversionFactor = parseFloat(selectedUnit.factor);
+          newBaseUnitCost = parseFloat(order.unitCost) / conversionFactor;
+        }
+      }
+
+      const stockToAdd = parseFloat(order.quantityOrdered) * conversionFactor;
+
+      // Update stock quantity and unit cost
+      await tx.material.update({
+        where: { id: order.materialId },
+        data: {
+          quantity: { increment: stockToAdd },
+          unitCost: newBaseUnitCost,
+        },
+      });
+
+      // Auto-log expense (read-only, system-generated)
+      const expense = await tx.expense.create({
+        data: {
+          type: 'cog',
+          category: 'material_reorder',
+          description: `Restock received: ${order.materialName}`,
+          amount: order.totalCost,
+          expenseDate: receivedAt,
+          source: 'system',
+          isReadOnly: true,
+          recordedBy: req.user.id,
+          businessId: req.user.businessId,
+        },
+      });
+
+      // Mark line item as received
+      await tx.materialReorder.update({
+        where: { id: order.id },
+        data: {
+          status: 'received',
+          receivedDate: receivedAt,
+          receivedBy: req.user.id,
+          expenseId: expense.id,
+        },
+      });
+
+      await tx.auditLog.create({
+        data: {
+          userId: req.user.id,
+          action: 'RECEIVE_RESTOCK',
+          entity: 'Material',
+          entityId: order.materialId,
+          description: `Received ${order.quantityOrdered} of ${order.materialName}. Added ${stockToAdd} base units to stock.`,
+        },
+      });
+
+      processed.push({ materialName: order.materialName, stockAdded: stockToAdd });
+    }
+
+    return processed;
+  });
+
+  res.status(200).json({
+    success: true,
+    message: `${result.length} item(s) received. Stock updated.`,
+    data: result,
   });
 });
 
@@ -705,6 +870,94 @@ export const getMaterialReorders = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Get inventory snapshot — stock levels at a given date
+// @route   GET /api/materials/snapshot?date=YYYY-MM-DD
+// @access  Private
+export const getInventorySnapshot = asyncHandler(async (req, res) => {
+  const businessId = req.user.businessId;
+  const snapshotDate = req.query.date ? new Date(req.query.date) : (() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1); // First of current month
+  })();
+
+  // End of the snapshot day (inclusive)
+  const snapshotEnd = new Date(snapshotDate);
+  snapshotEnd.setHours(23, 59, 59, 999);
+
+  // All active materials for this business
+  const materials = await req.db.material.findMany({
+    where: { businessId, isActive: true },
+    select: { id: true, name: true, baseUnit: true, quantity: true },
+    orderBy: { name: 'asc' },
+  });
+
+  // Aggregate all reorders up to snapshot date
+  const reorders = await req.db.materialReorder.groupBy({
+    by: ['materialId'],
+    where: {
+      businessId,
+      reorderDate: { lte: snapshotEnd },
+    },
+    _sum: { quantityOrdered: true },
+  });
+  const reorderMap = {};
+  for (const r of reorders) {
+    reorderMap[r.materialId] = parseFloat(r._sum.quantityOrdered || 0);
+  }
+
+  // Aggregate all sales outflows up to snapshot date (base units)
+  const sales = await req.db.saleItem.groupBy({
+    by: ['materialId'],
+    where: {
+      businessId,
+      materialId: { not: null },
+      sale: { createdAt: { lte: snapshotEnd } },
+    },
+    _sum: { quantity: true },
+  });
+  const salesMap = {};
+  for (const s of sales) {
+    if (s.materialId) salesMap[s.materialId] = parseFloat(s._sum.quantity || 0);
+  }
+
+  // Aggregate job material usage up to snapshot date (internal stock only)
+  const jobUsage = await req.db.jobMaterial.groupBy({
+    by: ['materialId'],
+    where: {
+      businessId,
+      materialId: { not: null },
+      isExternal: false,
+      job: { createdAt: { lte: snapshotEnd } },
+    },
+    _sum: { quantity: true },
+  });
+  const jobMap = {};
+  for (const j of jobUsage) {
+    if (j.materialId) jobMap[j.materialId] = parseFloat(j._sum.quantity || 0);
+  }
+
+  const snapshot = materials.map((m) => {
+    const totalIn = reorderMap[m.id] || 0;
+    const soldOut = salesMap[m.id] || 0;
+    const jobUsed = jobMap[m.id] || 0;
+    const stockAtDate = Math.max(0, totalIn - soldOut - jobUsed);
+    const current = parseFloat(m.quantity);
+    return {
+      id: m.id,
+      name: m.name,
+      baseUnit: m.baseUnit,
+      stockAtDate: parseFloat(stockAtDate.toFixed(2)),
+      currentStock: parseFloat(current.toFixed(2)),
+      change: parseFloat((current - stockAtDate).toFixed(2)),
+    };
+  });
+
+  res.status(200).json({
+    success: true,
+    snapshotDate: snapshotDate.toISOString().split('T')[0],
+    data: snapshot,
+  });
+});
 
 
 // @desc    Reorder material

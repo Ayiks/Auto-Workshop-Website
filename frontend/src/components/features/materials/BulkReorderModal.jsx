@@ -2,9 +2,11 @@ import { useState } from 'react';
 import Button from '@components/common/Button';
 
 export default function BulkReorderModal({ selectedMaterials, onReorder, onClose, isLoading }) {
-  
+
   // Safety check to prevent rendering with empty data
   if (!selectedMaterials || selectedMaterials.length === 0) return null;
+
+  const [notes, setNotes] = useState('');
 
   // Initialize state
   const [orderItems, setOrderItems] = useState(
@@ -80,7 +82,7 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
         quantityOrdered: parseFloat(item.quantityOrdered),
         unitCost: parseFloat(item.unitCost),
         unitId: item.unitId === 'base' ? null : Number(item.unitId),
-        notes: "Bulk Restock"
+        notes: notes.trim() || "Bulk Restock"
       }));
 
     if (validItems.length === 0) {
@@ -162,8 +164,8 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
                     />
                   </td>
 
-                  <td className="px-2 sm:px-3 py-1.5 sm:py-2 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right">
-                    {rowTotal.toFixed(2)}
+                  <td className="px-2 sm:px-3 py-1.5 sm:py-2 whitespace-nowrap text-xs sm:text-sm text-gray-900 text-right font-medium">
+                    GH₵{rowTotal.toFixed(2)}
                   </td>
                   
                   <td className="px-2 sm:px-3 py-1.5 sm:py-2 text-right">
@@ -180,15 +182,48 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
         </table>
       </div>
 
-      <div className="border-t border-gray-200 pt-3 sm:pt-4 mt-3 sm:mt-4 bg-gray-50 -mx-1 px-3 sm:px-4 py-3 sm:py-4 rounded-b-lg">
-        <div className="flex justify-between items-center mb-3 sm:mb-4">
+      <div className="border-t border-gray-200 pt-3 sm:pt-4 mt-3 sm:mt-4 bg-gray-50 -mx-1 px-3 sm:px-4 py-3 sm:py-4 rounded-b-lg space-y-3">
+        {/* Notes / Invoice Reference */}
+        <div>
+          <label className="block text-[10px] sm:text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">
+            Supplier / Invoice Reference <span className="font-normal normal-case text-gray-400">(optional)</span>
+          </label>
+          <input
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder="e.g. INV-2026-03, Supplier name…"
+            className="w-full px-2 sm:px-3 py-1.5 border border-gray-300 rounded text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
+          />
+        </div>
+
+        {/* Per-item breakdown */}
+        {orderItems.some(item => parseFloat(item.quantityOrdered) > 0) && (
+          <div className="text-xs text-gray-500 divide-y divide-gray-200 border border-gray-200 rounded bg-white">
+            {orderItems
+              .filter(item => parseFloat(item.quantityOrdered) > 0)
+              .map(item => {
+                const qty = parseFloat(item.quantityOrdered) || 0;
+                const cost = parseFloat(item.unitCost) || 0;
+                const unit = item.options.find(o => String(o.id) === String(item.unitId));
+                return (
+                  <div key={item.id} className="flex justify-between items-center px-3 py-1.5">
+                    <span className="text-gray-600">{item.name} <span className="text-gray-400">× {qty} {unit?.name || item.baseUnit}</span></span>
+                    <span className="font-medium text-gray-800">GH₵{(qty * cost).toFixed(2)}</span>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+
+        <div className="flex justify-between items-center">
           <span className="text-xs sm:text-sm font-medium text-gray-700">Items: {orderItems.length}</span>
           <div className="text-right">
             <span className="text-xs sm:text-sm text-gray-600 mr-2">Est. Total Cost:</span>
             <span className="text-lg sm:text-xl font-bold text-gray-900">GH₵{calculateTotal().toFixed(2)}</span>
           </div>
         </div>
-        
+
         <div className="flex justify-end gap-2 sm:gap-3">
           <Button type="button" variant="secondary" onClick={onClose} disabled={isLoading}>Cancel</Button>
           <Button type="submit" variant="primary" loading={isLoading} className="px-5 sm:px-8">Confirm Bulk Reorder</Button>

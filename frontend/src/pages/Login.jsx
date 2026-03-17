@@ -147,7 +147,7 @@ export default function Login() {
         {/* Brand & Version Footer */}
         <div className="mt-8 border-t border-slate-100 pt-6 text-center">
           <p className="text-xs text-slate-400">
-            v1.1.0 — © 2026 Ayiks Inc.
+            v1.4.3 — © 2026 Ayiks Inc.
           </p>
         </div>
       </div>

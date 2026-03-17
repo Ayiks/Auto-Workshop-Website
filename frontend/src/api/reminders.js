@@ -11,6 +11,11 @@ export const remindersApi = {
     return response.data;
   },
 
+  updateReminder: async (id, data) => {
+    const response = await api.put(`/reminders/${id}`, data);
+    return response.data;
+  },
+
   updateReminderStatus: async (id, status) => {
     const response = await api.put(`/reminders/${id}/status`, { status });
     return response.data;

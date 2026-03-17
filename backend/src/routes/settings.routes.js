@@ -6,8 +6,9 @@ import {
   getBoothPrice,
   getGlobalUnits,
   addGlobalUnit,
-  updateGlobalUnit, // Added this new controller
-  deleteGlobalUnit
+  updateGlobalUnit,
+  deleteGlobalUnit,
+  registerWhatsApp,
 } from '../controllers/settings.controller.js';
 import { protect, requirePermission } from '../middleware/auth.js';
 
@@ -42,6 +43,14 @@ router.put(
   updateLogo
 );
 
+
+// --- Messaging (WhatsApp Registration) ---
+router.post(
+  '/messaging/register-whatsapp',
+  protect,
+  requirePermission('settings', 'update'),
+  registerWhatsApp
+);
 
 // --- Unit of Measure (UoM) ---
 // Resource: 'units'

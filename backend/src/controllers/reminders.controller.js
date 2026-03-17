@@ -56,13 +56,14 @@ export const createReminder = asyncHandler(async (req, res) => {
   if (channel === 'email' && customer.email && new Date(scheduledFor) <= new Date()) {
     const settings = await req.db.businessSettings.findFirst({
       where: { businessId: req.user.businessId },
-      select: { name: true },
+      select: { name: true, email: true },
     });
     sendReminderEmail(customer.email, {
       customerName: `${customer.firstName} ${customer.lastName || ''}`.trim(),
       message,
       type,
       businessName: settings?.name || 'Gray Manager',
+      businessEmail: settings?.email || null,
     }).catch(() => {});
 
     await req.db.reminder.update({
@@ -96,6 +97,37 @@ export const updateReminderStatus = asyncHandler(async (req, res) => {
       status,
       sentAt: status === 'sent' ? new Date() : existing.sentAt,
     },
+  });
+
+  res.status(200).json({ success: true, data: reminder });
+});
+
+// @desc    Update a reminder (type, channel, scheduledFor, message)
+// @route   PUT /api/reminders/:id
+// @access  Private (admin/manager)
+export const updateReminder = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { type, channel, scheduledFor, message } = req.body;
+
+  const existing = await req.db.reminder.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
+  });
+  if (!existing) throw new AppError('Reminder not found', 404, 'NOT_FOUND');
+
+  const updateData = {};
+  if (type !== undefined) updateData.type = type;
+  if (channel !== undefined) updateData.channel = channel;
+  if (message !== undefined) updateData.message = message || null;
+  if (scheduledFor !== undefined) {
+    const date = new Date(scheduledFor);
+    updateData.scheduledFor = date;
+    // Reset to pending if rescheduled to a future date
+    if (date > new Date()) updateData.status = 'pending';
+  }
+
+  const reminder = await req.db.reminder.update({
+    where: { id: parseInt(id) },
+    data: updateData,
   });
 
   res.status(200).json({ success: true, data: reminder });

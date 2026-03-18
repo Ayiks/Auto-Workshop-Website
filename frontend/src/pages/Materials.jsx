@@ -14,8 +14,8 @@ import Modal from "@components/common/Modal";
 import LoadingSpinner from "@components/common/LoadingSpinner";
 import EmptyState from "@components/common/EmptyState";
 import MaterialForm from "@components/features/materials/MaterialForm";
-import ReorderModal from "@components/features/materials/ReorderModal";
-import BulkReorderModal from "@components/features/materials/BulkReorderModal";
+import RestockWizard from "@components/features/materials/RestockWizard";
+import RestockOrdersList from "@components/features/materials/RestockOrdersList";
 import { Image as ImageIcon } from "lucide-react";
 
 export default function Materials() {
@@ -32,8 +32,10 @@ export default function Materials() {
   // Modals
   const [showAddModal, setShowAddModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
-  const [showReorderModal, setShowReorderModal] = useState(false);
-  const [showBulkReorderModal, setShowBulkReorderModal] = useState(false);
+  const [showRestockWizard, setShowRestockWizard] = useState(false);
+
+  // Tab
+  const [activeTab, setActiveTab] = useState('inventory');
 
   // Selection
   const [selectedMaterial, setSelectedMaterial] = useState(null);
@@ -200,27 +202,6 @@ export default function Materials() {
     onError: (err) => alert(err.message || "Failed to delete material"),
   });
 
-  const reorderMutation = useMutation({
-    mutationFn: ({ id, data }) => materialsApi.reorderMaterial(id, data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(["materials"]);
-      setShowReorderModal(false);
-      setSelectedMaterial(null);
-    },
-    onError: (err) => alert(err.message || "Failed to reorder material"),
-  });
-
-  const bulkReorderMutation = useMutation({
-    mutationFn: (data) => materialsApi.bulkReorderMaterials(data),
-    onSuccess: () => {
-      queryClient.invalidateQueries(["materials"]);
-      setShowBulkReorderModal(false);
-      setSelectedIds([]);
-      alert("Bulk reorder processed successfully!");
-    },
-    onError: (err) => alert(err.message || "Failed to process bulk reorder"),
-  });
-
   const toggleStatusMutation = useMutation({
     mutationFn: ({ id, isActive }) =>
       materialsApi.updateMaterial(id, { isActive }),
@@ -281,22 +262,9 @@ useEffect(() => {
     }
   };
 
-  const handleReorder = (formData) => {
-    reorderMutation.mutate({ id: selectedMaterial.id, data: formData });
-  };
-
-  const handleBulkReorderSubmit = (items) => {
-    bulkReorderMutation.mutate({ items });
-  };
-
   const openEditModal = (material) => {
     setSelectedMaterial(material);
     setShowEditModal(true);
-  };
-
-  const openReorderModal = (material) => {
-    setSelectedMaterial(material);
-    setShowReorderModal(true);
   };
 
   // --- Table Configuration ---
@@ -464,28 +432,6 @@ useEffect(() => {
 
           {row.isActive && (
             <>
-              {hasPermission("materials", "reorder") && (
-                <button
-                  onClick={() => openReorderModal(row)}
-                  className="text-gray-500 hover:text-gray-900 hover:bg-gray-100 p-1.5 rounded transition-colors"
-                  title="Restock"
-                >
-                  <svg
-                    className="w-4 h-4"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={1.5}
-                      d="M12 4v16m8-8H4"
-                    />
-                  </svg>
-                </button>
-              )}
-
               {hasPermission("materials", "edit") && (
                 <button
                   onClick={() => openEditModal(row)}
@@ -565,32 +511,20 @@ useEffect(() => {
             </div>
 
             <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-              {/* Conditional Bulk Reorder Button */}
-              {selectedIds.length > 0 &&
-                hasPermission("materials", "reorder") && (
-                  <Button
-                    variant="secondary"
-                    onClick={() => setShowBulkReorderModal(true)}
-                    className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all text-xs sm:text-sm"
-                    icon={
-                      <svg
-                        className="w-4 h-4"
-                        fill="none"
-                        stroke="currentColor"
-                        viewBox="0 0 24 24"
-                      >
-                        <path
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z"
-                        />
-                      </svg>
-                    }
-                  >
-                    Restock Selected
-                  </Button>
-                )}
+              {hasPermission("materials", "reorder") && (
+                <Button
+                  variant="secondary"
+                  onClick={() => setShowRestockWizard(true)}
+                  className="bg-white border-gray-200 text-gray-700 hover:bg-gray-50 hover:border-gray-300 shadow-sm transition-all text-xs sm:text-sm"
+                  icon={
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                  }
+                >
+                  Restock
+                </Button>
+              )}
 
               {hasPermission("materials", "create") && (
                 <Button
@@ -624,10 +558,7 @@ useEffect(() => {
       {/* Main Content */}
       <div
         className={`px-4 sm:px-6 md:px-8 py-6 sm:py-8 max-w-7xl mx-auto transition-all duration-300 ${
-          showAddModal ||
-          showEditModal ||
-          showReorderModal ||
-          showBulkReorderModal
+          showAddModal || showEditModal || showRestockWizard
             ? "blur-sm opacity-50 pointer-events-none"
             : ""
         }`}
@@ -753,8 +684,28 @@ useEffect(() => {
           </Card>
         </div>
 
+        {/* Tab Switcher */}
+        <div className="flex gap-1 border-b border-gray-200 mb-4">
+          {[{ key: 'inventory', label: 'Inventory' }, { key: 'restock-orders', label: 'Restock Orders' }].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+                activeTab === tab.key ? 'border-gray-900 text-gray-900' : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+            >{tab.label}</button>
+          ))}
+        </div>
+
+        {/* Restock Orders Tab */}
+        {activeTab === 'restock-orders' && (
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+            <RestockOrdersList />
+          </div>
+        )}
+
         {/* Filters & Table Container */}
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        {activeTab === 'inventory' && <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-gray-100">
             {/* Filter Bar */}
             <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
@@ -845,7 +796,7 @@ useEffect(() => {
               </div>
             </>
           )}
-        </div>
+        </div>}
       </div>
 
       {/* --- Modals --- */}
@@ -888,41 +839,15 @@ useEffect(() => {
       </Modal>
 
       <Modal
-        isOpen={showReorderModal}
-        onClose={() => {
-          setShowReorderModal(false);
-          setSelectedMaterial(null);
-        }}
-        title={`Restock: ${selectedMaterial?.name}`}
-        size="sm"
-      >
-        <div className="p-1">
-          <ReorderModal
-            material={selectedMaterial}
-            onReorder={handleReorder}
-            onClose={() => {
-              setShowReorderModal(false);
-              setSelectedMaterial(null);
-            }}
-            isLoading={reorderMutation.isPending}
-          />
-        </div>
-      </Modal>
-
-      <Modal
-        isOpen={showBulkReorderModal}
-        onClose={() => setShowBulkReorderModal(false)}
-        title="Bulk Restock"
+        isOpen={showRestockWizard}
+        onClose={() => setShowRestockWizard(false)}
+        title="Restock Order"
         size="xl"
       >
         <div className="p-1">
-          <BulkReorderModal
-            selectedMaterials={materials.filter((m) =>
-              selectedIds.includes(m.id),
-            )}
-            onReorder={handleBulkReorderSubmit}
-            onClose={() => setShowBulkReorderModal(false)}
-            isLoading={bulkReorderMutation.isPending}
+          <RestockWizard
+            onClose={() => setShowRestockWizard(false)}
+            onSuccess={() => setActiveTab('restock-orders')}
           />
         </div>
       </Modal>

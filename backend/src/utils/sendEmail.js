@@ -78,9 +78,10 @@ export const sendVerificationEmail = async (email, fullName, verificationToken) 
 };
 
 // ─── Job Created Email ────────────────────────────────────────────────────────
-export const sendJobCreatedEmail = async (job, businessName) => {
+export const sendJobCreatedEmail = async (job, businessName, businessEmail) => {
   if (!job.clientEmail) return; // silent — no email provided
   const transporter = createTransporter();
+  const fromAddress = businessEmail || process.env.EMAIL_USER;
 
   const materialsRows = (job.materials || []).map(
     (m) => `<tr>
@@ -96,7 +97,8 @@ export const sendJobCreatedEmail = async (job, businessName) => {
 
   try {
     await transporter.sendMail({
-      from: `"${businessName || 'Gray Manager'}" <${process.env.EMAIL_USER}>`,
+      from: `"${businessName || 'Gray Manager'}" <${fromAddress}>`,
+      replyTo: fromAddress,
       to: job.clientEmail,
       subject: `Job Received — ${job.jobType?.charAt(0).toUpperCase()}${job.jobType?.slice(1)} Service`,
       html: `
@@ -151,9 +153,10 @@ export const sendJobCreatedEmail = async (job, businessName) => {
 };
 
 // ─── Job Completed Email ──────────────────────────────────────────────────────
-export const sendJobCompletedEmail = async (job, businessName) => {
+export const sendJobCompletedEmail = async (job, businessName, businessEmail) => {
   if (!job.clientEmail) return;
   const transporter = createTransporter();
+  const fromAddress = businessEmail || process.env.EMAIL_USER;
 
   const miscRow = parseFloat(job.miscellaneousCost || 0) > 0
     ? `<tr><td style="padding:6px 0;color:#666;">Miscellaneous</td><td style="padding:6px 0;text-align:right;">${fmt(job.miscellaneousCost)}</td></tr>`
@@ -161,7 +164,8 @@ export const sendJobCompletedEmail = async (job, businessName) => {
 
   try {
     await transporter.sendMail({
-      from: `"${businessName || 'Gray Manager'}" <${process.env.EMAIL_USER}>`,
+      from: `"${businessName || 'Gray Manager'}" <${fromAddress}>`,
+      replyTo: fromAddress,
       to: job.clientEmail,
       subject: `Your Vehicle is Ready — ${job.problemType}`,
       html: `
@@ -208,9 +212,10 @@ export const sendJobCompletedEmail = async (job, businessName) => {
 };
 
 // ─── Reminder Email ───────────────────────────────────────────────────────────
-export const sendReminderEmail = async (to, { customerName, message, type, businessName }) => {
+export const sendReminderEmail = async (to, { customerName, message, type, businessName, businessEmail }) => {
   if (!to) return;
   const transporter = createTransporter();
+  const fromAddress = businessEmail || process.env.EMAIL_USER;
 
   const subjectMap = {
     post_job: `How was your recent service at ${businessName}?`,
@@ -222,7 +227,8 @@ export const sendReminderEmail = async (to, { customerName, message, type, busin
 
   try {
     await transporter.sendMail({
-      from: `"${businessName || 'Gray Manager'}" <${process.env.EMAIL_USER}>`,
+      from: `"${businessName || 'Gray Manager'}" <${fromAddress}>`,
+      replyTo: fromAddress,
       to,
       subject,
       html: `

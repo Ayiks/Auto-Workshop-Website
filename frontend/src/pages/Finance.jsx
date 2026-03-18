@@ -1,6 +1,7 @@
 // src/pages/Finance.jsx
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { materialsApi } from "@api/materials";
 import { reportsApi } from "@api/reports";
 import { useResponsive } from "@hooks/useResponsive";
 import { RESPONSIVE_SPACING } from "@utils/responsiveHelpers";
@@ -222,11 +223,12 @@ export default function Finance() {
           <div className="flex space-x-1 bg-white rounded-lg p-1 border border-gray-200 w-fit overflow-x-auto">
             {[
               { id: "overview", label: "Overview" },
-              // { id: "sales", label: "Sales" },
+              { id: "sales", label: "Sales" },
               { id: "jobs", label: "Jobs" },
               { id: "expenses", label: "Expenses" },
               { id: "pl", label: "P&L" },
               { id: "materials", label: "Materials" },
+              { id: "inventory", label: "Inventory" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -271,6 +273,7 @@ export default function Finance() {
               dateRange={dateRange}
             />
           )}
+          {activeTab === "inventory" && <InventorySnapshotTab />}
         </div>
       </div>
     </div>
@@ -509,96 +512,87 @@ function OverviewTab({ pl, revenue, expenses, dateRange, sales, jobs }) {
   );
 }
 
-function ExpensesTab({ expenses }) {
+function ExpensesTab({ expenses, dateRange }) {
   const data = expenses?.breakdown?.byCategory || [];
-  const totalExpenses = expenses?.summary?.totalExpenses || 0;
+  const totalExpenses = expenses?.totalExpenses || 0;
+  const monthlyTrend = (expenses?.monthlyTrend || []).map((m) => ({
+    month: m.month ? format(new Date(m.month), "MMM yy") : "—",
+    total: Number(m.total || 0),
+  }));
+  const recentExpenses = expenses?.recentExpenses || [];
+
+  const handleExport = () => exportExpensesReport(expenses, dateRange);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header */}
+      <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm flex justify-between items-center">
+        <div>
+          <h2 className="text-lg font-bold text-gray-900">Expenses Report</h2>
+          <p className="text-sm text-gray-500">Operational costs and material purchases</p>
+        </div>
+        <button onClick={handleExport} className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-black transition-colors">
+          Export Expenses
+        </button>
+      </div>
+
       {/* Top Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <div className="text-sm font-medium text-gray-600 mb-2">
-            Total Outflow
-          </div>
-          <div className="text-2xl font-bold text-gray-900">
-            GH₵{Number(totalExpenses).toLocaleString()}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">
-            Includes OpEx & Materials
-          </div>
+        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+          <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Total Outflow</div>
+          <div className="text-2xl font-bold text-gray-900">GH₵{Number(totalExpenses).toLocaleString()}</div>
+          <div className="text-xs text-gray-400 mt-1">OpEx + Material Purchases</div>
         </div>
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <div className="text-sm font-medium text-gray-600 mb-2">
-            Operational
-          </div>
-          <div className="text-2xl font-bold text-gray-900">
-            GH₵{Number(expenses.operationalTotal || 0).toLocaleString()}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">Running costs</div>
+        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+          <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Operational</div>
+          <div className="text-2xl font-bold text-gray-900">GH₵{Number(expenses.operationalTotal || 0).toLocaleString()}</div>
+          <div className="text-xs text-gray-400 mt-1">{expenses.operationalCount || 0} transactions</div>
         </div>
-        <div className="bg-white rounded-xl p-5 border border-gray-200">
-          <div className="text-sm font-medium text-gray-600 mb-2">
-            Material Restock
-          </div>
-          <div className="text-2xl font-bold text-blue-600">
-            GH₵{Number(expenses.cogTotal || 0).toLocaleString()}
-          </div>
-          <div className="text-xs text-gray-500 mt-1">Stock purchases</div>
+        <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
+          <div className="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Material Restock</div>
+          <div className="text-2xl font-bold text-blue-600">GH₵{Number(expenses.cogTotal || 0).toLocaleString()}</div>
+          <div className="text-xs text-gray-400 mt-1">{expenses.materialReorderCount || 0} purchases</div>
         </div>
       </div>
 
+      {/* Monthly Trend */}
+      {monthlyTrend.length > 0 && (
+        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+          <h3 className="font-semibold text-gray-900 mb-1">Monthly Expense Trend</h3>
+          <p className="text-sm text-gray-500 mb-4">Total spending per month over the selected period</p>
+          <div className="h-64">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={monthlyTrend} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="month" axisLine={false} tickLine={false} fontSize={12} stroke="#94A3B8" />
+                <YAxis axisLine={false} tickLine={false} fontSize={11} stroke="#94A3B8"
+                  tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+                <Tooltip
+                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)" }}
+                  formatter={(val) => [`GH₵${Number(val).toLocaleString()}`, "Expenses"]}
+                />
+                <Bar dataKey="total" fill="#EF4444" radius={[3, 3, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      )}
+
+      {/* Breakdown Chart + Category Detail */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Breakdown Chart */}
         <div className="lg:col-span-2 bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-6">
-            Expense Breakdown
-          </h3>
+          <h3 className="text-lg font-bold text-gray-900 mb-6">Expense Breakdown by Category</h3>
           <div className="h-80">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                data={data}
-                layout="vertical"
-                margin={{ top: 5, right: 30, left: 20, bottom: 5 }}
-              >
-                <CartesianGrid
-                  strokeDasharray="3 3"
-                  horizontal={false}
-                  stroke="#E2E8F0"
-                />
-                <XAxis
-                  type="number"
-                  stroke="#94A3B8"
-                  fontSize={12}
-                  tickFormatter={(val) => `GH₵${val / 1000}k`}
-                />
-                <YAxis
-                  dataKey="category"
-                  type="category"
-                  width={120}
-                  stroke="#475569"
-                  fontSize={12}
-                  style={{ textTransform: "capitalize" }}
-                />
-                <Tooltip
-                  cursor={{ fill: "#F1F5F9" }}
-                  formatter={(val) => `GH₵${Number(val).toLocaleString()}`}
-                  contentStyle={{
-                    borderRadius: "8px",
-                    border: "none",
-                    boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
-                  }}
-                />
+              <BarChart data={data} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#E2E8F0" />
+                <XAxis type="number" stroke="#94A3B8" fontSize={12} tickFormatter={(val) => `GH₵${val / 1000}k`} />
+                <YAxis dataKey="category" type="category" width={120} stroke="#475569" fontSize={12} style={{ textTransform: "capitalize" }} />
+                <Tooltip cursor={{ fill: "#F1F5F9" }} formatter={(val) => `GH₵${Number(val).toLocaleString()}`}
+                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }} />
                 <Bar dataKey="amount" radius={[0, 4, 4, 0]}>
                   {data.map((entry, index) => (
-                    <Cell
-                      key={`cell-${index}`}
-                      fill={
-                        entry.category === "Material Purchases"
-                          ? "#3B82F6"
-                          : COLORS[index % COLORS.length]
-                      }
-                    />
+                    <Cell key={`cell-${index}`} fill={entry.category === "Material Purchases" ? "#3B82F6" : COLORS[index % COLORS.length]} />
                   ))}
                 </Bar>
               </BarChart>
@@ -606,52 +600,76 @@ function ExpensesTab({ expenses }) {
           </div>
         </div>
 
-        {/* Detailed List */}
         <div className="bg-white rounded-xl border border-gray-200 p-0 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-gray-100 bg-gray-50">
             <h3 className="font-semibold text-gray-900">Spending Details</h3>
           </div>
           <div className="max-h-96 overflow-y-auto">
             {data.map((item, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors"
-              >
+              <div key={idx} className="flex items-center justify-between p-4 border-b border-gray-50 last:border-0 hover:bg-gray-50 transition-colors">
                 <div className="flex items-center gap-3">
-                  <div
-                    className="w-2 h-2 rounded-full"
-                    style={{
-                      backgroundColor:
-                        item.category === "Material Purchases"
-                          ? "#3B82F6"
-                          : COLORS[idx % COLORS.length],
-                    }}
-                  />
+                  <div className="w-2 h-2 rounded-full flex-shrink-0"
+                    style={{ backgroundColor: item.category === "Material Purchases" ? "#3B82F6" : COLORS[idx % COLORS.length] }} />
                   <div>
-                    <p className="text-sm font-medium text-gray-900 capitalize">
-                      {item.category}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {item.count} transactions
-                    </p>
+                    <p className="text-sm font-medium text-gray-900 capitalize">{item.category}</p>
+                    <p className="text-xs text-gray-500">{item.count} transactions</p>
                   </div>
                 </div>
                 <div className="text-right">
-                  <p className="text-sm font-bold text-gray-900">
-                    GH₵{Number(item.amount).toLocaleString()}
-                  </p>
+                  <p className="text-sm font-bold text-gray-900">GH₵{Number(item.amount).toLocaleString()}</p>
                   <p className="text-xs text-gray-500">{item.percentage}%</p>
                 </div>
               </div>
             ))}
             {data.length === 0 && (
-              <div className="p-8 text-center text-gray-500 text-sm">
-                No expense data found.
-              </div>
+              <div className="p-8 text-center text-gray-500 text-sm">No expense data found.</div>
             )}
           </div>
         </div>
       </div>
+
+      {/* Recent Expenses */}
+      {recentExpenses.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Recent Expenses</h3>
+            <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded-full">Last {recentExpenses.length}</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Category</th>
+                  <th className="px-6 py-3">Description</th>
+                  <th className="px-6 py-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {recentExpenses.map((exp, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-6 py-3 text-gray-500 whitespace-nowrap">
+                      {exp.expenseDate ? format(new Date(exp.expenseDate), "dd MMM yyyy") : "—"}
+                    </td>
+                    <td className="px-6 py-3">
+                      <span className="text-xs font-semibold px-2 py-1 rounded-full capitalize"
+                        style={{ backgroundColor: exp.category === "materials" ? "#EFF6FF" : "#F1F5F9", color: exp.category === "materials" ? "#3B82F6" : "#475569" }}>
+                        {exp.category || "—"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-3 text-gray-700 max-w-xs truncate">
+                      {exp.materialReorder?.materialName
+                        ? `${exp.materialReorder.materialName} (×${exp.materialReorder.quantityOrdered})`
+                        : exp.description || "—"}
+                    </td>
+                    <td className="px-6 py-3 text-right font-semibold text-gray-900">GH₵{Number(exp.amount || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -660,178 +678,436 @@ function SalesTab({ sales, dateRange }) {
   const paymentMethodData = Array.isArray(sales.salesByMethod)
     ? sales.salesByMethod.map((method) => ({
         name: (method?.method || method?.paymentMethod || "Unknown").toUpperCase(),
-        revenue: Number(method?._sum.totalAmount || 0),
+        revenue: Number(method?._sum?.totalAmount || 0),
         count: method?._count || 0,
       }))
     : [];
+
+  const dailyTrendData = (sales.dailyTrend || []).map((d) => ({
+    date: d.date ? d.date.slice(5) : "",
+    revenue: Number(d.total || 0),
+    sales: Number(d.count || 0),
+  }));
+
+  const materialItems = sales.breakdown?.materials?.items || [];
+  const boothItems = sales.breakdown?.booth?.items || [];
+  const recentSales = sales.recentSales || [];
+
   const handleExport = () => exportSalesReport(sales, dateRange);
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header */}
       <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm flex justify-between items-center">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Sales Report</h2>
-          <p className="text-sm text-gray-500">
-            Revenue from counter & services
-          </p>
+          <p className="text-sm text-gray-500">Counter sales & booth services breakdown</p>
         </div>
-        <button
-          onClick={handleExport}
-          className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-black transition-colors"
-        >
+        <button onClick={handleExport} className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-black transition-colors">
           Export Sales
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <StatCard
-          title="Total Sales"
-          value={sales.totalSales}
-          subtitle="Transactions"
-        />
-        <StatCard
-          title="Total Revenue"
-          value={`GH₵${Number(sales.totalRevenue).toLocaleString()}`}
-          subtitle="Gross Income"
-        />
-        <StatCard
-          title="Avg. Sale"
-          value={`GH₵${Number(sales.averageSale).toFixed(2)}`}
-          subtitle="Per Transaction"
-        />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+        <StatCard title="Transactions" value={sales.totalSales} subtitle="Total sales" />
+        <StatCard title="Total Revenue" value={`GH₵${Number(sales.totalRevenue).toLocaleString()}`} subtitle="Gross income" />
+        <StatCard title="Material Sales" value={`GH₵${Number(sales.materialSales).toLocaleString()}`} subtitle="Counter stock" />
+        <StatCard title="Booth Sales" value={`GH₵${Number(sales.boothSales).toLocaleString()}`} subtitle="Services" />
+        <StatCard title="Avg. Sale" value={`GH₵${Number(sales.averageSale).toFixed(2)}`} subtitle="Per transaction" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Daily Trend */}
+      {dailyTrendData.length > 0 && (
         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-          <h3 className="font-semibold text-gray-900 mb-4">Payment Methods</h3>
+          <h3 className="font-semibold text-gray-900 mb-1">Daily Sales Trend</h3>
+          <p className="text-sm text-gray-500 mb-4">Revenue per day over the selected period</p>
           <div className="h-64">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={paymentMethodData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis
-                  dataKey="name"
-                  axisLine={false}
-                  tickLine={false}
-                  fontSize={12}
-                />
+              <BarChart data={dailyTrendData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                <XAxis dataKey="date" axisLine={false} tickLine={false} fontSize={11} stroke="#94A3B8" />
+                <YAxis axisLine={false} tickLine={false} fontSize={11} stroke="#94A3B8"
+                  tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
                 <Tooltip
-                  formatter={(val) => `GH₵${Number(val).toLocaleString()}`}
-                  cursor={{ fill: "#f9fafb" }}
+                  contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)" }}
+                  formatter={(val) => [`GH₵${Number(val).toLocaleString()}`, "Revenue"]}
                 />
-                <Bar
-                  dataKey="revenue"
-                  fill="#6366F1"
-                  radius={[4, 4, 0, 0]}
-                  barSize={40}
-                />
+                <Bar dataKey="revenue" fill="#6366F1" radius={[3, 3, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </div>
         </div>
+      )}
+
+      {/* Payment Methods + Revenue Split */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+          <h3 className="font-semibold text-gray-900 mb-4">Payment Methods</h3>
+          {paymentMethodData.length > 0 ? (
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={paymentMethodData}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} fontSize={12} />
+                  <Tooltip formatter={(val) => `GH₵${Number(val).toLocaleString()}`} cursor={{ fill: "#f9fafb" }} />
+                  <Bar dataKey="revenue" fill="#6366F1" radius={[4, 4, 0, 0]} barSize={40} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="h-64 flex items-center justify-center text-gray-400 text-sm">No payment data</div>
+          )}
+        </div>
+
         <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
           <h3 className="font-semibold text-gray-900 mb-4">Revenue Split</h3>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm font-medium text-gray-700">
-                Counter Materials
-              </span>
-              <span className="font-bold text-gray-900">
-                GH₵{Number(sales.materialSales).toLocaleString()}
-              </span>
+          <div className="space-y-3">
+            <div className="flex justify-between items-center p-4 bg-indigo-50 rounded-lg">
+              <div>
+                <span className="text-sm font-semibold text-gray-800">Counter Materials</span>
+                <div className="text-xs text-gray-500">{sales.breakdown?.materials?.count || 0} line items</div>
+              </div>
+              <span className="font-bold text-gray-900">GH₵{Number(sales.materialSales).toLocaleString()}</span>
             </div>
-            <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-              <span className="text-sm font-medium text-gray-700">
-                Booth Services
-              </span>
-              <span className="font-bold text-gray-900">
-                GH₵{Number(sales.boothSales).toLocaleString()}
-              </span>
+            <div className="flex justify-between items-center p-4 bg-emerald-50 rounded-lg">
+              <div>
+                <span className="text-sm font-semibold text-gray-800">Booth Services</span>
+                <div className="text-xs text-gray-500">{sales.breakdown?.booth?.count || 0} transactions</div>
+              </div>
+              <span className="font-bold text-gray-900">GH₵{Number(sales.boothSales).toLocaleString()}</span>
+            </div>
+            <div className="flex justify-between items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
+              <span className="font-bold text-gray-700">Total</span>
+              <span className="font-bold text-lg text-gray-900">GH₵{Number(sales.totalRevenue).toLocaleString()}</span>
             </div>
           </div>
         </div>
       </div>
+
+      {/* Material Sales Detail */}
+      {materialItems.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Material Sales Detail</h3>
+            <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded-full">{materialItems.length} items</span>
+          </div>
+          <div className="overflow-x-auto max-h-72 overflow-y-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200 sticky top-0">
+                <tr>
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Material</th>
+                  <th className="px-6 py-3 text-right">Qty</th>
+                  <th className="px-6 py-3 text-right">Unit Price</th>
+                  <th className="px-6 py-3 text-right">Subtotal</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {materialItems.map((item, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-6 py-3 text-gray-500 whitespace-nowrap">
+                      {item.saleDate ? format(new Date(item.saleDate), "dd MMM") : "—"}
+                    </td>
+                    <td className="px-6 py-3 font-medium text-gray-900">{item.materialName || "—"}</td>
+                    <td className="px-6 py-3 text-right">{Number(item.quantity || 0).toFixed(2)}</td>
+                    <td className="px-6 py-3 text-right text-gray-500">GH₵{Number(item.unitPrice || 0).toLocaleString()}</td>
+                    <td className="px-6 py-3 text-right font-semibold text-gray-900">GH₵{Number(item.subtotal || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Booth Sales Detail */}
+      {boothItems.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Booth Sales Detail</h3>
+            <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded-full">{boothItems.length} transactions</span>
+          </div>
+          <div className="overflow-x-auto max-h-64 overflow-y-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200 sticky top-0">
+                <tr>
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Service</th>
+                  <th className="px-6 py-3">Category</th>
+                  <th className="px-6 py-3">Type</th>
+                  <th className="px-6 py-3 text-right">Amount</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {boothItems.map((item, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-6 py-3 text-gray-500 whitespace-nowrap">
+                      {item.saleDate ? format(new Date(item.saleDate), "dd MMM yyyy") : "—"}
+                    </td>
+                    <td className="px-6 py-3 font-medium text-gray-900">{item.serviceName || "—"}</td>
+                    <td className="px-6 py-3 text-gray-600 capitalize">{item.category || "—"}</td>
+                    <td className="px-6 py-3">
+                      {item.type ? (
+                        <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 capitalize">{item.type}</span>
+                      ) : "—"}
+                    </td>
+                    <td className="px-6 py-3 text-right font-semibold text-gray-900">GH₵{Number(item.subtotal || item.price || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Transactions */}
+      {recentSales.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 bg-gray-50">
+            <h3 className="font-semibold text-gray-900">Recent Transactions</h3>
+          </div>
+          <div className="divide-y divide-gray-50">
+            {recentSales.map((sale, i) => (
+              <div key={i} className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors">
+                <div>
+                  <div className="text-sm font-medium text-gray-900">
+                    {sale.user?.fullName || "Unknown"} · {sale.items?.length || 0} item{sale.items?.length !== 1 ? "s" : ""}
+                  </div>
+                  <div className="text-xs text-gray-500 mt-0.5">
+                    {sale.saleDate ? format(new Date(sale.saleDate), "dd MMM yyyy, h:mm a") : "—"}
+                    {sale.paymentMethod && ` · ${sale.paymentMethod.toUpperCase()}`}
+                  </div>
+                </div>
+                <div className="font-bold text-gray-900">GH₵{Number(sale.totalAmount || 0).toLocaleString()}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {sales.totalSales === 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
+          <p className="text-gray-400 text-sm">No sales recorded in this period.</p>
+        </div>
+      )}
     </div>
   );
 }
 
+const JOB_TYPE_COLORS = {
+  mechanic: "#6366F1",
+  sprayer: "#10B981",
+  bodyworks: "#F59E0B",
+  other: "#64748B",
+};
+
 function JobsTab({ jobs, dateRange }) {
   const handleExport = () => exportJobsReport(jobs, dateRange);
+
+  const revenueByTypeData = Object.entries(jobs.revenueByType || {})
+    .map(([type, data]) => ({
+      type: type.charAt(0).toUpperCase() + type.slice(1),
+      typeKey: type,
+      revenue: Number(data.revenue || 0),
+      jobs: data.jobs || 0,
+      labourCost: Number(data.labourCost || 0),
+      miscellaneousCost: Number(data.miscellaneousCost || 0),
+    }))
+    .filter((d) => d.jobs > 0);
+
+  const materialUsageData = (jobs.materialUsage || [])
+    .sort((a, b) => b.cost - a.cost)
+    .slice(0, 15);
+
+  const recentJobs = jobs.recentJobs || [];
+
+  const paymentStatusColors = {
+    paid: { bg: "bg-emerald-50", border: "border-emerald-100", text: "text-emerald-600", bold: "text-emerald-900", sub: "text-emerald-500" },
+    partial: { bg: "bg-amber-50", border: "border-amber-100", text: "text-amber-600", bold: "text-amber-900", sub: "text-amber-500" },
+    unpaid: { bg: "bg-red-50", border: "border-red-100", text: "text-red-600", bold: "text-red-900", sub: "text-red-500" },
+  };
+
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Header */}
       <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm flex justify-between items-center">
         <div>
           <h2 className="text-lg font-bold text-gray-900">Jobs Report</h2>
-          <p className="text-sm text-gray-500">
-            Service repairs and labor analysis
-          </p>
+          <p className="text-sm text-gray-500">Service repairs and labor analysis</p>
         </div>
-        <button
-          onClick={handleExport}
-          className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-black transition-colors"
-        >
+        <button onClick={handleExport} className="px-4 py-2 bg-gray-900 text-white text-sm font-medium rounded-lg hover:bg-black transition-colors">
           Export Jobs
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <StatCard
-          title="Total Jobs"
-          value={jobs.totalJobs}
-          subtitle="Completed"
-        />
-        <StatCard
-          title="Revenue"
-          value={`GH₵${Number(jobs.totalRevenue).toLocaleString()}`}
-          subtitle="Service earned (paid)"
-        />
-        <StatCard
-          title="Materials"
-          value={`GH₵${Number(jobs.totalMaterialsCost).toLocaleString()}`}
-          subtitle="Cost"
-        />
-        <StatCard
-          title="Labour"
-          value={`GH₵${Number(jobs.totalLabourCost).toLocaleString()}`}
-          subtitle="Value"
-        />
+      {/* KPI Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <StatCard title="Total Jobs" value={jobs.totalJobs} subtitle="Invoices" />
+        <StatCard title="Revenue" value={`GH₵${Number(jobs.totalRevenue).toLocaleString()}`} subtitle="Service earned (paid)" />
+        <StatCard title="Avg. Job Value" value={`GH₵${Number(jobs.averageJob || 0).toFixed(0)}`} subtitle="Per invoice" />
+        <StatCard title="Outstanding" value={`GH₵${Number(jobs.totalOutstanding).toLocaleString()}`} subtitle="Amount due" />
       </div>
 
-      <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
-        <h3 className="font-semibold text-gray-900 mb-4">Payment Status</h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="p-4 bg-red-50 border border-red-100 rounded-lg">
-            <div className="text-sm text-red-600 font-medium">Unpaid</div>
-            <div className="text-xl font-bold text-red-900 mt-1">
-              {jobs.unpaidJobs} Jobs
-            </div>
-            <div className="text-xs text-red-500 mt-1">
-              GH₵{Number(jobs.unpaidAmount).toLocaleString()} outstanding
+      {/* Revenue by Job Type */}
+      {revenueByTypeData.length > 0 && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+            <h3 className="font-semibold text-gray-900 mb-1">Revenue by Job Type</h3>
+            <p className="text-sm text-gray-500 mb-4">Labour & miscellaneous revenue per department</p>
+            <div className="h-64">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={revenueByTypeData} margin={{ top: 5, right: 20, left: 0, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#F1F5F9" />
+                  <XAxis dataKey="type" axisLine={false} tickLine={false} fontSize={12} stroke="#94A3B8" />
+                  <YAxis axisLine={false} tickLine={false} fontSize={11} stroke="#94A3B8"
+                    tickFormatter={(v) => v >= 1000 ? `${(v / 1000).toFixed(0)}k` : v} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.1)" }}
+                    formatter={(val) => [`GH₵${Number(val).toLocaleString()}`, "Revenue"]}
+                  />
+                  <Bar dataKey="revenue" radius={[4, 4, 0, 0]} barSize={50}>
+                    {revenueByTypeData.map((entry) => (
+                      <Cell key={entry.typeKey} fill={JOB_TYPE_COLORS[entry.typeKey] || "#64748B"} />
+                    ))}
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
             </div>
           </div>
-          <div className="p-4 bg-amber-50 border border-amber-100 rounded-lg">
-            <div className="text-sm text-amber-600 font-medium">
-              Partially Paid
+
+          <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+            <div className="p-4 border-b border-gray-100 bg-gray-50">
+              <h3 className="font-semibold text-gray-900">Department Breakdown</h3>
             </div>
-            <div className="text-xl font-bold text-amber-900 mt-1">
-              {jobs.partialJobs} Jobs
-            </div>
-            <div className="text-xs text-amber-500 mt-1">
-              GH₵{Number(jobs.partialAmount).toLocaleString()} due
-            </div>
-          </div>
-          <div className="p-4 bg-emerald-50 border border-emerald-100 rounded-lg">
-            <div className="text-sm text-emerald-600 font-medium">
-              Fully Paid
-            </div>
-            <div className="text-xl font-bold text-emerald-900 mt-1">
-              {jobs.paidJobs} Jobs
-            </div>
-            <div className="text-xs text-emerald-500 mt-1">
-              GH₵{Number(jobs.paidAmount).toLocaleString()} collected
+            <div className="divide-y divide-gray-50">
+              {revenueByTypeData.map((d) => (
+                <div key={d.typeKey} className="flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: JOB_TYPE_COLORS[d.typeKey] || "#64748B" }} />
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">{d.type}</div>
+                      <div className="text-xs text-gray-500">{d.jobs} job{d.jobs !== 1 ? "s" : ""}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-bold text-gray-900">GH₵{d.revenue.toLocaleString()}</div>
+                    <div className="text-xs text-gray-400">Labour + Misc</div>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
+      )}
+
+      {/* Payment Status */}
+      <div className="bg-white rounded-xl p-6 border border-gray-200 shadow-sm">
+        <h3 className="font-semibold text-gray-900 mb-4">Payment Status</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[
+            { key: "paid", label: "Fully Paid", count: jobs.paidJobs, amount: jobs.paidAmount, amountLabel: "collected" },
+            { key: "partial", label: "Partially Paid", count: jobs.partialJobs, amount: jobs.partialAmount, amountLabel: "due" },
+            { key: "unpaid", label: "Unpaid", count: jobs.unpaidJobs, amount: jobs.unpaidAmount, amountLabel: "outstanding" },
+          ].map(({ key, label, count, amount, amountLabel }) => {
+            const c = paymentStatusColors[key];
+            return (
+              <div key={key} className={`p-4 ${c.bg} border ${c.border} rounded-lg`}>
+                <div className={`text-sm ${c.text} font-medium`}>{label}</div>
+                <div className={`text-xl font-bold ${c.bold} mt-1`}>{count} Jobs</div>
+                <div className={`text-xs ${c.sub} mt-1`}>GH₵{Number(amount).toLocaleString()} {amountLabel}</div>
+              </div>
+            );
+          })}
+        </div>
       </div>
+
+      {/* Materials Used in Jobs */}
+      {materialUsageData.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <h3 className="font-semibold text-gray-900">Materials Used in Jobs</h3>
+            <span className="text-xs text-gray-500 bg-white border border-gray-200 px-2 py-1 rounded-full">{(jobs.materialUsage || []).length} materials</span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3">Material</th>
+                  <th className="px-6 py-3 text-right">Qty Used</th>
+                  <th className="px-6 py-3 text-right">Total Cost</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {materialUsageData.map((m, i) => (
+                  <tr key={i} className="hover:bg-gray-50">
+                    <td className="px-6 py-3 font-medium text-gray-900">{m.materialName}</td>
+                    <td className="px-6 py-3 text-right">{Number(m.quantity || 0).toFixed(2)}</td>
+                    <td className="px-6 py-3 text-right font-semibold text-gray-900">GH₵{Number(m.cost || 0).toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* Recent Jobs */}
+      {recentJobs.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-gray-100 bg-gray-50">
+            <h3 className="font-semibold text-gray-900">Recent Invoices</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm text-left">
+              <thead className="bg-gray-50 text-gray-500 font-medium border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-3">Date</th>
+                  <th className="px-6 py-3">Client / Vehicle</th>
+                  <th className="px-6 py-3">Type</th>
+                  <th className="px-6 py-3 text-right">Total</th>
+                  <th className="px-6 py-3 text-right">Paid</th>
+                  <th className="px-6 py-3 text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {recentJobs.map((inv, i) => {
+                  const status = inv.paymentStatus?.toLowerCase() || "unpaid";
+                  const statusStyle = {
+                    paid: "bg-emerald-50 text-emerald-700 border-emerald-200",
+                    partial: "bg-amber-50 text-amber-700 border-amber-200",
+                    unpaid: "bg-red-50 text-red-700 border-red-200",
+                  }[status] || "bg-gray-50 text-gray-600 border-gray-200";
+                  return (
+                    <tr key={i} className="hover:bg-gray-50">
+                      <td className="px-6 py-3 text-gray-500 whitespace-nowrap">
+                        {inv.invoiceDate ? format(new Date(inv.invoiceDate), "dd MMM yyyy") : "—"}
+                      </td>
+                      <td className="px-6 py-3">
+                        <div className="font-medium text-gray-900">{inv.job?.clientName || "—"}</div>
+                        <div className="text-xs text-gray-400">{inv.job?.vehicleRegNumber || ""}</div>
+                      </td>
+                      <td className="px-6 py-3">
+                        <span className="text-xs font-semibold px-2 py-1 rounded-full capitalize"
+                          style={{ backgroundColor: (JOB_TYPE_COLORS[inv.job?.jobType] || "#64748B") + "20", color: JOB_TYPE_COLORS[inv.job?.jobType] || "#64748B" }}>
+                          {inv.job?.jobType || "—"}
+                        </span>
+                      </td>
+                      <td className="px-6 py-3 text-right font-semibold">GH₵{Number(inv.totalAmount || 0).toLocaleString()}</td>
+                      <td className="px-6 py-3 text-right text-emerald-600">GH₵{Number(inv.amountPaid || 0).toLocaleString()}</td>
+                      <td className="px-6 py-3 text-center">
+                        <span className={`text-xs font-medium px-2 py-1 rounded-full border capitalize ${statusStyle}`}>
+                          {status}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1231,6 +1507,186 @@ function TrendsChart({ dateRange }) {
           </ResponsiveContainer>
         </div>
       )}
+    </div>
+  );
+}
+
+// --- INVENTORY SNAPSHOT TAB ---
+const SNAPSHOT_PRESETS = [
+  { id: 'this-month',    label: 'This Month' },
+  { id: 'last-month',    label: 'Last Month' },
+  { id: 'this-quarter',  label: 'This Quarter' },
+  { id: 'last-quarter',  label: 'Last Quarter' },
+  { id: 'mid-year',      label: 'Mid-Year' },
+  { id: 'year-to-date',  label: 'Year to Date' },
+  { id: 'full-year',     label: 'Full Year' },
+  { id: 'custom',        label: 'Custom' },
+];
+
+function getDateForPreset(preset, customDate) {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = now.getMonth(); // 0-indexed
+
+  const lastDay = (year, month) => new Date(year, month + 1, 0).toISOString().split('T')[0];
+  const fmt = (d) => d.toISOString().split('T')[0];
+
+  switch (preset) {
+    case 'this-month':   return lastDay(y, m);
+    case 'last-month':   return lastDay(y, m - 1 < 0 ? 11 : m - 1);
+    case 'this-quarter': {
+      const qEnd = Math.floor(m / 3) * 3 + 2;
+      return lastDay(y, qEnd);
+    }
+    case 'last-quarter': {
+      const qStart = Math.floor(m / 3) * 3 - 3;
+      const qEndM = qStart + 2;
+      return qStart < 0 ? lastDay(y - 1, 11) : lastDay(y, qEndM);
+    }
+    case 'mid-year':     return `${y}-06-30`;
+    case 'year-to-date': return fmt(now);
+    case 'full-year':    return `${y}-12-31`;
+    case 'custom':       return customDate || fmt(now);
+    default:             return fmt(now);
+  }
+}
+
+function InventorySnapshotTab() {
+  const today = new Date();
+  const [preset, setPreset] = useState('this-month');
+  const [customDate, setCustomDate] = useState(today.toISOString().split('T')[0]);
+
+  const snapshotDate = getDateForPreset(preset, customDate);
+
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['inventory-snapshot', snapshotDate],
+    queryFn: () => materialsApi.getInventorySnapshot(snapshotDate),
+    enabled: !!snapshotDate,
+  });
+
+  const snapshot = data?.data || [];
+
+  const exportCSV = () => {
+    if (!snapshot.length) return;
+    const headers = ['Material', 'Unit', `Stock at ${snapshotDate}`, 'Current Stock', 'Change'];
+    const rows = snapshot.map(m => [m.name, m.baseUnit, m.stockAtDate, m.currentStock, m.change]);
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `inventory-snapshot-${snapshotDate}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="bg-white rounded-xl border border-gray-200 p-5 shadow-sm">
+        <div className="mb-5">
+          <h2 className="text-base font-bold text-gray-900">Inventory Snapshot</h2>
+          <p className="text-sm text-gray-500 mt-0.5">
+            See how much stock you had at any point in time, calculated from reorder and sales history.
+          </p>
+        </div>
+
+        {/* Period selector */}
+        <div className="mb-5">
+          <div className="flex flex-wrap gap-2">
+            {SNAPSHOT_PRESETS.map(p => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => setPreset(p.id)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full border transition-all ${
+                  preset === p.id
+                    ? 'bg-gray-900 text-white border-gray-900'
+                    : 'bg-white text-gray-600 border-gray-200 hover:border-gray-400'
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+
+          {preset === 'custom' && (
+            <div className="mt-3 flex items-center gap-3">
+              <input
+                type="date"
+                value={customDate}
+                max={today.toISOString().split('T')[0]}
+                onChange={(e) => setCustomDate(e.target.value)}
+                className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-black focus:border-black"
+              />
+              <span className="text-xs text-gray-400">Stock levels as of this date</span>
+            </div>
+          )}
+
+          {preset !== 'custom' && (
+            <p className="mt-2 text-xs text-gray-400">
+              Showing stock levels as of <span className="font-medium text-gray-600">{snapshotDate}</span>
+            </p>
+          )}
+        </div>
+
+        <div className="flex justify-end mb-3">
+          <button
+            onClick={exportCSV}
+            disabled={!snapshot.length}
+            className="px-3 py-1.5 border border-gray-300 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            Export CSV
+          </button>
+        </div>
+
+        {isLoading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="animate-spin w-6 h-6 border-2 border-gray-300 border-t-gray-900 rounded-full" />
+          </div>
+        ) : isError ? (
+          <div className="text-center py-12 text-red-500 text-sm">
+            Failed to load inventory data. Please try again.
+          </div>
+        ) : snapshot.length === 0 ? (
+          <div className="text-center py-12 text-gray-500 text-sm">
+            No inventory data found for this period.
+          </div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200">
+                  <th className="text-left py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Material</th>
+                  <th className="text-center py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Unit</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Stock at {snapshotDate}</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Current Stock</th>
+                  <th className="text-right py-3 px-4 text-xs font-semibold text-gray-500 uppercase tracking-wider">Change</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {snapshot.map((item) => {
+                  const atDate = parseFloat(item.stockAtDate) || 0;
+                  const current = parseFloat(item.currentStock) || 0;
+                  const change = parseFloat(item.change) || 0;
+                  return (
+                    <tr key={item.id} className="hover:bg-gray-50 transition-colors">
+                      <td className="py-3 px-4 font-medium text-gray-900">{item.name}</td>
+                      <td className="py-3 px-4 text-center text-gray-500">{item.baseUnit}</td>
+                      <td className="py-3 px-4 text-right text-gray-900">{atDate.toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right text-gray-900">{current.toFixed(2)}</td>
+                      <td className="py-3 px-4 text-right">
+                        <span className={`font-medium ${change > 0 ? 'text-green-600' : change < 0 ? 'text-red-500' : 'text-gray-400'}`}>
+                          {change > 0 ? '+' : ''}{change.toFixed(2)}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

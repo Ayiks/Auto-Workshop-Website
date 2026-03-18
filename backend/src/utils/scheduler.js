@@ -11,6 +11,43 @@
 import cron from 'node-cron';
 import prisma from '../config/database.js';
 import { sendReminderEmail } from './sendEmail.js';
+import { sendViaBusiness } from './sendSMS.js';
+
+// ---------------------------------------------------------------------------
+// Helper: send reminder via email + SMS if Arkesel is configured
+// ---------------------------------------------------------------------------
+async function sendReminderMultiChannel({ email, phone, customerName, type, businessId, message }) {
+  // Email (always attempt if email present)
+  if (email) {
+    const settings = await prisma.businessSettings.findFirst({
+      where: { businessId },
+      select: { name: true, email: true, arkeselSenderId: true, arkeselWhatsAppSenderId: true },
+    });
+    const businessName = settings?.name || 'Gray Manager';
+    await sendReminderEmail(email, { customerName, type, businessName, businessEmail: settings?.email || null, message });
+
+    // SMS (if Arkesel configured and phone present)
+    if (phone && process.env.ARKESEL_API_KEY && settings?.arkeselSenderId) {
+      const config = { apiKey: process.env.ARKESEL_API_KEY, arkeselSenderId: settings.arkeselSenderId, arkeselWhatsAppSenderId: settings.arkeselWhatsAppSenderId, whatsappStatus: settings.whatsappStatus };
+      await sendViaBusiness(phone, message || getDefaultSMSMessage(type, customerName, businessName), 'sms', config).catch(() => {});
+    }
+  }
+}
+
+function getDefaultSMSMessage(type, customerName, businessName) {
+  const messages = {
+    post_job: `Hi ${customerName}, how has your car been since the service? We hope all is well. - ${businessName}`,
+    post_job_week: `Hi ${customerName}, it's been a week since your service. How is your car doing? - ${businessName}`,
+    service_due: `Hi ${customerName}, your vehicle is due for a service check. Contact us to book. - ${businessName}`,
+    invoice_overdue: `Hi ${customerName}, you have an outstanding payment due. Please contact ${businessName} to settle.`,
+    follow_up: `Hi ${customerName}, just following up on your recent job with us. Any issues? - ${businessName}`,
+    oil_coolant_change: `Hi ${customerName}, reminder: your vehicle is due for an oil/coolant change. - ${businessName}`,
+    general_check: `Hi ${customerName}, it's time for a general vehicle check-up. Book with ${businessName} today.`,
+    how_was_job: `Hi ${customerName}, how was your recent service experience at ${businessName}? We value your feedback.`,
+    manual: `Message from ${businessName}: Hi ${customerName}.`,
+  };
+  return messages[type] || messages.manual;
+}
 
 // ---------------------------------------------------------------------------
 // Helper: delete all data for a sandbox business in FK-safe order
@@ -143,12 +180,15 @@ export function startScheduler() {
         });
         if (alreadySent) continue;
 
-        const settings = await prisma.businessSettings.findFirst({
-          where: { businessId: job.businessId },
-          select: { name: true },
-        });
-        const businessName = settings?.name || 'Gray Manager';
         const customerName = `${job.customer.firstName} ${job.customer.lastName || ''}`.trim();
+
+        await sendReminderMultiChannel({
+          email: job.customer?.email,
+          phone: job.customer?.phone,
+          customerName,
+          type: 'post_job',
+          businessId: job.businessId,
+        });
 
         await prisma.reminder.create({
           data: {
@@ -157,16 +197,10 @@ export function startScheduler() {
             jobId: job.id,
             type: 'post_job',
             channel: 'email',
-            status: 'pending',
+            status: 'sent',
             scheduledFor: new Date(),
+            sentAt: new Date(),
           },
-        });
-
-        await sendReminderEmail(job.customer.email, { customerName, type: 'post_job', businessName });
-
-        await prisma.reminder.updateMany({
-          where: { jobId: job.id, type: 'post_job', status: 'pending' },
-          data: { status: 'sent', sentAt: new Date() },
         });
 
         console.log(`${label} ✅ Post-job reminder sent for job #${job.id}`);
@@ -215,7 +249,7 @@ export function startScheduler() {
 
         const settings = await prisma.businessSettings.findFirst({
           where: { businessId: job.businessId },
-          select: { name: true },
+          select: { name: true, email: true },
         });
         const businessName = settings?.name || 'Gray Manager';
         const customerName = `${job.customer.firstName} ${job.customer.lastName || ''}`.trim();
@@ -232,7 +266,7 @@ export function startScheduler() {
           },
         });
 
-        await sendReminderEmail(job.customer.email, { customerName, type: 'service_due', businessName });
+        await sendReminderEmail(job.customer.email, { customerName, type: 'service_due', businessName, businessEmail: settings?.email || null });
 
         await prisma.reminder.updateMany({
           where: { customerId: job.customer.id, type: 'service_due', status: 'pending' },
@@ -288,7 +322,7 @@ export function startScheduler() {
 
         const settings = await prisma.businessSettings.findFirst({
           where: { businessId: job.businessId },
-          select: { name: true },
+          select: { name: true, email: true },
         });
         const businessName = settings?.name || 'Gray Manager';
         const customerId = job.customer?.id || null;
@@ -310,7 +344,7 @@ export function startScheduler() {
           },
         });
 
-        await sendReminderEmail(email, { customerName, type: 'invoice_overdue', businessName });
+        await sendReminderEmail(email, { customerName, type: 'invoice_overdue', businessName, businessEmail: settings?.email || null });
 
         await prisma.reminder.updateMany({
           where: { jobId: job.id, type: 'invoice_overdue', status: 'pending' },
@@ -324,5 +358,127 @@ export function startScheduler() {
     }
   }, { timezone: 'Africa/Accra' });
 
-  console.log('⏰ Reminder cron jobs registered: post-job (09:00), service-due (10:00 1st), invoice-overdue (09:30).');
+  // ── 1-week post-job follow-up ──────────────────────────────────────────
+  // Runs daily at 09:15. Sends a "how has it been a week after your service?" message.
+  cron.schedule('15 9 * * *', async () => {
+    const label = `[POST-JOB-WEEK CRON ${new Date().toISOString()}]`;
+    try {
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      const dayStart = new Date(sevenDaysAgo); dayStart.setHours(0, 0, 0, 0);
+      const dayEnd   = new Date(sevenDaysAgo); dayEnd.setHours(23, 59, 59, 999);
+
+      const jobs = await prisma.job.findMany({
+        where: {
+          status: 'completed',
+          customerId: { not: null },
+          updatedAt: { gte: dayStart, lte: dayEnd },
+        },
+        include: {
+          customer: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+        },
+      });
+
+      for (const job of jobs) {
+        const alreadySent = await prisma.reminder.findFirst({
+          where: { jobId: job.id, type: 'post_job_week' },
+        });
+        if (alreadySent) continue;
+
+        const customerName = `${job.customer.firstName} ${job.customer.lastName || ''}`.trim();
+        await sendReminderMultiChannel({
+          email: job.customer?.email,
+          phone: job.customer?.phone,
+          customerName,
+          type: 'post_job_week',
+          businessId: job.businessId,
+        });
+
+        await prisma.reminder.create({
+          data: {
+            businessId: job.businessId,
+            customerId: job.customer.id,
+            jobId: job.id,
+            type: 'post_job_week',
+            channel: 'email',
+            status: 'sent',
+            scheduledFor: new Date(),
+            sentAt: new Date(),
+          },
+        });
+
+        console.log(`${label} ✅ 1-week follow-up sent for job #${job.id}`);
+      }
+    } catch (err) {
+      console.error(`${label} ❌ Error:`, err.message);
+    }
+  }, { timezone: 'Africa/Accra' });
+
+  // ── Recurring job reminders ──────────────────────────────────────────────
+  // Runs daily at 09:45. Processes pending reminders that are due today,
+  // sends them, then schedules the next one in the cycle if the job has
+  // a reminderIntervalMonths set (i.e. user opted into recurring reminders).
+  cron.schedule('45 9 * * *', async () => {
+    const label = `[RECURRING-REMINDERS CRON ${new Date().toISOString()}]`;
+    try {
+      const now = new Date();
+      const dayEnd = new Date(now); dayEnd.setHours(23, 59, 59, 999);
+
+      const dueReminders = await prisma.reminder.findMany({
+        where: {
+          status: 'pending',
+          scheduledFor: { lte: dayEnd },
+          type: { in: ['follow_up', 'oil_coolant_change', 'general_check', 'how_was_job'] },
+        },
+        include: {
+          customer: { select: { id: true, firstName: true, lastName: true, email: true, phone: true } },
+          job: { select: { id: true, businessId: true, reminderIntervalMonths: true, reminderEnabled: true } },
+        },
+      });
+
+      for (const reminder of dueReminders) {
+        if (!reminder.customer) continue;
+        const job = reminder.job;
+        const customerName = `${reminder.customer.firstName} ${reminder.customer.lastName || ''}`.trim();
+
+        await sendReminderMultiChannel({
+          email: reminder.customer.email,
+          phone: reminder.customer.phone,
+          customerName,
+          type: reminder.type,
+          businessId: reminder.businessId,
+        });
+
+        await prisma.reminder.update({
+          where: { id: reminder.id },
+          data: { status: 'sent', sentAt: new Date() },
+        });
+
+        // Schedule next reminder if job has recurring interval
+        if (job?.reminderEnabled && job?.reminderIntervalMonths) {
+          const nextDate = new Date(reminder.scheduledFor);
+          nextDate.setMonth(nextDate.getMonth() + job.reminderIntervalMonths);
+
+          await prisma.reminder.create({
+            data: {
+              businessId: reminder.businessId,
+              customerId: reminder.customerId,
+              jobId: reminder.jobId,
+              type: reminder.type,
+              channel: reminder.channel,
+              status: 'pending',
+              scheduledFor: nextDate,
+            },
+          });
+          console.log(`${label} ✅ Sent + rescheduled reminder #${reminder.id} (type: ${reminder.type}), next: ${nextDate.toDateString()}`);
+        } else {
+          console.log(`${label} ✅ Sent one-time reminder #${reminder.id} (type: ${reminder.type})`);
+        }
+      }
+    } catch (err) {
+      console.error(`${label} ❌ Error:`, err.message);
+    }
+  }, { timezone: 'Africa/Accra' });
+
+  console.log('⏰ Reminder cron jobs registered: post-job (09:00), 1-week follow-up (09:15), service-due (10:00 1st), invoice-overdue (09:30), recurring reminders (09:45).');
 }

@@ -1,5 +1,6 @@
 import { getTenantDB } from '../config/database.js';
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
+import { registerWhatsAppSender } from '../utils/sendSMS.js';
 
 // @desc    Get business settings
 // @route   GET /api/settings/business
@@ -38,7 +39,7 @@ export const getSettings = asyncHandler(async (req, res) => {
 // @route   PUT /api/settings/business
 // @access  Private (requires 'settings:update' permission)
 export const updateSettings = asyncHandler(async (req, res) => {
-  const { name, logo, address, phone, email, website } = req.body;
+  const { name, logo, address, phone, email, website, arkeselSenderId, arkeselWhatsAppSenderId } = req.body;
 
   if (email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -77,6 +78,9 @@ export const updateSettings = asyncHandler(async (req, res) => {
   if (phone !== undefined) updateData.phone = phone.trim();
   if (email !== undefined) updateData.email = email.trim();
   if (website !== undefined) updateData.website = website?.trim();
+  // Arkesel messaging config — only update if provided (empty string = clear)
+  if (arkeselSenderId !== undefined) updateData.arkeselSenderId = arkeselSenderId?.trim() || null;
+  if (arkeselWhatsAppSenderId !== undefined) updateData.arkeselWhatsAppSenderId = arkeselWhatsAppSenderId?.trim() || null;
 
   if (settings) {
     settings = await req.db.businessSettings.update({
@@ -312,5 +316,60 @@ export const deleteGlobalUnit = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     message: 'Unit removed successfully',
+  });
+});
+
+/* ==========================================================================
+   WHATSAPP REGISTRATION
+   ========================================================================== */
+
+// @desc    Initiate WhatsApp Business number registration via Arkesel
+// @route   POST /api/settings/messaging/register-whatsapp
+// @access  Private (requires 'settings:update' permission)
+export const registerWhatsApp = asyncHandler(async (req, res) => {
+  const apiKey = process.env.ARKESEL_API_KEY;
+  if (!apiKey) {
+    throw new AppError('Platform Arkesel key is not configured. Contact your administrator.', 500, 'CONFIG_ERROR');
+  }
+
+  const settings = await req.db.businessSettings.findFirst({
+    where: { businessId: req.user.businessId },
+    select: { id: true, name: true, arkeselWhatsAppSenderId: true },
+  });
+
+  if (!settings) {
+    throw new AppError('Business settings not found. Please save your settings first.', 404, 'NOT_FOUND');
+  }
+
+  if (!settings.arkeselWhatsAppSenderId) {
+    throw new AppError('WhatsApp Business number is not set. Please enter it in Settings → Messaging.', 400, 'VALIDATION_ERROR');
+  }
+
+  const result = await registerWhatsAppSender(settings.arkeselWhatsAppSenderId, settings.name, apiKey);
+
+  if (!result.success) {
+    throw new AppError(`WhatsApp registration failed: ${result.error}`, 502, 'UPSTREAM_ERROR');
+  }
+
+  await req.db.businessSettings.update({
+    where: { id: settings.id },
+    data: { whatsappStatus: 'pending' },
+  });
+
+  await req.db.auditLog.create({
+    data: {
+      userId: req.user.id,
+      action: 'UPDATE',
+      entity: 'BusinessSettings',
+      entityId: settings.id,
+      description: 'Initiated WhatsApp Business number registration',
+      businessId: req.user.businessId,
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'WhatsApp registration submitted. You will receive an OTP on your WhatsApp number to complete activation.',
+    data: { whatsappStatus: 'pending' },
   });
 });

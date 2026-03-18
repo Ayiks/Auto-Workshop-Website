@@ -39,6 +39,7 @@ model Business {
   users            User[]
   vehicles         Vehicle[]
   reminders        Reminder[]
+  vendors          Vendor[]
 
   @@map("businesses")
 }
@@ -59,13 +60,14 @@ model User {
   isEmailVerified         Boolean   @default(false) @map("is_email_verified")
   emailVerificationToken  String?   @unique @map("email_verification_token")
   verificationTokenExpiry DateTime? @map("verification_token_expiry")
-  expensesRecorded Expense[]
-  jobsAssigned     Job[]
-  reordersCreated  MaterialReorder[]
-  paymentsReceived Payment[]
-  receiptsIssued   Receipt[]
-  salesMade        Sale[]
-  business         Business?          @relation(fields: [businessId], references: [id])
+  expensesRecorded  Expense[]
+  jobsAssigned      Job[]
+  reordersCreated   MaterialReorder[] @relation("CreatedReorders")
+  reordersReceived  MaterialReorder[] @relation("ReceivedReorders")
+  paymentsReceived  Payment[]
+  receiptsIssued    Receipt[]
+  salesMade         Sale[]
+  business          Business?          @relation(fields: [businessId], references: [id])
 
   @@map("users")
 }
@@ -135,25 +137,52 @@ model MaterialUnit {
 }
 
 model MaterialReorder {
-  id              Int           @id @default(autoincrement())
-  materialId      Int           @map("material_id")
-  materialName    String        @db.VarChar(100)
-  quantityOrdered Decimal       @map("quantity_ordered") @db.Decimal(10, 2)
-  unitCost        Decimal       @map("unit_cost") @db.Decimal(10, 2)
-  totalCost       Decimal       @map("total_cost") @db.Decimal(10, 2)
-  reorderedBy     Int           @map("reordered_by")
-  reorderDate     DateTime      @default(now()) @map("reorder_date")
-  notes           String?
-  expenseId       Int?          @unique @map("expense_id")
-  materialUnitId  Int?          @map("material_unit_id")
-  businessId      String        @map("business_id")
-  business        Business      @relation(fields: [businessId], references: [id])
-  expense         Expense?      @relation(fields: [expenseId], references: [id])
-  material        Material      @relation(fields: [materialId], references: [id])
-  materialUnit    MaterialUnit? @relation(fields: [materialUnitId], references: [id])
-  user            User          @relation(fields: [reorderedBy], references: [id])
+  id               Int           @id @default(autoincrement())
+  materialId       Int           @map("material_id")
+  materialName     String        @db.VarChar(100)
+  quantityOrdered  Decimal       @map("quantity_ordered") @db.Decimal(10, 2)
+  unitCost         Decimal       @map("unit_cost") @db.Decimal(10, 2)
+  totalCost        Decimal       @map("total_cost") @db.Decimal(10, 2)
+  reorderedBy      Int           @map("reordered_by")
+  reorderDate      DateTime      @default(now()) @map("reorder_date")
+  notes            String?
+  expenseId        Int?          @unique @map("expense_id")
+  materialUnitId   Int?          @map("material_unit_id")
+  businessId       String        @map("business_id")
+  status           String        @default("pending") @db.VarChar(20)
+  vendorId         Int?          @map("vendor_id")
+  receivedDate     DateTime?     @map("received_date")
+  receivedBy       Int?          @map("received_by")
+  notificationSent Boolean       @default(false) @map("notification_sent")
+  orderId          String?       @db.VarChar(36) @map("order_id")
+  business         Business      @relation(fields: [businessId], references: [id])
+  expense          Expense?      @relation(fields: [expenseId], references: [id])
+  material         Material      @relation(fields: [materialId], references: [id])
+  materialUnit     MaterialUnit? @relation(fields: [materialUnitId], references: [id])
+  user             User          @relation("CreatedReorders", fields: [reorderedBy], references: [id])
+  receivedUser     User?         @relation("ReceivedReorders", fields: [receivedBy], references: [id])
+  vendor           Vendor?       @relation(fields: [vendorId], references: [id])
 
   @@map("material_reorders")
+}
+
+model Vendor {
+  id             Int               @id @default(autoincrement())
+  companyName    String            @map("company_name") @db.VarChar(100)
+  contactName    String?           @map("contact_name") @db.VarChar(100)
+  phone          String?           @db.VarChar(20)
+  email          String?           @db.VarChar(100)
+  whatsappNumber String?           @map("whatsapp_number") @db.VarChar(20)
+  location       String?           @db.VarChar(200)
+  notes          String?           @db.Text
+  isActive       Boolean           @default(true) @map("is_active")
+  createdAt      DateTime          @default(now()) @map("created_at")
+  updatedAt      DateTime          @updatedAt @map("updated_at")
+  businessId     String            @map("business_id")
+  business       Business          @relation(fields: [businessId], references: [id])
+  reorders       MaterialReorder[]
+
+  @@map("vendors")
 }
 
 model GlobalUnit {
@@ -253,9 +282,12 @@ model Job {
   createdAt          DateTime      @default(now()) @map("created_at")
   updatedAt          DateTime      @updatedAt @map("updated_at")
   businessId         String        @map("business_id")
-  customerId         Int?          @map("customer_id")
-  vehicleId          Int?          @map("vehicle_id")
-  invoice            Invoice?
+  customerId              Int?          @map("customer_id")
+  vehicleId               Int?          @map("vehicle_id")
+  reminderEnabled         Boolean       @default(false) @map("reminder_enabled")
+  reminderIntervalMonths  Int?          @map("reminder_interval_months")
+  reminderTypes           String[]      @map("reminder_types")
+  invoice                 Invoice?
   materials          JobMaterial[]
   user               User          @relation(fields: [assignedTo], references: [id])
   business           Business      @relation(fields: [businessId], references: [id])
@@ -408,16 +440,19 @@ model Booking {
 }
 
 model BusinessSettings {
-  id         Int      @id @default(autoincrement())
-  name       String   @db.VarChar(100)
-  logo       String?
-  address    String
-  phone      String   @db.VarChar(50)
-  email      String   @db.VarChar(100)
-  website    String?  @db.VarChar(200)
-  updatedAt  DateTime @updatedAt @map("updated_at")
-  businessId String   @map("business_id")
-  business   Business @relation(fields: [businessId], references: [id])
+  id                      Int      @id @default(autoincrement())
+  name                    String   @db.VarChar(100)
+  logo                    String?
+  address                 String
+  phone                   String   @db.VarChar(50)
+  email                   String   @db.VarChar(100)
+  website                 String?  @db.VarChar(200)
+  arkeselSenderId         String?  @map("arkesel_sender_id") @db.VarChar(50)
+  arkeselWhatsAppSenderId String?  @map("arkesel_whatsapp_sender_id") @db.VarChar(50)
+  whatsappStatus          String?  @default("unregistered") @map("whatsapp_status") @db.VarChar(20)
+  updatedAt               DateTime @updatedAt @map("updated_at")
+  businessId              String   @map("business_id")
+  business                Business @relation(fields: [businessId], references: [id])
 
   @@map("business_settings")
 }

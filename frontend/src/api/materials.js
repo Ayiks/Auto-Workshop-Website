@@ -49,9 +49,27 @@ export const materialsApi = {
     return response;
   },
 
-bulkReorderMaterials: async (data) => {
-  const payload = Array.isArray(data) ? { items: data } : data;
+  bulkReorderMaterials: async (data) => {
+    const payload = Array.isArray(data) ? { items: data } : data;
     const response = await apiClient.post('/materials/bulk-reorder', payload);
-    return response.data; 
-},
+    return response.data;
+  },
+
+  // Get inventory snapshot at a given date
+  getInventorySnapshot: async (date) => {
+    const response = await apiClient.get('/materials/snapshot', { params: { date } });
+    return response;
+  },
+
+  // Get all restock orders
+  getRestockOrders: async (params) => {
+    const response = await apiClient.get('/materials/restock-orders', { params });
+    return response;
+  },
+
+  // Mark all items in a restock order as received (orderId is a UUID string)
+  receiveRestockOrder: async (orderId) => {
+    const response = await apiClient.post(`/materials/restock-orders/${orderId}/receive`);
+    return response;
+  },
 };

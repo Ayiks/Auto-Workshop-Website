@@ -6,9 +6,10 @@ import { sendJobCreatedEmail, sendJobCompletedEmail } from '../utils/sendEmail.j
 export const createJob = asyncHandler(async (req, res) => {
   const {
     jobType, clientName, clientPhone, clientEmail,
-    vehicleMake, vehicleModel, vehicleRegNumber, odometer,
+    vehicleMake, vehicleModel, vehicleRegNumber, odometer, vehicleYear,
     problemType, problemDescription,
     labourCost = 0, miscellaneousCost = 0, materials = [],
+    reminderEnabled = false, reminderIntervalMonths, reminderTypes = [], reminderChannels = ['email'],
   } = req.body;
 
   if (!jobType || !['mechanic', 'sprayer', 'bodyworks', 'other'].includes(jobType))
@@ -19,6 +20,22 @@ export const createJob = asyncHandler(async (req, res) => {
     throw new AppError('Please provide problem type', 400, 'VALIDATION_ERROR');
   if (req.allowedJobType && req.allowedJobType !== jobType && jobType !== 'other')
     throw new AppError('You can only create ' + req.allowedJobType + ' jobs', 403, 'PERMISSION_DENIED');
+
+  // Validate vehicle year
+  if (vehicleYear !== undefined && vehicleYear !== null && vehicleYear !== '') {
+    const yearInt = parseInt(vehicleYear, 10);
+    const currentYear = new Date().getFullYear();
+    if (isNaN(yearInt) || yearInt < 1886 || yearInt > currentYear) {
+      throw new AppError(`Vehicle year must be between 1886 and ${currentYear}`, 400, 'VALIDATION_ERROR');
+    }
+  }
+
+  // Validate odometer
+  if (odometer !== undefined && odometer !== null && odometer !== '') {
+    if (parseInt(odometer, 10) < 0) {
+      throw new AppError('Odometer reading cannot be negative', 400, 'VALIDATION_ERROR');
+    }
+  }
 
   let materialsCostTotal = 0;
   const validatedMaterials = [];
@@ -61,6 +78,10 @@ export const createJob = asyncHandler(async (req, res) => {
         problemType: problemType.trim(), problemDescription: (problemDescription || '').trim(),
         labourCost: parseFloat(labourCost), miscellaneousCost: parseFloat(miscellaneousCost),
         totalCost, assignedTo: req.user.id, status: 'pending',
+        reminderEnabled: !!reminderEnabled,
+        reminderIntervalMonths: reminderEnabled && reminderIntervalMonths ? parseInt(reminderIntervalMonths, 10) : null,
+        reminderTypes: reminderEnabled && reminderTypes?.length ? reminderTypes : [],
+        businessId: req.user.businessId,
       },
     });
     for (const m of validatedMaterials) {
@@ -111,6 +132,7 @@ export const createJob = asyncHandler(async (req, res) => {
             customerId,
             make: vehicleMake?.trim() || null,
             model: vehicleModel?.trim() || null,
+            year: vehicleYear ? parseInt(vehicleYear, 10) : null,
             regNumber,
             businessId: req.user.businessId,
           },
@@ -129,6 +151,30 @@ export const createJob = asyncHandler(async (req, res) => {
 
     await tx.job.update({ where: { id: job.id }, data: { customerId, vehicleId } });
 
+    // Create scheduled reminders if requested — one row per type × channel
+    if (reminderEnabled && reminderIntervalMonths && reminderTypes?.length && customerId) {
+      const months = parseInt(reminderIntervalMonths, 10);
+      const firstReminderDate = new Date(job.createdAt);
+      firstReminderDate.setMonth(firstReminderDate.getMonth() + months);
+      const channels = Array.isArray(reminderChannels) && reminderChannels.length ? reminderChannels : ['email'];
+
+      for (const type of reminderTypes) {
+        for (const channel of channels) {
+          await tx.reminder.create({
+            data: {
+              businessId: req.user.businessId,
+              customerId,
+              jobId: job.id,
+              type,
+              channel,
+              status: 'pending',
+              scheduledFor: firstReminderDate,
+            },
+          });
+        }
+      }
+    }
+
     await tx.auditLog.create({
       data: { userId: req.user.id, action: 'CREATE', entity: 'Job', entityId: job.id,
         description: 'Created ' + jobType + ' job #' + job.id + ' for ' + clientName + '. Total: GHc' + totalCost },
@@ -144,8 +190,11 @@ export const createJob = asyncHandler(async (req, res) => {
     },
   });
 
-  const business = await req.db.business.findUnique({ where: { id: req.user.businessId }, select: { name: true } });
-  sendJobCreatedEmail(completeJob, business?.name).catch(() => {});
+  const [business, bizSettings] = await Promise.all([
+    req.db.business.findUnique({ where: { id: req.user.businessId }, select: { name: true } }),
+    req.db.businessSettings.findFirst({ where: { businessId: req.user.businessId }, select: { email: true } }),
+  ]);
+  sendJobCreatedEmail(completeJob, business?.name, bizSettings?.email).catch(() => {});
 
   res.status(201).json({ success: true, message: 'Job created successfully', data: completeJob });
 });
@@ -404,8 +453,11 @@ export const completeJob = asyncHandler(async (req, res) => {
       description: `Completed job #${updatedJob.id}` },
   });
 
-  const business = await req.db.business.findUnique({ where: { id: req.user.businessId }, select: { name: true } });
-  sendJobCompletedEmail(updatedJob, business ? business.name : null).catch(() => {});
+  const [business, bizSettings] = await Promise.all([
+    req.db.business.findUnique({ where: { id: req.user.businessId }, select: { name: true } }),
+    req.db.businessSettings.findFirst({ where: { businessId: req.user.businessId }, select: { email: true } }),
+  ]);
+  sendJobCompletedEmail(updatedJob, business?.name ?? null, bizSettings?.email).catch(() => {});
 
   res.status(200).json({ success: true, message: 'Job completed successfully. Ready for invoicing.', data: updatedJob });
 });

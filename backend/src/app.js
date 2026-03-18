@@ -22,6 +22,8 @@ import customerRoutes from './routes/customer.routes.js';
 import vehicleRoutes from './routes/vehicles.routes.js';
 import reminderRoutes from './routes/reminders.routes.js';
 import sandboxRoutes from './routes/sandbox.routes.js';
+import messagingRoutes from './routes/messaging.routes.js';
+import vendorRoutes from './routes/vendors.routes.js';
 import { sendContactEmail } from './utils/sendEmail.js';
 
 const app = express();
@@ -98,6 +100,8 @@ app.use(`${API_PREFIX}/customers`, customerRoutes);
 app.use(`${API_PREFIX}/vehicles`, vehicleRoutes);
 app.use(`${API_PREFIX}/reminders`, reminderRoutes);
 app.use(`${API_PREFIX}/sandboxes`, sandboxRoutes);
+app.use(`${API_PREFIX}/messaging`, messagingRoutes);
+app.use(`${API_PREFIX}/vendors`, vendorRoutes);
 
 // Public contact form
 app.post(`${API_PREFIX}/contact`, async (req, res) => {

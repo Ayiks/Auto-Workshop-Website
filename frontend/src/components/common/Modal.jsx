@@ -112,7 +112,7 @@ export default function Modal({ isOpen, onClose, title, children, size = 'md' })
       </div>
 
       {/* Modal Container */}
-      <div className="fixed inset-0 z-50 overflow-y-auto">
+      <div className="fixed inset-0 z-50 overflow-hidden">
         <div className="flex min-h-full items-center justify-center p-4">
           <div
             className={`relative w-full transform transition-all duration-300 ease-out ${

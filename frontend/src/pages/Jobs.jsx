@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { jobsApi } from '@api/jobs';
 import { useAuthStore } from '@stores/authStore';
@@ -46,6 +47,7 @@ const INVOICE_LABELS = {
 
 export default function Jobs() {
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const { user } = useAuthStore();
   const { isMobile } = useResponsive();
 
@@ -356,12 +358,12 @@ export default function Jobs() {
               <span className="font-semibold">Job created.</span> Customer record saved — complete their vehicle profile for better tracking.
             </p>
             <div className="flex items-center gap-3 flex-shrink-0">
-              <a
-                href="/settings?tab=customers"
+              <button
+                onClick={() => navigate('/app/customers')}
                 className="text-xs font-semibold text-amber-900 underline hover:no-underline"
               >
                 Go to Customers
-              </a>
+              </button>
               <button
                 onClick={() => setProfilePrompt(null)}
                 className="text-xs text-amber-600 hover:text-amber-900 transition-colors"

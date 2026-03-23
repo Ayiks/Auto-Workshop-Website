@@ -844,12 +844,10 @@ useEffect(() => {
         title="Restock Order"
         size="xl"
       >
-        <div className="p-1">
-          <RestockWizard
-            onClose={() => setShowRestockWizard(false)}
-            onSuccess={() => setActiveTab('restock-orders')}
-          />
-        </div>
+        <RestockWizard
+          onClose={() => setShowRestockWizard(false)}
+          onSuccess={() => setActiveTab('restock-orders')}
+        />
       </Modal>
     </div>
   );

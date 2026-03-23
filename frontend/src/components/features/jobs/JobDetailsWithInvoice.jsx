@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { invoicesApi } from '@api/jobs';
+import { invoicesApi, paymentsApi } from '@api/jobs';
+import JobPhotos from './JobPhotos';
 import { settingsApi } from '@api/settings';
 import Modal from '@components/common/Modal';
 import Button from '@components/common/Button';
 import Card from '@components/common/Card';
 import RecordPaymentModal from '@components/features/invoices/RecordPaymentModal';
+import { useAuthStore } from '@stores/authStore';
 import { format } from 'date-fns';
 
 // ... existing STATUS_STYLES and STATUS_LABELS ...
@@ -32,7 +34,10 @@ export default function JobDetailsWithInvoice({
   onRefresh 
 }) {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [voidConfirmId, setVoidConfirmId] = useState(null);
 
   // 1. FETCH BUSINESS SETTINGS (Dynamic Header)
   const { data: settings } = useQuery({
@@ -46,10 +51,22 @@ export default function JobDetailsWithInvoice({
     mutationFn: invoicesApi.generateInvoice,
     onSuccess: () => {
       queryClient.invalidateQueries(['jobs']);
-      onRefresh(); 
+      onRefresh();
     },
     onError: (error) => {
       alert(error.response?.data?.message || 'Failed to generate invoice');
+    },
+  });
+
+  const voidPaymentMutation = useMutation({
+    mutationFn: (id) => paymentsApi.voidPayment(id),
+    onSuccess: () => {
+      setVoidConfirmId(null);
+      queryClient.invalidateQueries(['jobs']);
+      onRefresh();
+    },
+    onError: (error) => {
+      alert(error.response?.data?.message || 'Failed to void payment');
     },
   });
 
@@ -251,24 +268,65 @@ export default function JobDetailsWithInvoice({
                            <th className="px-2 sm:px-4 py-1.5 sm:py-2 font-medium">Date</th>
                            <th className="px-2 sm:px-4 py-1.5 sm:py-2 font-medium">Method</th>
                            <th className="px-2 sm:px-4 py-1.5 sm:py-2 font-medium text-right">Amount</th>
+                           {isAdmin && <th className="px-2 sm:px-4 py-1.5 sm:py-2 font-medium no-print" />}
                          </tr>
                        </thead>
                        <tbody className="divide-y divide-gray-100">
                          {sortedPayments.map((payment) => (
-                           <tr key={payment.id} className="payment-row">
-                             <td className="px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm">{format(new Date(payment.paymentDate), 'MMM d, yyyy')}</td>
-                             <td className="px-2 sm:px-4 py-1.5 sm:py-2 capitalize text-xs sm:text-sm">
-                               {payment.paymentMethod}
-                             </td>
-                             <td className="px-2 sm:px-4 py-1.5 sm:py-2 text-right font-mono font-medium text-gray-900 text-xs sm:text-sm">
-                               GH₵{parseFloat(payment.amount).toFixed(2)}
-                             </td>
-                           </tr>
+                           <Fragment key={payment.id}>
+                             <tr className="payment-row">
+                               <td className="px-2 sm:px-4 py-1.5 sm:py-2 text-xs sm:text-sm">{format(new Date(payment.paymentDate), 'MMM d, yyyy')}</td>
+                               <td className="px-2 sm:px-4 py-1.5 sm:py-2 capitalize text-xs sm:text-sm">
+                                 {payment.paymentMethod}
+                               </td>
+                               <td className="px-2 sm:px-4 py-1.5 sm:py-2 text-right font-mono font-medium text-gray-900 text-xs sm:text-sm">
+                                 GH₵{parseFloat(payment.amount).toFixed(2)}
+                               </td>
+                               {isAdmin && (
+                                 <td className="px-2 sm:px-4 py-1.5 sm:py-2 text-right no-print">
+                                   <button
+                                     onClick={() => setVoidConfirmId(payment.id)}
+                                     className="text-xs text-red-500 hover:text-red-700 font-medium px-2 py-1 rounded hover:bg-red-50 transition-colors"
+                                   >
+                                     Void
+                                   </button>
+                                 </td>
+                               )}
+                             </tr>
+                             {/* Inline void confirmation */}
+                             {isAdmin && voidConfirmId === payment.id && (
+                               <tr className="bg-red-50 no-print">
+                                 <td colSpan={isAdmin ? 4 : 3} className="px-2 sm:px-4 py-2 sm:py-3">
+                                   <div className="flex items-center justify-between gap-3">
+                                     <p className="text-xs text-red-700">
+                                       Void this payment of <strong>GH₵{parseFloat(payment.amount).toFixed(2)}</strong>? The invoice balance will be recalculated.
+                                     </p>
+                                     <div className="flex gap-2 shrink-0">
+                                       <button
+                                         onClick={() => setVoidConfirmId(null)}
+                                         className="text-xs px-2.5 py-1 border border-gray-300 rounded bg-white hover:bg-gray-50"
+                                       >
+                                         Cancel
+                                       </button>
+                                       <button
+                                         onClick={() => voidPaymentMutation.mutate(payment.id)}
+                                         disabled={voidPaymentMutation.isPending}
+                                         className="text-xs px-2.5 py-1 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+                                       >
+                                         {voidPaymentMutation.isPending ? 'Voiding…' : 'Confirm Void'}
+                                       </button>
+                                     </div>
+                                   </div>
+                                 </td>
+                               </tr>
+                             )}
+                           </Fragment>
                          ))}
                          {/* Balance Row */}
                          <tr className="bg-gray-50 font-bold border-t border-gray-200">
-                           <td colSpan="2" className="px-2 sm:px-4 py-1.5 sm:py-2 text-right text-gray-600 text-xs sm:text-sm">Balance Due:</td>
+                           <td colSpan={2} className="px-2 sm:px-4 py-1.5 sm:py-2 text-right text-gray-600 text-xs sm:text-sm">Balance Due:</td>
                            <td className="px-2 sm:px-4 py-1.5 sm:py-2 text-right text-red-600 text-xs sm:text-sm">GH₵{parseFloat(job.invoice.amountDue).toFixed(2)}</td>
+                           {isAdmin && <td className="no-print" />}
                          </tr>
                        </tbody>
                      </table>
@@ -287,6 +345,11 @@ export default function JobDetailsWithInvoice({
               </div>
 
             </div>
+          </div>
+
+          {/* --- JOB PHOTOS (No Print) --- */}
+          <div className="mt-4 sm:mt-6 pt-4 sm:pt-5 border-t border-gray-100 no-print">
+            <JobPhotos jobId={job.id} canEdit={canEdit} allowedCaptions={['after', 'other']} />
           </div>
 
           {/* --- FOOTER ACTIONS (No Print) --- */}

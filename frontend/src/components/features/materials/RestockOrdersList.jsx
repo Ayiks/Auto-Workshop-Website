@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { materialsApi } from '@/api/materials';
+import { useAuthStore } from '@stores/authStore';
 import { format } from 'date-fns';
 
 const STATUS_TABS = [
@@ -12,11 +13,13 @@ const STATUS_TABS = [
 const statusBadge = (status) => {
   if (status === 'pending') return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Pending</span>;
   if (status === 'received') return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Received</span>;
+  if (status === 'cancelled') return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Cancelled</span>;
   return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">{status}</span>;
 };
 
-function OrderDetailPanel({ order, onClose, onReceive, isReceiving }) {
+function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onEditClick, onCancel, isCancelling }) {
   const [confirming, setConfirming] = useState(false);
+  const [cancelConfirming, setCancelConfirming] = useState(false);
   const orderedBy = order.user?.fullName || order.user?.username || '—';
   const receivedBy = order.receivedUser?.fullName || order.receivedUser?.username || '—';
   const grandTotal = parseFloat(order.totalCost);
@@ -125,39 +128,84 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving }) {
           )}
         </div>
 
-        {/* Footer — Receive button for pending orders */}
+        {/* Footer — actions for pending orders */}
         {isPending && (
-          <div className="px-6 py-4 border-t border-gray-100">
-            {!confirming ? (
-              <button
-                onClick={() => setConfirming(true)}
-                className="w-full py-2.5 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors"
-              >
-                Mark All as Received
-              </button>
-            ) : (
+          <div className="px-6 py-4 border-t border-gray-100 space-y-2">
+            {/* Admin: Edit + Cancel row */}
+            {isAdmin && !confirming && !cancelConfirming && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { onEditClick(order); }}
+                  className="flex-1 py-2 text-sm font-medium border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+                >
+                  Edit Order
+                </button>
+                <button
+                  onClick={() => setCancelConfirming(true)}
+                  className="flex-1 py-2 text-sm font-medium border border-red-200 text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+                >
+                  Cancel Order
+                </button>
+              </div>
+            )}
+
+            {/* Cancel confirmation */}
+            {cancelConfirming && (
               <div className="space-y-2">
                 <p className="text-sm text-center text-gray-600">
-                  Confirm receipt of <strong>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</strong>?
-                  Total expense of{' '}
-                  <strong>GH₵{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> will be logged.
+                  Cancel this pending order? The {order.items.length} item{order.items.length !== 1 ? 's' : ''} will not be restocked.
                 </p>
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setConfirming(false)}
+                    onClick={() => setCancelConfirming(false)}
                     className="flex-1 py-2.5 text-sm border border-gray-300 rounded-xl hover:bg-gray-50"
                   >
-                    Cancel
+                    Back
                   </button>
                   <button
-                    onClick={() => onReceive(order.orderId)}
-                    disabled={isReceiving}
-                    className="flex-1 py-2.5 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50"
+                    onClick={() => onCancel(order.orderId)}
+                    disabled={isCancelling}
+                    className="flex-1 py-2.5 text-sm font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50"
                   >
-                    {isReceiving ? 'Processing…' : 'Yes, Received'}
+                    {isCancelling ? 'Cancelling…' : 'Yes, Cancel'}
                   </button>
                 </div>
               </div>
+            )}
+
+            {/* Receive confirmation */}
+            {!cancelConfirming && (
+              !confirming ? (
+                <button
+                  onClick={() => setConfirming(true)}
+                  className="w-full py-2.5 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors"
+                >
+                  Mark All as Received
+                </button>
+              ) : (
+                <div className="space-y-2">
+                  <p className="text-sm text-center text-gray-600">
+                    Confirm receipt of <strong>{order.items.length} item{order.items.length !== 1 ? 's' : ''}</strong>?
+                    Total expense of{' '}
+                    <strong>GH₵{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> will be logged.
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setConfirming(false)}
+                      className="flex-1 py-2.5 text-sm border border-gray-300 rounded-xl hover:bg-gray-50"
+                    >
+                      Back
+                    </button>
+                    <button
+                      onClick={() => onReceive(order.orderId)}
+                      disabled={isReceiving}
+                      className="flex-1 py-2.5 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      {isReceiving ? 'Processing…' : 'Yes, Received'}
+                    </button>
+                  </div>
+                </div>
+              )
             )}
           </div>
         )}
@@ -166,10 +214,144 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving }) {
   );
 }
 
+function EditOrderModal({ order, onClose, onSave, isSaving }) {
+  const [items, setItems] = useState(
+    order.items.map(item => ({
+      id: item.id,
+      materialName: item.materialName,
+      unitLabel: item.materialUnit?.name || item.material?.baseUnit || '',
+      quantityOrdered: String(parseFloat(item.quantityOrdered)),
+      unitCost: String(parseFloat(item.unitCost)),
+    }))
+  );
+
+  const updateItem = (index, field, value) => {
+    setItems(prev => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: value };
+      return next;
+    });
+  };
+
+  const grandTotal = items.reduce((sum, item) => {
+    const qty = parseFloat(item.quantityOrdered) || 0;
+    const cost = parseFloat(item.unitCost) || 0;
+    return sum + qty * cost;
+  }, 0);
+
+  const handleSave = () => {
+    const payload = items.map(item => ({
+      id: item.id,
+      quantityOrdered: parseFloat(item.quantityOrdered),
+      unitCost: parseFloat(item.unitCost),
+    }));
+    onSave({ items: payload });
+  };
+
+  const isValid = items.every(item => {
+    const qty = parseFloat(item.quantityOrdered);
+    const cost = parseFloat(item.unitCost);
+    return qty > 0 && cost >= 0;
+  });
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end sm:items-center justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl w-full sm:max-w-lg mx-0 sm:mx-4 max-h-[90vh] flex flex-col"
+        onClick={e => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 shrink-0">
+          <div>
+            <h3 className="text-base font-bold text-gray-900">Edit Restock Order</h3>
+            <p className="text-xs text-gray-400 mt-0.5">Adjust quantities and unit costs</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1">
+            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+
+        {/* Items */}
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+          {items.map((item, index) => {
+            const lineTotal = (parseFloat(item.quantityOrdered) || 0) * (parseFloat(item.unitCost) || 0);
+            return (
+              <div key={item.id} className="border border-gray-200 rounded-xl p-4">
+                <p className="text-sm font-semibold text-gray-900 mb-3">{item.materialName}</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">
+                      Qty{item.unitLabel ? ` (${item.unitLabel})` : ''}
+                    </label>
+                    <input
+                      type="number"
+                      min="0.01"
+                      step="any"
+                      value={item.quantityOrdered}
+                      onChange={e => updateItem(index, 'quantityOrdered', e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-500 mb-1">Unit Cost (GH₵)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      step="any"
+                      value={item.unitCost}
+                      onChange={e => updateItem(index, 'unitCost', e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-gray-900"
+                    />
+                  </div>
+                </div>
+                <div className="mt-2 text-right text-xs text-gray-500">
+                  Line total: <span className="font-semibold text-gray-700">
+                    GH₵{lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Footer */}
+        <div className="px-6 py-4 border-t border-gray-100 shrink-0">
+          <div className="flex justify-between items-center mb-3">
+            <span className="text-sm font-medium text-gray-600">Grand Total</span>
+            <span className="text-lg font-bold text-gray-900">
+              GH₵{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 text-sm border border-gray-300 rounded-xl hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving || !isValid}
+              className="flex-1 py-2.5 text-sm font-semibold bg-gray-900 text-white rounded-xl hover:bg-gray-800 disabled:opacity-50"
+            >
+              {isSaving ? 'Saving…' : 'Save Changes'}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function RestockOrdersList() {
   const queryClient = useQueryClient();
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
   const [activeTab, setActiveTab] = useState('all');
   const [selectedOrder, setSelectedOrder] = useState(null);
+  const [editingOrder, setEditingOrder] = useState(null);
 
   const { data, isLoading } = useQuery({
     queryKey: ['restockOrders'],
@@ -182,7 +364,6 @@ export default function RestockOrdersList() {
     onSuccess: (_, orderId) => {
       queryClient.invalidateQueries(['restockOrders']);
       queryClient.invalidateQueries(['materials']);
-      // Update the selected order panel immediately
       setSelectedOrder(prev =>
         prev?.orderId === orderId
           ? {
@@ -196,9 +377,29 @@ export default function RestockOrdersList() {
     },
   });
 
+  const updateMutation = useMutation({
+    mutationFn: ({ orderId, data }) => materialsApi.updateRestockOrder(orderId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['restockOrders']);
+      queryClient.invalidateQueries(['expenses']);
+      setEditingOrder(null);
+      setSelectedOrder(null);
+    },
+  });
+
+  const cancelMutation = useMutation({
+    mutationFn: (orderId) => materialsApi.cancelRestockOrder(orderId),
+    onSuccess: (_, orderId) => {
+      queryClient.invalidateQueries(['restockOrders']);
+      queryClient.invalidateQueries(['expenses']);
+      setSelectedOrder(prev =>
+        prev?.orderId === orderId ? { ...prev, status: 'cancelled' } : prev
+      );
+    },
+  });
+
   const orders = data?.data?.data || data?.data || [];
 
-  // Filter groups by status tab
   const filtered = activeTab === 'all' ? orders : orders.filter(o => o.status === activeTab);
   const pendingCount = orders.filter(o => o.status === 'pending').length;
 
@@ -248,7 +449,6 @@ export default function RestockOrdersList() {
               {filtered.map((order, idx) => {
                 const orderedBy = order.user?.fullName || order.user?.username || '—';
                 const isPending = order.status === 'pending';
-                // Build a preview of item names
                 const itemPreview = order.items.length === 1
                   ? order.items[0].materialName
                   : `${order.items[0].materialName} +${order.items.length - 1} more`;
@@ -299,6 +499,20 @@ export default function RestockOrdersList() {
           onClose={() => setSelectedOrder(null)}
           onReceive={(orderId) => receiveMutation.mutate(orderId)}
           isReceiving={receiveMutation.isPending}
+          isAdmin={isAdmin}
+          onEditClick={(order) => setEditingOrder(order)}
+          onCancel={(orderId) => cancelMutation.mutate(orderId)}
+          isCancelling={cancelMutation.isPending}
+        />
+      )}
+
+      {/* Edit Order Modal */}
+      {editingOrder && (
+        <EditOrderModal
+          order={editingOrder}
+          onClose={() => setEditingOrder(null)}
+          onSave={(data) => updateMutation.mutate({ orderId: editingOrder.orderId, data })}
+          isSaving={updateMutation.isPending}
         />
       )}
     </div>

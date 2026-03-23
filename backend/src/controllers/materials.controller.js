@@ -826,6 +826,112 @@ export const receiveRestockOrder = asyncHandler(async (req, res) => {
 });
 
 
+// @desc    Admin: update quantities/costs on a pending restock order
+// @route   PUT /api/materials/restock-orders/:orderId
+// @access  Private (Admin only)
+export const updateRestockOrder = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { items } = req.body; // [{ id, quantityOrdered, unitCost }]
+
+  if (!Array.isArray(items) || items.length === 0) {
+    throw new AppError('items array is required', 400, 'VALIDATION_ERROR');
+  }
+
+  const lineItems = await req.db.materialReorder.findMany({
+    where: { orderId, businessId: req.user.businessId },
+  });
+
+  if (lineItems.length === 0) {
+    throw new AppError('Order not found', 404, 'NOT_FOUND');
+  }
+
+  const hasReceived = lineItems.some(i => i.status === 'received');
+  if (hasReceived) {
+    throw new AppError('Cannot edit an order that has already been received', 400, 'INVALID_OPERATION');
+  }
+
+  const hasCancelled = lineItems.every(i => i.status === 'cancelled');
+  if (hasCancelled) {
+    throw new AppError('Cannot edit a cancelled order', 400, 'INVALID_OPERATION');
+  }
+
+  const lineItemMap = new Map(lineItems.map(i => [i.id, i]));
+
+  const updated = await req.db.$transaction(async (tx) => {
+    const results = [];
+    for (const { id, quantityOrdered, unitCost } of items) {
+      if (!lineItemMap.has(id)) continue;
+      const qty = parseFloat(quantityOrdered);
+      const cost = parseFloat(unitCost);
+      if (qty <= 0 || cost <= 0) continue;
+      const totalCost = qty * cost;
+      const result = await tx.materialReorder.update({
+        where: { id },
+        data: { quantityOrdered: qty, unitCost: cost, totalCost },
+      });
+      results.push(result);
+    }
+    return results;
+  });
+
+  await req.db.auditLog.create({
+    data: {
+      userId: req.user.id,
+      action: 'UPDATE',
+      entity: 'MaterialReorder',
+      businessId: req.user.businessId,
+      description: `Admin updated pending restock order ${orderId}: ${updated.length} item(s) adjusted`,
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Restock order updated',
+    data: { orderId, updatedItems: updated.length },
+  });
+});
+
+// @desc    Admin: cancel a pending restock order
+// @route   PUT /api/materials/restock-orders/:orderId/cancel
+// @access  Private (Admin only)
+export const cancelRestockOrder = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+
+  const lineItems = await req.db.materialReorder.findMany({
+    where: { orderId, businessId: req.user.businessId },
+  });
+
+  if (lineItems.length === 0) {
+    throw new AppError('Order not found', 404, 'NOT_FOUND');
+  }
+
+  const hasReceived = lineItems.some(i => i.status === 'received');
+  if (hasReceived) {
+    throw new AppError('Cannot cancel an order that has already been received', 400, 'INVALID_OPERATION');
+  }
+
+  // Expenses are only created when received, so no expense cleanup needed for pending orders
+  await req.db.materialReorder.updateMany({
+    where: { orderId, businessId: req.user.businessId },
+    data: { status: 'cancelled' },
+  });
+
+  await req.db.auditLog.create({
+    data: {
+      userId: req.user.id,
+      action: 'CANCEL',
+      entity: 'MaterialReorder',
+      businessId: req.user.businessId,
+      description: `Admin cancelled restock order ${orderId} (${lineItems.length} item(s))`,
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Restock order cancelled',
+  });
+});
+
 // @desc    Get material reorder history
 // @route   GET /api/materials/:id/reorders
 // @access  Private (requires 'materials:view' permission)

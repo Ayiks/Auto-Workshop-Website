@@ -72,4 +72,16 @@ export const materialsApi = {
     const response = await apiClient.post(`/materials/restock-orders/${orderId}/receive`);
     return response;
   },
+
+  // Admin: edit quantities/costs on a pending restock order
+  updateRestockOrder: async (orderId, data) => {
+    const response = await apiClient.put(`/materials/restock-orders/${orderId}`, data);
+    return response;
+  },
+
+  // Admin: cancel a pending restock order
+  cancelRestockOrder: async (orderId) => {
+    const response = await apiClient.put(`/materials/restock-orders/${orderId}/cancel`);
+    return response;
+  },
 };

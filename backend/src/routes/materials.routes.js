@@ -12,8 +12,10 @@ import {
   getInventorySnapshot,
   getRestockOrders,
   receiveRestockOrder,
+  updateRestockOrder,
+  cancelRestockOrder,
 } from '../controllers/materials.controller.js';
-import { protect, requirePermission } from '../middleware/auth.js';
+import { protect, requirePermission, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -34,6 +36,8 @@ router.post('/bulk-reorder', requirePermission('materials', 'reorder'), bulkReor
 // Restock orders
 router.get('/restock-orders', requirePermission('materials', 'view'), getRestockOrders);
 router.post('/restock-orders/:orderId/receive', requirePermission('materials', 'reorder'), receiveRestockOrder);
+router.put('/restock-orders/:orderId', authorize('admin'), updateRestockOrder);
+router.put('/restock-orders/:orderId/cancel', authorize('admin'), cancelRestockOrder);
 
 // CRUD routes
 router

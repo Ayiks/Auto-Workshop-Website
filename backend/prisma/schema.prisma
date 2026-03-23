@@ -40,6 +40,7 @@ model Business {
   vehicles         Vehicle[]
   reminders        Reminder[]
   vendors          Vendor[]
+  jobPhotos        JobPhoto[]
 
   @@map("businesses")
 }
@@ -62,6 +63,7 @@ model User {
   verificationTokenExpiry DateTime? @map("verification_token_expiry")
   expensesRecorded  Expense[]
   jobsAssigned      Job[]
+  uploadedPhotos    JobPhoto[]  @relation("PhotoUploader")
   reordersCreated   MaterialReorder[] @relation("CreatedReorders")
   reordersReceived  MaterialReorder[] @relation("ReceivedReorders")
   paymentsReceived  Payment[]
@@ -294,8 +296,26 @@ model Job {
   customer           Customer?     @relation(fields: [customerId], references: [id])
   vehicle            Vehicle?      @relation(fields: [vehicleId], references: [id])
   reminders          Reminder[]
+  photos             JobPhoto[]
 
   @@map("jobs")
+}
+
+model JobPhoto {
+  id         Int      @id @default(autoincrement())
+  jobId      Int      @map("job_id")
+  url        String   @map("url") @db.VarChar(500)
+  publicId   String   @map("public_id") @db.VarChar(200)
+  caption    String?  @map("caption") @db.VarChar(20)
+  uploadedBy Int      @map("uploaded_by")
+  createdAt  DateTime @default(now()) @map("created_at")
+  businessId String   @map("business_id")
+
+  job      Job      @relation(fields: [jobId],      references: [id], onDelete: Cascade)
+  uploader User     @relation("PhotoUploader", fields: [uploadedBy], references: [id])
+  business Business @relation(fields: [businessId], references: [id])
+
+  @@map("job_photos")
 }
 
 model Vehicle {
@@ -450,6 +470,7 @@ model BusinessSettings {
   arkeselSenderId         String?  @map("arkesel_sender_id") @db.VarChar(50)
   arkeselWhatsAppSenderId String?  @map("arkesel_whatsapp_sender_id") @db.VarChar(50)
   whatsappStatus          String?  @default("unregistered") @map("whatsapp_status") @db.VarChar(20)
+  enabledJobTypes         String[] @default(["mechanic","sprayer","bodyworks","other"]) @map("enabled_job_types")
   updatedAt               DateTime @updatedAt @map("updated_at")
   businessId              String   @map("business_id")
   business                Business @relation(fields: [businessId], references: [id])

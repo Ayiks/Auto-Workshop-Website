@@ -5,8 +5,9 @@ import {
   getPayment,
   getInvoicePayments,
   getPaymentStats,
+  voidPayment,
 } from '../controllers/payment.controller.js';
-import { protect, requirePermission } from '../middleware/auth.js';
+import { protect, requirePermission, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -25,6 +26,7 @@ router
 
 router
   .route('/:id')
-  .get(getPayment);
+  .get(getPayment)
+  .delete(authorize('admin'), voidPayment);
 
 export default router;

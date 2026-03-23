@@ -8,10 +8,9 @@ import {
   getExpensesByCategory,
   getCOGSExpenses,
   getExpenseStats,
-  // revertReorder,
-  // correctReorder
+  adminCorrectExpense,
 } from '../controllers/expenses.controller.js';
-import { protect, requirePermission } from '../middleware/auth.js';
+import { protect, requirePermission, authorize } from '../middleware/auth.js';
 
 const router = express.Router();
 
@@ -50,19 +49,8 @@ router
   .put(requirePermission('expenses', 'edit'), updateExpense)
   .delete(requirePermission('expenses', 'delete'), deleteExpense);
 
-// 1. Route for Reverting (Deleting)
-// router.delete(
-//   '/:id/revert-reorder', 
-//   requirePermission('expenses', 'delete'), 
-//   revertReorder
-// );
-
-// 2. Route for Correcting (Updating) - Note the URL change here
-// router.put(
-//   '/:id/correct-reorder', 
-//   requirePermission('expenses', 'edit'), 
-//   correctReorder
-// );
+// Admin-only: correct the amount on a locked (COG/auto-generated) expense record
+router.put('/:id/admin-correct', authorize('admin'), adminCorrectExpense);
 
 
 export default router;

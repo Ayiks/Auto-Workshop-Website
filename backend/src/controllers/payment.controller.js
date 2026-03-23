@@ -383,6 +383,70 @@ export const getInvoicePayments = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Void a payment (admin only) — deletes the payment and recalculates the invoice
+// @route   DELETE /api/payments/:id
+// @access  Admin only
+export const voidPayment = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const payment = await req.db.payment.findFirst({
+    where: { id: parseInt(id), invoice: { job: { businessId: req.user.businessId } } },
+    include: { invoice: true },
+  });
+
+  if (!payment) {
+    throw new AppError('Payment not found', 404, 'NOT_FOUND');
+  }
+
+  const invoice = payment.invoice;
+  const voidedAmount = parseFloat(payment.amount);
+
+  await req.db.$transaction(async (tx) => {
+    // 1. Delete the payment record
+    await tx.payment.delete({ where: { id: payment.id } });
+
+    // 2. Recalculate invoice
+    const newAmountPaid = Math.max(0, parseFloat(invoice.amountPaid) - voidedAmount);
+    const newAmountDue = parseFloat(invoice.totalAmount) - newAmountPaid;
+
+    let newStatus;
+    if (newAmountPaid <= 0) {
+      newStatus = 'unpaid';
+    } else if (newAmountDue <= 0.01) {
+      newStatus = 'paid';
+    } else {
+      newStatus = 'partial';
+    }
+
+    await tx.invoice.update({
+      where: { id: invoice.id },
+      data: {
+        amountPaid: newAmountPaid,
+        amountDue: newAmountDue > 0 ? newAmountDue : 0,
+        paymentStatus: newStatus,
+        fullyPaidDate: newStatus === 'paid' ? invoice.fullyPaidDate : null,
+      },
+    });
+
+    // 3. Audit log
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'DELETE',
+        entity: 'Payment',
+        entityId: payment.id,
+        businessId: req.user.businessId,
+        description: `Admin voided payment #${payment.id} of GH₵${voidedAmount.toFixed(2)} on invoice ${invoice.invoiceNumber}. Status reverted to ${newStatus}.`,
+      },
+    });
+  });
+
+  res.status(200).json({
+    success: true,
+    message: `Payment of GH₵${voidedAmount.toFixed(2)} voided. Invoice balance recalculated.`,
+  });
+});
+
 // @desc    Get payment statistics
 // @route   GET /api/payments/stats
 // @access  Private

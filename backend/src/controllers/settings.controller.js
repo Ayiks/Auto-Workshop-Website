@@ -39,7 +39,7 @@ export const getSettings = asyncHandler(async (req, res) => {
 // @route   PUT /api/settings/business
 // @access  Private (requires 'settings:update' permission)
 export const updateSettings = asyncHandler(async (req, res) => {
-  const { name, logo, address, phone, email, website, arkeselSenderId, arkeselWhatsAppSenderId } = req.body;
+  const { name, logo, address, phone, email, website, arkeselSenderId, arkeselWhatsAppSenderId, enabledJobTypes } = req.body;
 
   if (email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -81,6 +81,7 @@ export const updateSettings = asyncHandler(async (req, res) => {
   // Arkesel messaging config — only update if provided (empty string = clear)
   if (arkeselSenderId !== undefined) updateData.arkeselSenderId = arkeselSenderId?.trim() || null;
   if (arkeselWhatsAppSenderId !== undefined) updateData.arkeselWhatsAppSenderId = arkeselWhatsAppSenderId?.trim() || null;
+  if (Array.isArray(enabledJobTypes) && enabledJobTypes.length) updateData.enabledJobTypes = enabledJobTypes;
 
   if (settings) {
     settings = await req.db.businessSettings.update({

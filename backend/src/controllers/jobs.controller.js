@@ -10,10 +10,28 @@ export const createJob = asyncHandler(async (req, res) => {
     problemType, problemDescription,
     labourCost = 0, miscellaneousCost = 0, materials = [],
     reminderEnabled = false, reminderIntervalMonths, reminderTypes = [], reminderChannels = ['email'],
+    beforePhotos = [],
   } = req.body;
 
   if (!jobType || !['mechanic', 'sprayer', 'bodyworks', 'other'].includes(jobType))
     throw new AppError('Invalid job type. Must be mechanic, sprayer, bodyworks, or other', 400, 'VALIDATION_ERROR');
+
+  // Validate jobType against this business's enabled job types
+  const bizConfig = await req.db.businessSettings.findFirst({
+    where: { businessId: req.user.businessId },
+    select: { enabledJobTypes: true },
+  });
+  const allowedTypes = bizConfig?.enabledJobTypes?.length
+    ? bizConfig.enabledJobTypes
+    : ['mechanic', 'sprayer', 'bodyworks', 'other'];
+  if (!allowedTypes.includes(jobType)) {
+    throw new AppError(
+      `Job type "${jobType}" is not enabled for this workshop. Enabled types: ${allowedTypes.join(', ')}`,
+      400,
+      'VALIDATION_ERROR'
+    );
+  }
+
   if (!clientName || !clientPhone)
     throw new AppError('Please provide client name and phone number', 400, 'VALIDATION_ERROR');
   if (!problemType)
@@ -86,6 +104,24 @@ export const createJob = asyncHandler(async (req, res) => {
     });
     for (const m of validatedMaterials) {
       await tx.jobMaterial.create({ data: { jobId: job.id, ...m } });
+    }
+
+    // Save before photos if provided
+    if (Array.isArray(beforePhotos) && beforePhotos.length > 0) {
+      for (const photo of beforePhotos) {
+        if (photo?.url && photo?.publicId) {
+          await tx.jobPhoto.create({
+            data: {
+              jobId: job.id,
+              url: photo.url,
+              publicId: photo.publicId,
+              caption: 'before',
+              uploadedBy: req.user.id,
+              businessId: req.user.businessId,
+            },
+          });
+        }
+      }
     }
 
     // Auto-upsert Customer and Vehicle records from job data
@@ -249,6 +285,10 @@ export const getJob = asyncHandler(async (req, res) => {
             orderBy: { paymentDate: 'desc' },
           },
         },
+      },
+      photos: {
+        orderBy: { createdAt: 'asc' },
+        include: { uploader: { select: { fullName: true } } },
       },
     },
   });

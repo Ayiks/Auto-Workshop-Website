@@ -146,6 +146,30 @@ export const paymentsApi = {
     const response = await apiClient.get('/payments/stats');
     return response;
   },
+
+  // Admin: void (delete) a payment and recalculate the invoice
+  voidPayment: async (id) => {
+    const response = await apiClient.delete(`/payments/${id}`);
+    return response;
+  },
+};
+
+// ============================================
+// JOB PHOTOS API
+// ============================================
+export const jobPhotosApi = {
+  getPhotos: async (jobId) => {
+    const response = await apiClient.get(`/jobs/${jobId}/photos`);
+    return response;
+  },
+  addPhoto: async (jobId, data) => {
+    const response = await apiClient.post(`/jobs/${jobId}/photos`, data);
+    return response;
+  },
+  deletePhoto: async (jobId, photoId) => {
+    const response = await apiClient.delete(`/jobs/${jobId}/photos/${photoId}`);
+    return response;
+  },
 };
 
 export default { jobsApi, invoicesApi, paymentsApi };

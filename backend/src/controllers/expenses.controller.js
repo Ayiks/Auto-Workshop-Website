@@ -1170,11 +1170,57 @@ export const getExpenseStats = asyncHandler(async (req, res) => {
 });
 
 /**
- * NOTE: 
+ * NOTE:
  * The `revertReorder` and `correctReorder` functions have been REMOVED.
- * * Since we have decoupled Stock (Materials) from Money (Expenses), 
+ * Since we have decoupled Stock (Materials) from Money (Expenses),
  * there is no longer a guaranteed link between an Expense ID and a Material Reorder.
- * * If a user needs to fix a mistake:
+ * If a user needs to fix a mistake:
  * 1. Adjust Stock via Inventory/Material endpoints.
  * 2. Edit/Delete the manual Expense record via the Expense endpoints above.
+ * Admin users can correct the amount on locked (COG/auto-generated) records via adminCorrectExpense below.
  */
+
+// @desc    Admin-only: correct the amount on a locked (isReadOnly) expense record
+// @route   PUT /api/expenses/:id/admin-correct
+// @access  Private (Admin only)
+export const adminCorrectExpense = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+  const { amount } = req.body;
+
+  if (!amount || parseFloat(amount) <= 0) {
+    throw new AppError('A valid amount greater than 0 is required', 400, 'VALIDATION_ERROR');
+  }
+
+  const expense = await req.db.expense.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
+  });
+
+  if (!expense) {
+    throw new AppError('Expense not found', 404, 'NOT_FOUND');
+  }
+
+  const oldAmount = parseFloat(expense.amount);
+  const newAmount = parseFloat(amount);
+
+  const updated = await req.db.expense.update({
+    where: { id: parseInt(id) },
+    data: { amount: newAmount },
+  });
+
+  await req.db.auditLog.create({
+    data: {
+      userId: req.user.id,
+      action: 'UPDATE',
+      entity: 'Expense',
+      entityId: updated.id,
+      businessId: req.user.businessId,
+      description: `Admin corrected locked expense #${updated.id} amount from GH₵${oldAmount.toFixed(2)} to GH₵${newAmount.toFixed(2)}`,
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Expense amount corrected',
+    data: updated,
+  });
+});

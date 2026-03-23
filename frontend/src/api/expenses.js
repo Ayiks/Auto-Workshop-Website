@@ -59,14 +59,12 @@ export const expensesApi = {
     return response;
   },
 
-  // Correct a reorder (Update expense + Adjust Inventory Stock & Unit Cost)
-  // Route: PUT /api/expenses/:id/correct-reorder
-  correctReorder: async (id, data) => {
-    const response = await apiClient.put(`/expenses/${id}/correct-reorder`, data);
+  // Admin-only: correct amount on a locked (COG/auto-generated) expense
+  // Route: PUT /api/expenses/:id/admin-correct
+  adminCorrectExpense: async (id, data) => {
+    const response = await apiClient.put(`/expenses/${id}/admin-correct`, data);
     return response;
   },
-
-  
 };
 
 export default expensesApi;

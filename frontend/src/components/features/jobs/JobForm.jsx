@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { materialsApi } from '@api/materials';
+import { settingsApi } from '@api/settings';
 import { useAuthStore } from '@stores/authStore';
 import Button from '@components/common/Button';
 import CustomerSelect from '@components/common/CustomerSelect';
+import { uploadToCloudinary } from '@/services/cloudinary';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -50,6 +52,27 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
   const [availableVehicles, setAvailableVehicles] = useState([]);
   const [selectedVehicleId, setSelectedVehicleId] = useState(null);
 
+  // Before photos (uploaded to Cloudinary at selection time, saved on submit)
+  const [beforePhotos, setBeforePhotos] = useState([]);  // [{ url, publicId }]
+  const [uploadingBefore, setUploadingBefore] = useState(false);
+  const beforePhotoInputRef = useRef(null);
+
+  const handleBeforePhotoSelect = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = '';
+    if (file.size > 5 * 1024 * 1024) { alert('Photo must be less than 5MB'); return; }
+    setUploadingBefore(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      setBeforePhotos(prev => [...prev, { url, publicId: url.split('/').slice(-2).join('/') }]);
+    } catch {
+      alert('Photo upload failed. Please try again.');
+    } finally {
+      setUploadingBefore(false);
+    }
+  };
+
   // Reminder state
   const [reminderEnabled, setReminderEnabled] = useState(job?.reminderEnabled || false);
   const [reminderIntervalMonths, setReminderIntervalMonths] = useState(job?.reminderIntervalMonths || 3);
@@ -61,6 +84,13 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
     queryKey: ['materials', { status: 'active' }],
     queryFn: () => materialsApi.getMaterials({ status: 'active' }),
   });
+
+  const { data: settingsData } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: settingsApi.getBusinessSettings,
+  });
+
+  const enabledJobTypes = settingsData?.data?.enabledJobTypes ?? ['mechanic', 'sprayer', 'bodyworks', 'other'];
 
   const inventoryMaterials = materialsData?.data || [];
 
@@ -255,6 +285,7 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
           unitPrice: parseFloat(m.unitPrice),
           isExternal: m.isExternal,
         })),
+        beforePhotos,
         reminderEnabled,
         reminderIntervalMonths: reminderEnabled ? reminderIntervalMonths : undefined,
         reminderTypes: reminderEnabled ? reminderTypes : [],
@@ -278,8 +309,8 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
           <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-5 shadow-sm">
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2 sm:mb-3">Job Type</label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
-              {['mechanic', 'sprayer', 'bodyworks', 'other'].map((type) => {
-                const allowed = isJobTypeAllowed(user?.role, type);
+              {enabledJobTypes.filter(type => isJobTypeAllowed(user?.role, type)).map((type) => {
+                const allowed = true;
                 return (
                   <button
                     key={type}
@@ -438,6 +469,55 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
                 <textarea name="problemDescription" value={formData.problemDescription} onChange={handleChange}
                   rows={4} className={inputClass(false)} placeholder="Describe the issue in detail..." disabled={isLoading} />
               </div>
+
+              {/* Before Photos */}
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1.5">
+                  Before Photos
+                  <span className="ml-1 text-gray-400 font-normal">(optional — document the problem)</span>
+                </label>
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {beforePhotos.map((photo, idx) => (
+                    <div key={photo.url} className="relative w-16 h-16 shrink-0">
+                      <img src={photo.url} alt="Before" className="w-full h-full object-cover rounded-lg border border-gray-200" />
+                      <button
+                        type="button"
+                        onClick={() => setBeforePhotos(prev => prev.filter((_, i) => i !== idx))}
+                        className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-white border border-gray-300 rounded-full flex items-center justify-center shadow-sm hover:bg-red-50 text-gray-500 hover:text-red-500 text-xs leading-none"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                  {uploadingBefore && (
+                    <div className="w-16 h-16 border-2 border-dashed border-gray-300 rounded-lg flex items-center justify-center">
+                      <svg className="animate-spin w-4 h-4 text-gray-400" viewBox="0 0 24 24" fill="none">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/>
+                      </svg>
+                    </div>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => beforePhotoInputRef.current?.click()}
+                  disabled={uploadingBefore || isLoading}
+                  className="inline-flex items-center gap-1.5 px-2.5 py-1.5 text-xs font-medium text-gray-600 bg-gray-50 border border-gray-300 rounded-lg hover:bg-gray-100 disabled:opacity-50 transition-colors"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                  </svg>
+                  {uploadingBefore ? 'Uploading…' : 'Add Photo'}
+                </button>
+                <input
+                  ref={beforePhotoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleBeforePhotoSelect}
+                />
+              </div>
             </div>
           </div>
 
@@ -490,28 +570,30 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
                 <div>
                   <label className="block text-xs font-semibold text-gray-600 uppercase tracking-wider mb-2">Reminder Types</label>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {REMINDER_TYPES.map(({ value, label }) => (
-                      <label key={value} className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border cursor-pointer transition-all ${
-                        reminderTypes.includes(value) ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-400'
-                      }`}>
-                        <input
-                          type="checkbox"
-                          checked={reminderTypes.includes(value)}
-                          onChange={() => toggleReminderType(value)}
-                          className="sr-only"
-                        />
-                        <span className={`w-4 h-4 rounded flex-shrink-0 flex items-center justify-center border transition-colors ${
-                          reminderTypes.includes(value) ? 'bg-white border-white' : 'border-gray-300'
-                        }`}>
-                          {reminderTypes.includes(value) && (
-                            <svg className="w-2.5 h-2.5 text-gray-900" fill="currentColor" viewBox="0 0 12 12">
-                              <path d="M3.707 5.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L5 6.586 3.707 5.293z" />
-                            </svg>
-                          )}
-                        </span>
-                        <span className="text-xs font-medium">{label}</span>
-                      </label>
-                    ))}
+                    {REMINDER_TYPES.map(({ value, label }) => {
+                      const checked = reminderTypes.includes(value);
+                      return (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => toggleReminderType(value)}
+                          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-left transition-all ${
+                            checked ? 'bg-gray-900 border-gray-900 text-white' : 'bg-white border-gray-200 text-gray-700 hover:border-gray-400'
+                          }`}
+                        >
+                          <span className={`w-4 h-4 rounded shrink-0 flex items-center justify-center border transition-colors ${
+                            checked ? 'bg-white border-white' : 'border-gray-300'
+                          }`}>
+                            {checked && (
+                              <svg className="w-2.5 h-2.5 text-gray-900" fill="currentColor" viewBox="0 0 12 12">
+                                <path d="M3.707 5.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4a1 1 0 00-1.414-1.414L5 6.586 3.707 5.293z" />
+                              </svg>
+                            )}
+                          </span>
+                          <span className="text-xs font-medium">{label}</span>
+                        </button>
+                      );
+                    })}
                   </div>
                   {errors.reminderTypes && <p className="text-xs text-red-500 mt-1">{errors.reminderTypes}</p>}
                 </div>

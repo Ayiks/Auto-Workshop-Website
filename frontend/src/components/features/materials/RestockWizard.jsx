@@ -220,23 +220,100 @@ export default function RestockWizard({ onClose, onSuccess }) {
     );
   }
 
+  // ── Derive footer content per step so the shell stays clean ──────────────
+  const renderFooter = () => {
+    if (step === 0) return (
+      // Step 0 footer: Cancel on the left, selection count + Next on the right.
+      // No total needed here — user is just picking items.
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          Cancel
+        </button>
+        <div className="flex items-center gap-2">
+          {selectedIds.size > 0 && (
+            <span className="text-xs font-semibold bg-gray-100 text-gray-600 px-2.5 py-1 rounded-full">
+              {selectedIds.size} item{selectedIds.size > 1 ? "s" : ""} selected
+            </span>
+          )}
+          <button
+            onClick={goToStep2}
+            disabled={selectedIds.size === 0}
+            className="px-5 py-2 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40"
+          >
+            Next →
+          </button>
+        </div>
+      </div>
+    );
+
+    if (step === 1) return (
+      // Step 1 footer: Back left, grand total centre, Next right.
+      // Total is shown here so it's always visible as the user fills in costs.
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => setStep(0)}
+          className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          ← Back
+        </button>
+        <span className="text-sm font-bold text-gray-900">
+          GH₵{grandTotal.toFixed(2)}
+        </span>
+        <button
+          onClick={() => setStep(2)}
+          disabled={!orderItems.some((i) => parseFloat(i.quantityOrdered) > 0)}
+          className="px-5 py-2 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40"
+        >
+          Next →
+        </button>
+      </div>
+    );
+
+    if (step === 2) return (
+      // Step 2 footer: Back left, total + Confirm right.
+      // Confirm is the primary action — wider padding and no competing centre element.
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => setStep(1)}
+          className="px-4 py-2 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+        >
+          ← Back
+        </button>
+        <div className="flex items-center gap-3">
+          <span className="text-sm font-bold text-gray-900">GH₵{grandTotal.toFixed(2)}</span>
+          <button
+            onClick={handleConfirm}
+            disabled={bulkMutation.isPending}
+            className="px-6 py-2 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50"
+          >
+            {bulkMutation.isPending ? "Placing Order…" : "Confirm Order"}
+          </button>
+        </div>
+      </div>
+    );
+  };
+
   return (
-    <div className="flex flex-col h-[80vh]">
-      <StepBar current={step} />
+    // Outer shell: fixed height, flex column — header locks top, footer locks bottom,
+    // the middle grows and scrolls independently. Nothing inside can push the footer away.
+    <div className="flex flex-col h-[calc(100vh-280px)] overflow-hidden">
 
-      {/* ── STEP 0: Select Products ──────────────────────────────────── */}
-      {step === 0 && (
-        <div className="flex flex-col flex-1 overflow-hidden">
+      {/* ── STATIC HEADER: StepBar always visible, never scrolls ── */}
+      <div className="flex-shrink-0 border-b border-gray-100 pb-4">
+        <StepBar current={step} />
+      </div>
 
-          {/*
-            ACTION BAR — pinned at top of step content, never scrolls away.
-            Reason: Users should never have to scroll to reach Cancel / Next.
-            The search input is intentionally compact (max-w-xs) so the action
-            buttons sit comfortably on the same row even on narrow screens.
-          */}
-          <div className="flex items-center gap-2 mb-3">
-            {/* Compact search: constrained width frees space for buttons on the same row */}
-            <div className="relative flex-1 max-w-xs">
+      {/* ── SCROLLABLE MIDDLE: only this region scrolls ────────── */}
+      <div className="flex-1 min-h-0 overflow-y-auto py-4">
+
+        {/* STEP 0 — Select Products */}
+        {step === 0 && (
+          <div className="flex flex-col h-full gap-3">
+            {/* Search bar stays at the top of the scroll region */}
+            <div className="relative flex-shrink-0">
               <svg className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-gray-400 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
               </svg>
@@ -245,70 +322,41 @@ export default function RestockWizard({ onClose, onSuccess }) {
                 placeholder="Search materials…"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+                className="w-full max-w-xs pl-8 pr-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
               />
             </div>
 
-            {/* Selection count badge — stays visible at a glance */}
-            {selectedIds.size > 0 && (
-              <span className="text-xs font-semibold bg-gray-900 text-white px-2 py-0.5 rounded-full whitespace-nowrap">
-                {selectedIds.size} selected
-              </span>
-            )}
-
-            {/* Spacer pushes buttons to the right on wider viewports */}
-            <div className="flex-1" />
-
-            <button
-              onClick={onClose}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={goToStep2}
-              disabled={selectedIds.size === 0}
-              className="px-4 py-1.5 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40 whitespace-nowrap"
-            >
-              Next{selectedIds.size > 0 ? ` — ${selectedIds.size} item${selectedIds.size > 1 ? "s" : ""}` : ""}
-            </button>
+            <div className="divide-y divide-gray-100 border border-gray-200 rounded-lg">
+              {filteredMaterials.map((m) => {
+                const isLow = parseFloat(m.quantity) <= parseFloat(m.lowStockThreshold);
+                const checked = selectedIds.has(m.id);
+                return (
+                  <label key={m.id} className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${checked ? "bg-gray-50" : ""}`}>
+                    <input type="checkbox" checked={checked} onChange={() => toggleSelect(m.id)} className="rounded border-gray-300 text-gray-900" />
+                    <div className="flex-1 min-w-0">
+                      <span className="text-sm font-medium text-gray-900">{m.name}</span>
+                      {isLow && (
+                        <span className="ml-2 text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Low</span>
+                      )}
+                    </div>
+                    <span className="text-xs text-gray-400 whitespace-nowrap">
+                      {parseFloat(m.quantity).toLocaleString()} {m.baseUnit}
+                    </span>
+                  </label>
+                );
+              })}
+              {filteredMaterials.length === 0 && (
+                <div className="py-10 text-center text-sm text-gray-400">No materials found</div>
+              )}
+            </div>
           </div>
+        )}
 
-          {/* Scrollable list fills remaining height */}
-          <div className="flex-1 overflow-y-auto divide-y divide-gray-100 border border-gray-200 rounded-lg">
-            {filteredMaterials.map((m) => {
-              const isLow = parseFloat(m.quantity) <= parseFloat(m.lowStockThreshold);
-              const checked = selectedIds.has(m.id);
-              return (
-                <label key={m.id} className={`flex items-center gap-3 px-4 py-2.5 cursor-pointer hover:bg-gray-50 ${checked ? "bg-gray-50" : ""}`}>
-                  <input type="checkbox" checked={checked} onChange={() => toggleSelect(m.id)} className="rounded border-gray-300 text-gray-900" />
-                  <div className="flex-1 min-w-0">
-                    <span className="text-sm font-medium text-gray-900">{m.name}</span>
-                    {isLow && (
-                      <span className="ml-2 text-[10px] font-semibold bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-full">Low</span>
-                    )}
-                  </div>
-                  <span className="text-xs text-gray-400 whitespace-nowrap">
-                    {parseFloat(m.quantity).toLocaleString()} {m.baseUnit}
-                  </span>
-                </label>
-              );
-            })}
-            {filteredMaterials.length === 0 && (
-              <div className="py-10 text-center text-sm text-gray-400">No materials found</div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* ── STEP 1: Quantities & Costs ───────────────────────────────── */}
-      {step === 1 && (
-        <div className="flex flex-col flex-1 overflow-hidden">
-
-          {/* Scrollable table — fills available space above the fixed footer */}
-          <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg">
+        {/* STEP 1 — Quantities & Costs */}
+        {step === 1 && (
+          <div className="border border-gray-200 rounded-lg overflow-hidden">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 sticky top-0 z-10">
+              <thead className="bg-gray-50">
                 <tr className="text-xs text-gray-500 uppercase">
                   <th className="px-3 py-2 text-left">Material</th>
                   <th className="px-3 py-2 text-left w-28">Unit</th>
@@ -377,42 +425,11 @@ export default function RestockWizard({ onClose, onSuccess }) {
               </tbody>
             </table>
           </div>
+        )}
 
-          {/*
-            ACTION BAR — pinned at the bottom, outside the scroll container.
-            Step 1 is a data-entry step (filling in quantities & costs), so
-            the user naturally works top-to-bottom through the rows. The footer
-            bar is always visible once they finish entering data, without being
-            in the way while they type. The grand total here gives a final
-            sanity-check before advancing.
-          */}
-          <div className="border-t border-gray-200 pt-3 mt-2 flex items-center justify-between gap-2">
-            <button
-              onClick={() => setStep(0)}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
-            >
-              ← Back
-            </button>
-            <span className="text-sm font-bold text-gray-900">
-              Total: GH₵{grandTotal.toFixed(2)}
-            </span>
-            <button
-              onClick={() => setStep(2)}
-              disabled={!orderItems.some((i) => parseFloat(i.quantityOrdered) > 0)}
-              className="px-4 py-1.5 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-40 whitespace-nowrap"
-            >
-              Next →
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* ── STEP 2: Vendor & Confirm ─────────────────────────────────── */}
-      {step === 2 && (
-        <div className="flex flex-col flex-1 overflow-hidden">
-
-          {/* Scrollable body — user reads vendor, notes, and summary before acting */}
-          <div className="flex-1 overflow-y-auto space-y-4">
+        {/* STEP 2 — Vendor & Confirm */}
+        {step === 2 && (
+          <div className="space-y-4">
             {/* Vendor Select */}
             <div>
               <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -482,7 +499,7 @@ export default function RestockWizard({ onClose, onSuccess }) {
             {/* Order Summary */}
             <div className="border border-gray-200 rounded-lg overflow-hidden">
               <div className="bg-gray-50 px-4 py-2 text-xs font-semibold text-gray-500 uppercase">Order Summary</div>
-              <div className="divide-y divide-gray-100 max-h-40 overflow-y-auto">
+              <div className="divide-y divide-gray-100">
                 {orderItems.filter((i) => parseFloat(i.quantityOrdered) > 0).map((i) => {
                   const unit = i.options.find((o) => String(o.id) === String(i.unitId));
                   return (
@@ -497,10 +514,6 @@ export default function RestockWizard({ onClose, onSuccess }) {
                   );
                 })}
               </div>
-              <div className="flex justify-between px-4 py-3 bg-gray-50 border-t border-gray-200 font-bold text-sm">
-                <span>Total</span>
-                <span>GH₵{grandTotal.toFixed(2)}</span>
-              </div>
             </div>
 
             {bulkMutation.isError && (
@@ -509,31 +522,14 @@ export default function RestockWizard({ onClose, onSuccess }) {
               </p>
             )}
           </div>
+        )}
+      </div>
 
-          {/*
-            ACTION BAR — pinned at the bottom, outside the scroll container.
-            Step 2 is a review-and-confirm step: the user should read through
-            the vendor, notes, and order summary before committing. Placing
-            Back/Confirm here means they naturally reach the buttons only after
-            scrolling through all the details, which reduces accidental submits.
-          */}
-          <div className="border-t border-gray-200 pt-3 mt-2 flex items-center justify-between gap-2">
-            <button
-              onClick={() => setStep(1)}
-              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 whitespace-nowrap"
-            >
-              ← Back
-            </button>
-            <button
-              onClick={handleConfirm}
-              disabled={bulkMutation.isPending}
-              className="px-5 py-2 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 whitespace-nowrap"
-            >
-              {bulkMutation.isPending ? "Placing Order…" : "Confirm Order"}
-            </button>
-          </div>
-        </div>
-      )}
+      {/* ── STATIC FOOTER: buttons + total always visible, never scrolls ── */}
+      <div className="flex-shrink-0 border-t border-gray-200 pt-3 mt-1">
+        {renderFooter()}
+      </div>
+
     </div>
   );
 }

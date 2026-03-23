@@ -835,7 +835,7 @@ function SalesTab({ sales, dateRange }) {
                   <th className="px-6 py-3">Date</th>
                   <th className="px-6 py-3">Service</th>
                   <th className="px-6 py-3">Category</th>
-                  <th className="px-6 py-3">Type</th>
+                  {/* <th className="px-6 py-3">Type</th> */}
                   <th className="px-6 py-3 text-right">Amount</th>
                 </tr>
               </thead>
@@ -847,11 +847,11 @@ function SalesTab({ sales, dateRange }) {
                     </td>
                     <td className="px-6 py-3 font-medium text-gray-900">{item.serviceName || "—"}</td>
                     <td className="px-6 py-3 text-gray-600 capitalize">{item.category || "—"}</td>
-                    <td className="px-6 py-3">
+                    {/* <td className="px-6 py-3">
                       {item.type ? (
                         <span className="text-xs font-semibold px-2 py-1 rounded-full bg-emerald-50 text-emerald-700 capitalize">{item.type}</span>
                       ) : "—"}
-                    </td>
+                    </td> */}
                     <td className="px-6 py-3 text-right font-semibold text-gray-900">GH₵{Number(item.subtotal || item.price || 0).toLocaleString()}</td>
                   </tr>
                 ))}
@@ -861,30 +861,7 @@ function SalesTab({ sales, dateRange }) {
         </div>
       )}
 
-      {/* Recent Transactions */}
-      {recentSales.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-gray-100 bg-gray-50">
-            <h3 className="font-semibold text-gray-900">Recent Transactions</h3>
-          </div>
-          <div className="divide-y divide-gray-50">
-            {recentSales.map((sale, i) => (
-              <div key={i} className="flex items-center justify-between px-6 py-3 hover:bg-gray-50 transition-colors">
-                <div>
-                  <div className="text-sm font-medium text-gray-900">
-                    {sale.user?.fullName || "Unknown"} · {sale.items?.length || 0} item{sale.items?.length !== 1 ? "s" : ""}
-                  </div>
-                  <div className="text-xs text-gray-500 mt-0.5">
-                    {sale.saleDate ? format(new Date(sale.saleDate), "dd MMM yyyy, h:mm a") : "—"}
-                    {sale.paymentMethod && ` · ${sale.paymentMethod.toUpperCase()}`}
-                  </div>
-                </div>
-                <div className="font-bold text-gray-900">GH₵{Number(sale.totalAmount || 0).toLocaleString()}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
+      
 
       {sales.totalSales === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-12 text-center">
@@ -1528,26 +1505,26 @@ function getDateForPreset(preset, customDate) {
   const y = now.getFullYear();
   const m = now.getMonth(); // 0-indexed
 
-  const lastDay = (year, month) => new Date(year, month + 1, 0).toISOString().split('T')[0];
-  const fmt = (d) => d.toISOString().split('T')[0];
+  const pad = (n) => String(n).padStart(2, '0');
+  // Returns the first day of a given month (month is 0-indexed)
+  const firstDay = (year, month) => `${year}-${pad(month + 1)}-01`;
 
   switch (preset) {
-    case 'this-month':   return lastDay(y, m);
-    case 'last-month':   return lastDay(y, m - 1 < 0 ? 11 : m - 1);
+    case 'this-month':   return firstDay(y, m);
+    case 'last-month':   return m === 0 ? firstDay(y - 1, 11) : firstDay(y, m - 1);
     case 'this-quarter': {
-      const qEnd = Math.floor(m / 3) * 3 + 2;
-      return lastDay(y, qEnd);
+      const qStartM = Math.floor(m / 3) * 3; // 0, 3, 6, or 9
+      return firstDay(y, qStartM);
     }
     case 'last-quarter': {
-      const qStart = Math.floor(m / 3) * 3 - 3;
-      const qEndM = qStart + 2;
-      return qStart < 0 ? lastDay(y - 1, 11) : lastDay(y, qEndM);
+      const qStartM = Math.floor(m / 3) * 3 - 3;
+      return qStartM < 0 ? firstDay(y - 1, 9) : firstDay(y, qStartM);
     }
-    case 'mid-year':     return `${y}-06-30`;
-    case 'year-to-date': return fmt(now);
-    case 'full-year':    return `${y}-12-31`;
-    case 'custom':       return customDate || fmt(now);
-    default:             return fmt(now);
+    case 'mid-year':     return `${y}-07-01`;
+    case 'year-to-date': return `${y}-01-01`;
+    case 'full-year':    return `${y}-01-01`;
+    case 'custom':       return customDate || now.toISOString().split('T')[0];
+    default:             return now.toISOString().split('T')[0];
   }
 }
 
@@ -1624,7 +1601,7 @@ function InventorySnapshotTab() {
 
           {preset !== 'custom' && (
             <p className="mt-2 text-xs text-gray-400">
-              Showing stock levels as of <span className="font-medium text-gray-600">{snapshotDate}</span>
+              Showing stock levels as at the start of this period — <span className="font-medium text-gray-600">{snapshotDate}</span>
             </p>
           )}
         </div>

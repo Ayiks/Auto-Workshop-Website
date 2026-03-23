@@ -1,9 +1,17 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Wrench, Paintbrush, Car, MoreHorizontal } from 'lucide-react';
 import { settingsApi } from '@api/settings';
 import Card from '@components/common/Card';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
+
+const JOB_TYPE_OPTIONS = [
+  { value: 'mechanic',  label: 'Mechanic',    icon: Wrench,         desc: 'Engine, brakes, suspension, electrical' },
+  { value: 'sprayer',   label: 'Sprayer',      icon: Paintbrush,     desc: 'Full respray, touch-up, primer & paint' },
+  { value: 'bodyworks', label: 'Body Works',   icon: Car,            desc: 'Panel beating, dent removal, welding' },
+  { value: 'other',     label: 'Other',        icon: MoreHorizontal, desc: 'Other workshop services' },
+];
 
 export default function BusinessSettings() {
   const queryClient = useQueryClient();
@@ -22,14 +30,28 @@ export default function BusinessSettings() {
     phone: settings?.phone || '',
     email: settings?.email || '',
     website: settings?.website || '',
+    enabledJobTypes: settings?.enabledJobTypes ?? ['mechanic', 'sprayer', 'bodyworks', 'other'],
   });
 
   // Re-sync state when data loads
   useState(() => {
     if (settings) {
-      setFormData(settings);
+      setFormData({
+        ...settings,
+        enabledJobTypes: settings.enabledJobTypes ?? ['mechanic', 'sprayer', 'bodyworks', 'other'],
+      });
     }
   }, [settings]);
+
+  const toggleJobType = (value) => {
+    setFormData(prev => {
+      const current = prev.enabledJobTypes;
+      if (current.includes(value)) {
+        return current.length > 1 ? { ...prev, enabledJobTypes: current.filter(t => t !== value) } : prev;
+      }
+      return { ...prev, enabledJobTypes: [...current, value] };
+    });
+  };
 
   const updateMutation = useMutation({
     mutationFn: settingsApi.updateBusinessSettings,
@@ -54,7 +76,10 @@ export default function BusinessSettings() {
 
   const handleCancel = () => {
     setIsEditing(false);
-    if (settings) setFormData(settings);
+    if (settings) setFormData({
+      ...settings,
+      enabledJobTypes: settings.enabledJobTypes ?? ['mechanic', 'sprayer', 'bodyworks', 'other'],
+    });
   };
 
   if (isLoading) return <div className="p-8 text-center"><LoadingSpinner /></div>;
@@ -147,8 +172,59 @@ export default function BusinessSettings() {
               value={isEditing ? formData.address : settings?.address || ''}
               onChange={handleChange}
               disabled={!isEditing}
-                        className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
+                        className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
             />
+          </div>
+        </div>
+
+        <hr className="border-gray-100" />
+
+        {/* Workshop Specializations */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-start">
+          <div>
+            <label className="block text-xs sm:text-sm text-gray-700">Workshop Specializations</label>
+            <p className="text-[11px] text-gray-400 mt-0.5">Controls which job types and staff roles are available.</p>
+          </div>
+          <div className="sm:col-span-2">
+            {isEditing ? (
+              <div className="grid grid-cols-2 gap-2">
+                {JOB_TYPE_OPTIONS.map(({ value, label, icon: Icon, desc }) => {
+                  const selected = formData.enabledJobTypes.includes(value);
+                  return (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => toggleJobType(value)}
+                      className={`flex items-start gap-2.5 p-3 rounded-xl border-2 text-left transition-colors ${
+                        selected ? 'border-slate-900 bg-slate-50' : 'border-slate-200 hover:border-slate-300'
+                      }`}
+                    >
+                      <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 mt-0.5 ${selected ? 'bg-slate-900 text-white' : 'bg-slate-100 text-slate-500'}`}>
+                        <Icon className="w-3.5 h-3.5" />
+                      </div>
+                      <div>
+                        <p className={`text-xs font-semibold ${selected ? 'text-slate-900' : 'text-slate-600'}`}>{label}</p>
+                        <p className="text-[10px] text-slate-400 leading-tight mt-0.5">{desc}</p>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {(settings?.enabledJobTypes ?? ['mechanic', 'sprayer', 'bodyworks', 'other']).map(type => {
+                  const opt = JOB_TYPE_OPTIONS.find(o => o.value === type);
+                  if (!opt) return null;
+                  const Icon = opt.icon;
+                  return (
+                    <span key={type} className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium bg-slate-100 text-slate-700 rounded-lg border border-slate-200">
+                      <Icon className="w-3 h-3" />
+                      {opt.label}
+                    </span>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </div>

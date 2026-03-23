@@ -16,18 +16,22 @@ import ExpenseForm from "@components/features/expenses/ExpenseForm";
 
 export default function Expenses() {
   const queryClient = useQueryClient();
-  const { hasPermission } = useAuthStore();
+  const { hasPermission, user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
 
   // State
   const [selectedMonth, setSelectedMonth] = useState(new Date());
   const [typeFilter, setTypeFilter] = useState("all");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [searchTerm, setSearchTerm] = useState("");
-  
+
   // Modal States
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState(null);
+  const [showCorrectModal, setShowCorrectModal] = useState(false);
+  const [correctingExpense, setCorrectingExpense] = useState(null);
+  const [correctAmount, setCorrectAmount] = useState("");
 
   // Date Filters
   const dateFilters = {
@@ -95,6 +99,25 @@ export default function Expenses() {
     },
     onError: () => toast.error("Failed to delete expense"),
   });
+
+  const correctMutation = useMutation({
+    mutationFn: ({ id, amount }) => expensesApi.adminCorrectExpense(id, { amount }),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["expenses"]);
+      queryClient.invalidateQueries(["expense-stats"]);
+      setShowCorrectModal(false);
+      setCorrectingExpense(null);
+      setCorrectAmount("");
+      toast.success("Expense amount corrected");
+    },
+    onError: (err) => toast.error(err.response?.data?.error?.message || "Failed to correct expense"),
+  });
+
+  const handleOpenCorrect = (expense) => {
+    setCorrectingExpense(expense);
+    setCorrectAmount(parseFloat(expense.amount).toFixed(2));
+    setShowCorrectModal(true);
+  };
 
   // Handlers
   const handleEdit = (expense) => {
@@ -223,10 +246,21 @@ export default function Expenses() {
               </button>
             </>
           ) : (
-             <span className="text-[10px] text-gray-400 font-medium px-2 py-1 bg-gray-50 rounded select-none border border-gray-100 flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
+              <span className="text-[10px] text-gray-400 font-medium px-2 py-1 bg-gray-50 rounded select-none border border-gray-100 flex items-center gap-1">
                 <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                 LOCKED
-             </span>
+              </span>
+              {isAdmin && (
+                <button
+                  onClick={() => handleOpenCorrect(expense)}
+                  className="text-[10px] font-medium px-2 py-1 text-amber-700 bg-amber-50 border border-amber-200 rounded hover:bg-amber-100 transition-colors"
+                  title="Correct amount (admin only)"
+                >
+                  Correct
+                </button>
+              )}
+            </div>
           )}
         </div>
       ),
@@ -406,6 +440,56 @@ export default function Expenses() {
       <Modal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setSelectedExpense(null); }} title="Edit Expense" size="md">
         <div className="p-1">
           <ExpenseForm expense={selectedExpense} onSubmit={(data) => updateMutation.mutate({ id: selectedExpense.id, data })} onCancel={() => { setShowEditModal(false); setSelectedExpense(null); }} isLoading={updateMutation.isPending} />
+        </div>
+      </Modal>
+
+      {/* Admin: Correct locked expense amount */}
+      <Modal
+        isOpen={showCorrectModal}
+        onClose={() => { setShowCorrectModal(false); setCorrectingExpense(null); setCorrectAmount(""); }}
+        title="Correct Expense Amount"
+        size="sm"
+      >
+        <div className="p-4 space-y-4">
+          <p className="text-xs text-gray-500">
+            This expense is locked because it was auto-generated from a restock order.
+            You can correct the recorded amount below.
+          </p>
+          {correctingExpense && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 text-xs text-gray-600 space-y-0.5">
+              <p className="font-medium text-gray-800 truncate">{correctingExpense.description}</p>
+              <p>Current amount: <span className="font-semibold">GH₵{parseFloat(correctingExpense.amount).toFixed(2)}</span></p>
+            </div>
+          )}
+          <div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">New Amount (GH₵)</label>
+            <input
+              type="number"
+              min="0.01"
+              step="0.01"
+              value={correctAmount}
+              onChange={(e) => setCorrectAmount(e.target.value)}
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
+              placeholder="0.00"
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => { setShowCorrectModal(false); setCorrectingExpense(null); setCorrectAmount(""); }}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={!correctAmount || parseFloat(correctAmount) <= 0 || correctMutation.isPending}
+              onClick={() => correctMutation.mutate({ id: correctingExpense.id, amount: parseFloat(correctAmount) })}
+              className="px-4 py-1.5 text-sm font-semibold bg-amber-600 text-white rounded-lg hover:bg-amber-700 disabled:opacity-50"
+            >
+              {correctMutation.isPending ? "Saving…" : "Save Correction"}
+            </button>
+          </div>
         </div>
       </Modal>
     </div>

@@ -1,16 +1,31 @@
 // src/components/features/users/UserForm.jsx
 import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import Button from '@components/common/Button'; // reusing your common button
+import { settingsApi } from '@api/settings';
 
-const ROLES = [
-  { value: 'admin', label: 'Admin' },
-  { value: 'sales', label: 'Sales' },
-  { value: 'mechanic', label: 'Mechanic' },
-  { value: 'sprayer', label: 'Sprayer' },
+const ALL_ROLES = [
+  { value: 'admin',     label: 'Admin' },
+  { value: 'sales',     label: 'Sales' },
+  { value: 'mechanic',  label: 'Mechanic' },
+  { value: 'sprayer',   label: 'Sprayer' },
   { value: 'bodyworks', label: 'Body Works' },
 ];
 
+// Roles that require a matching enabled job type
+const WORKER_ROLE_JOB_MAP = { mechanic: 'mechanic', sprayer: 'sprayer', bodyworks: 'bodyworks' };
+
 export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
+  const { data: settingsData } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: settingsApi.getBusinessSettings,
+  });
+
+  const enabledJobTypes = settingsData?.data?.enabledJobTypes ?? ['mechanic', 'sprayer', 'bodyworks', 'other'];
+  const ROLES = ALL_ROLES.filter(r => {
+    if (!WORKER_ROLE_JOB_MAP[r.value]) return true; // admin, sales always shown
+    return enabledJobTypes.includes(WORKER_ROLE_JOB_MAP[r.value]);
+  });
   const [formData, setFormData] = useState({
     username: user?.username || '',
     password: '',

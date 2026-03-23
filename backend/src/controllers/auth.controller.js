@@ -185,7 +185,7 @@ export const verifyEmail = asyncHandler(async (req, res) => {
 
 // 3. STEP THREE: Setup the Workspace (Requires the User to be logged in via JWT)
 export const setupWorkspace = asyncHandler(async (req, res) => {
-  const { businessName, plan = 'free' } = req.body;
+  const { businessName, plan = 'free', enabledJobTypes } = req.body;
   const userId = req.user.id; // From your JWT auth middleware
 
   if (!businessName) throw new AppError('Business name is required', 400);
@@ -223,6 +223,9 @@ export const setupWorkspace = asyncHandler(async (req, res) => {
       email: req.user.email,
       phone: req.user.phone || '',
       address: 'Please update your address in settings',
+      enabledJobTypes: Array.isArray(enabledJobTypes) && enabledJobTypes.length
+        ? enabledJobTypes
+        : ['mechanic', 'sprayer', 'bodyworks', 'other'],
     }
   });
 

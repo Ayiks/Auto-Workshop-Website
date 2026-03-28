@@ -1,4 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
+import { format } from "date-fns";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { materialsApi } from "@api/materials";
 import { useAuthStore } from "@stores/authStore";
@@ -329,11 +330,15 @@ useEffect(() => {
               {row.name}
             </p>
             {row.isActive &&
-              Number(row.quantity) <= Number(row.lowStockThreshold) && (
+              Number(row.quantity) <= Number(row.lowStockThreshold) ? (
                 <span className="text-[10px] text-red-600 font-bold uppercase tracking-wide">
                   Restock Needed
                 </span>
-              )}
+              ) : row.updatedAt ? (
+                <span className="text-[10px] text-gray-400">
+                  edited {format(new Date(row.updatedAt), 'dd MMM yy')}
+                </span>
+              ) : null}
           </div>
         </div>
       ),
@@ -364,6 +369,11 @@ useEffect(() => {
                 style={{ width: `${percentage}%` }}
               />
             </div>
+            {row.reorders?.[0]?.receivedDate && (
+              <p className="text-[10px] text-gray-400 mt-1">
+                restocked {format(new Date(row.reorders[0].receivedDate), 'dd MMM yy')}
+              </p>
+            )}
           </div>
         );
       },

@@ -18,8 +18,14 @@ export const getMaterials = asyncHandler(async (req, res) => {
     where,
     orderBy: { name: 'asc' },
     include: {
-      alternateUnits: true
-    }
+      alternateUnits: true,
+      reorders: {
+        where: { status: 'received' },
+        orderBy: { receivedDate: 'desc' },
+        take: 1,
+        select: { receivedDate: true },
+      },
+    },
   });
 
   // Filter low stock items if requested

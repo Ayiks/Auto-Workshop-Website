@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { materialsApi } from "@/api/materials";
 import { vendorsApi } from "@/api/vendors";
+import VendorSelect from "@components/common/VendorSelect";
 
 const STEPS = ["Select Products", "Quantities & Costs", "Vendor & Confirm"];
 
@@ -99,7 +100,6 @@ export default function RestockWizard({ onClose, onSuccess }) {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [orderItems, setOrderItems] = useState([]);
   const [vendor, setVendor] = useState(null);
-  const [vendorSearch, setVendorSearch] = useState("");
   const [showVendorCreate, setShowVendorCreate] = useState(false);
   const [notes, setNotes] = useState("");
   const [done, setDone] = useState(false);
@@ -108,12 +108,6 @@ export default function RestockWizard({ onClose, onSuccess }) {
   const { data: materialsData } = useQuery({
     queryKey: ["materials"],
     queryFn: () => materialsApi.getMaterials({ status: "active" }),
-    staleTime: 60_000,
-  });
-
-  const { data: vendorsData } = useQuery({
-    queryKey: ["allVendors"],
-    queryFn: () => vendorsApi.getVendors(),
     staleTime: 60_000,
   });
 
@@ -127,7 +121,6 @@ export default function RestockWizard({ onClose, onSuccess }) {
   });
 
   const allMaterials = materialsData?.data?.data || materialsData?.data || [];
-  const allVendors = vendorsData?.data?.data || vendorsData?.data || [];
 
   const filteredMaterials = allMaterials
     .filter((m) => m.name.toLowerCase().includes(search.toLowerCase()))
@@ -136,10 +129,6 @@ export default function RestockWizard({ onClose, onSuccess }) {
       const bLow = parseFloat(b.quantity) <= parseFloat(b.lowStockThreshold);
       return bLow - aLow;
     });
-
-  const filteredVendors = allVendors.filter((v) =>
-    v.companyName.toLowerCase().includes(vendorSearch.toLowerCase())
-  );
 
   const toggleSelect = (id) => {
     setSelectedIds((prev) => {
@@ -203,7 +192,7 @@ export default function RestockWizard({ onClose, onSuccess }) {
         </div>
         <h3 className="text-lg font-bold text-gray-900 mb-1">Order Placed</h3>
         <p className="text-sm text-gray-500 mb-1">
-          {orderResult?.length || 0} item(s) ordered{vendor ? ` from ${vendor.companyName}` : ""}.
+          {orderResult?.length || 0} item(s) ordered{vendor ? ` from ${vendor.name}` : ""}.
         </p>
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 mb-6">
           Stock quantities will update when you mark goods as received.
@@ -432,48 +421,30 @@ export default function RestockWizard({ onClose, onSuccess }) {
           <div className="space-y-4">
             {/* Vendor Select */}
             <div>
-              <label className="block text-sm font-semibold text-gray-700 mb-2">
+              <p className="text-sm font-semibold text-gray-700 mb-2">
                 Select Vendor <span className="text-xs font-normal text-gray-400">(optional)</span>
-              </label>
-              {vendor ? (
-                <div className="flex items-center justify-between border border-gray-300 rounded-lg px-4 py-3 bg-gray-50">
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900">{vendor.companyName}</p>
-                    {vendor.contactName && <p className="text-xs text-gray-500">{vendor.contactName}</p>}
-                    <p className="text-xs text-gray-400">{vendor.phone || vendor.email || vendor.whatsappNumber || ""}</p>
-                  </div>
-                  <button onClick={() => setVendor(null)} className="text-xs text-gray-400 hover:text-red-500">Change</button>
-                </div>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    placeholder="Search vendors…"
-                    value={vendorSearch}
-                    onChange={(e) => setVendorSearch(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-1 focus:ring-gray-900"
-                  />
-                  {vendorSearch.length > 0 && (
-                    <div className="border border-gray-200 rounded-lg mt-1 max-h-40 overflow-y-auto divide-y divide-gray-100">
-                      {filteredVendors.map((v) => (
-                        <button key={v.id} onClick={() => { setVendor(v); setVendorSearch(""); setShowVendorCreate(false); }} className="w-full text-left px-4 py-2.5 hover:bg-gray-50 text-sm">
-                          <span className="font-medium text-gray-900">{v.companyName}</span>
-                          {v.phone && <span className="ml-2 text-xs text-gray-400">{v.phone}</span>}
-                        </button>
-                      ))}
-                      {filteredVendors.length === 0 && <div className="px-4 py-3 text-xs text-gray-400">No vendors found</div>}
-                    </div>
-                  )}
-                  <button onClick={() => setShowVendorCreate((v) => !v)} className="mt-2 text-xs font-semibold text-gray-600 hover:text-gray-900 underline">
-                    + Add new vendor
-                  </button>
-                  {showVendorCreate && (
-                    <VendorCreateForm
-                      onCreated={(v) => { setVendor(v); setShowVendorCreate(false); queryClient.invalidateQueries(["allVendors"]); }}
-                      onCancel={() => setShowVendorCreate(false)}
-                    />
-                  )}
-                </>
+              </p>
+              <VendorSelect
+                value={vendor}
+                onChange={(v) => { setVendor(v); if (v) setShowVendorCreate(false); }}
+                label=""
+              />
+              <button
+                type="button"
+                onClick={() => setShowVendorCreate((s) => !s)}
+                className="mt-2 text-xs font-semibold text-gray-600 hover:text-gray-900 underline"
+              >
+                + Add new vendor
+              </button>
+              {showVendorCreate && (
+                <VendorCreateForm
+                  onCreated={(v) => {
+                    setVendor({ id: v.id, name: v.companyName, contactName: v.contactName || null, phone: v.phone || null, email: v.email || null, whatsappNumber: v.whatsappNumber || null });
+                    setShowVendorCreate(false);
+                    queryClient.invalidateQueries(["allVendors"]);
+                  }}
+                  onCancel={() => setShowVendorCreate(false)}
+                />
               )}
               {vendor && notifyChannel && (
                 <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2 mt-2">

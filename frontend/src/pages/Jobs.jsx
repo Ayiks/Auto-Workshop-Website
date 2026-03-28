@@ -13,6 +13,7 @@ import LoadingSpinner from '@components/common/LoadingSpinner';
 import EmptyState from '@components/common/EmptyState';
 import JobForm from '@components/features/jobs/JobForm';
 import JobDetailsWithInvoice from '@components/features/jobs/JobDetailsWithInvoice';
+import { format } from 'date-fns';
 
 // We keep colors ONLY for status/invoice states (Trends/Data)
 const STATUS_STYLES = {
@@ -203,9 +204,18 @@ export default function Jobs() {
   // --- Table Columns ---
   const columns = [
     {
-      header: 'Job ID',
-      accessor: 'id',
-      render: (row) => <span className="font-mono text-xs text-gray-500">#{String(row.id).substring(0, 6)}</span>,
+      header: 'Date',
+      accessor: 'createdAt',
+      render: (row) =>(
+          <div className="flex flex-col">
+            <span className="font-medium text-gray-900 text-sm">
+              {format(new Date(row.createdAt), "MMM dd, yyyy")}
+            </span>
+            <span className="text-[11px] text-gray-400">
+              {format(new Date(row.createdAt), "HH:mm")}
+            </span>
+          </div>
+        ),
     },
     {
       header: 'Client',

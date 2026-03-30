@@ -128,6 +128,18 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
           )}
         </div>
 
+        {/* Footer — admin correction for received orders */}
+        {order.status === 'received' && isAdmin && (
+          <div className="px-6 py-4 border-t border-gray-100">
+            <button
+              onClick={() => onEditClick(order)}
+              className="w-full py-2 text-sm font-medium border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+            >
+              Edit Order (Admin Correction)
+            </button>
+          </div>
+        )}
+
         {/* Footer — actions for pending orders */}
         {isPending && (
           <div className="px-6 py-4 border-t border-gray-100 space-y-2">
@@ -275,6 +287,16 @@ function EditOrderModal({ order, onClose, onSave, isSaving }) {
 
         {/* Items */}
         <div className="flex-1 overflow-y-auto px-6 py-4 space-y-3">
+          {order.status === 'received' && (
+            <div className="flex items-start gap-2 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3">
+              <svg className="w-4 h-4 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+              </svg>
+              <p className="text-xs text-amber-700 leading-snug">
+                This order has been received. Saving will adjust stock levels and update the expense record.
+              </p>
+            </div>
+          )}
           {items.map((item, index) => {
             const lineTotal = (parseFloat(item.quantityOrdered) || 0) * (parseFloat(item.unitCost) || 0);
             return (
@@ -381,6 +403,17 @@ export default function RestockOrdersList() {
     mutationFn: ({ orderId, data }) => materialsApi.updateRestockOrder(orderId, data),
     onSuccess: () => {
       queryClient.invalidateQueries(['restockOrders']);
+      queryClient.invalidateQueries(['expenses']);
+      setEditingOrder(null);
+      setSelectedOrder(null);
+    },
+  });
+
+  const adminCorrectMutation = useMutation({
+    mutationFn: ({ orderId, data }) => materialsApi.adminEditReceivedOrder(orderId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['restockOrders']);
+      queryClient.invalidateQueries(['materials']);
       queryClient.invalidateQueries(['expenses']);
       setEditingOrder(null);
       setSelectedOrder(null);
@@ -511,8 +544,16 @@ export default function RestockOrdersList() {
         <EditOrderModal
           order={editingOrder}
           onClose={() => setEditingOrder(null)}
-          onSave={(data) => updateMutation.mutate({ orderId: editingOrder.orderId, data })}
-          isSaving={updateMutation.isPending}
+          onSave={(data) =>
+            editingOrder.status === 'received'
+              ? adminCorrectMutation.mutate({ orderId: editingOrder.orderId, data })
+              : updateMutation.mutate({ orderId: editingOrder.orderId, data })
+          }
+          isSaving={
+            editingOrder.status === 'received'
+              ? adminCorrectMutation.isPending
+              : updateMutation.isPending
+          }
         />
       )}
     </div>

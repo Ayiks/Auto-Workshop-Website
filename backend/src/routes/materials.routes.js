@@ -13,6 +13,7 @@ import {
   getRestockOrders,
   receiveRestockOrder,
   updateRestockOrder,
+  adminEditReceivedOrder,
   cancelRestockOrder,
 } from '../controllers/materials.controller.js';
 import { protect, requirePermission, authorize } from '../middleware/auth.js';
@@ -37,6 +38,7 @@ router.post('/bulk-reorder', requirePermission('materials', 'reorder'), bulkReor
 router.get('/restock-orders', requirePermission('materials', 'view'), getRestockOrders);
 router.post('/restock-orders/:orderId/receive', requirePermission('materials', 'reorder'), receiveRestockOrder);
 router.put('/restock-orders/:orderId', authorize('admin'), updateRestockOrder);
+router.put('/restock-orders/:orderId/admin-correct', authorize('admin'), adminEditReceivedOrder);
 router.put('/restock-orders/:orderId/cancel', authorize('admin'), cancelRestockOrder);
 
 // CRUD routes

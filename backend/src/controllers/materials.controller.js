@@ -938,6 +938,103 @@ export const cancelRestockOrder = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Admin: correct quantities/costs on an already-received restock order
+// @route   PUT /api/materials/restock-orders/:orderId/admin-correct
+// @access  Private (Admin only)
+export const adminEditReceivedOrder = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { items } = req.body;
+
+  if (!Array.isArray(items) || items.length === 0)
+    throw new AppError('items array is required', 400, 'VALIDATION_ERROR');
+
+  const lineItems = await req.db.materialReorder.findMany({
+    where: { orderId, businessId: req.user.businessId },
+    include: { material: { include: { alternateUnits: true } } },
+  });
+
+  if (!lineItems.length) throw new AppError('Order not found', 404, 'NOT_FOUND');
+
+  if (lineItems.some(i => i.status !== 'received'))
+    throw new AppError('This endpoint is only for received orders', 400, 'INVALID_OPERATION');
+
+  const lineItemMap = new Map(lineItems.map(i => [i.id, i]));
+
+  const results = await req.db.$transaction(async (tx) => {
+    const processed = [];
+    for (const { id, quantityOrdered, unitCost } of items) {
+      const existing = lineItemMap.get(id);
+      if (!existing) continue;
+
+      const newQty  = parseFloat(quantityOrdered);
+      const newCost = parseFloat(unitCost);
+      if (isNaN(newQty) || newQty <= 0) continue;
+      if (isNaN(newCost) || newCost < 0) continue;
+
+      let conversionFactor = 1;
+      if (existing.materialUnitId) {
+        const unit = existing.material.alternateUnits
+          .find(u => u.unitId === existing.materialUnitId);
+        if (unit) conversionFactor = parseFloat(unit.factor);
+      }
+
+      const oldBaseStock = parseFloat(existing.quantityOrdered) * conversionFactor;
+      const newBaseStock = newQty * conversionFactor;
+      const stockDelta   = newBaseStock - oldBaseStock;
+      const newTotalCost = newQty * newCost;
+
+      await tx.materialReorder.update({
+        where: { id },
+        data: { quantityOrdered: newQty, unitCost: newCost, totalCost: newTotalCost },
+      });
+
+      if (stockDelta !== 0) {
+        await tx.material.update({
+          where: { id: existing.materialId },
+          data: { quantity: { increment: stockDelta } },
+        });
+      }
+
+      if (existing.expenseId) {
+        await tx.expense.update({
+          where: { id: existing.expenseId },
+          data: { amount: newTotalCost },
+        });
+      }
+
+      processed.push({
+        materialName: existing.materialName,
+        oldQty: parseFloat(existing.quantityOrdered),
+        newQty,
+        oldCost: parseFloat(existing.unitCost),
+        newCost,
+        stockDelta,
+      });
+    }
+    return processed;
+  });
+
+  const auditLines = results.map(r =>
+    `${r.materialName}: qty ${r.oldQty}→${r.newQty}, cost ${r.oldCost}→${r.newCost}, stock Δ${r.stockDelta >= 0 ? '+' : ''}${r.stockDelta}`
+  ).join('; ');
+
+  await req.db.auditLog.create({
+    data: {
+      userId: req.user.id,
+      action: 'ADMIN_EDIT_RECEIVED_ORDER',
+      entity: 'MaterialReorder',
+      businessId: req.user.businessId,
+      description: `Admin corrected received order ${orderId}: ${auditLines}`,
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: `${results.length} item(s) corrected. Stock and expense records updated.`,
+    data: { orderId, correctedItems: results.length },
+  });
+});
+
 // @desc    Get material reorder history
 // @route   GET /api/materials/:id/reorders
 // @access  Private (requires 'materials:view' permission)

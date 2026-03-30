@@ -79,6 +79,12 @@ export const materialsApi = {
     return response;
   },
 
+  // Admin: correct quantities/costs on an already-received restock order
+  adminEditReceivedOrder: async (orderId, data) => {
+    const response = await apiClient.put(`/materials/restock-orders/${orderId}/admin-correct`, data);
+    return response;
+  },
+
   // Admin: cancel a pending restock order
   cancelRestockOrder: async (orderId) => {
     const response = await apiClient.put(`/materials/restock-orders/${orderId}/cancel`);

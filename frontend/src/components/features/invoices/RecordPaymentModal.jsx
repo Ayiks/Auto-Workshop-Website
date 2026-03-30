@@ -148,7 +148,7 @@ export default function RecordPaymentModal({ isOpen, onClose, invoice }) {
         />
 
         {/* Quick Amount Buttons */}
-        <div>
+        {/* <div>
           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1.5 sm:mb-2">
             Quick Select
           </label>
@@ -181,7 +181,7 @@ export default function RecordPaymentModal({ isOpen, onClose, invoice }) {
               Full Amount
             </Button>
           </div>
-        </div>
+        </div> */}
 
         {/* Payment Method */}
         <Select

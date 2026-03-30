@@ -205,13 +205,18 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
                 name="quantity"
                 value={formData.quantity}
                 onChange={handleChange}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm"
-                disabled={isLoading}
+                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
+                disabled={isLoading || material}
               />
               <span className="absolute right-3 sm:right-4 top-2.5 sm:top-3 text-gray-500 text-[10px] sm:text-xs font-medium uppercase pointer-events-none">
                  {getBaseUnitSymbol()}
               </span>
             </div>
+            {material && (
+              <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
+                Stock quantity is updated through restock orders.
+              </p>
+            )}
           </div>
 
           <div>

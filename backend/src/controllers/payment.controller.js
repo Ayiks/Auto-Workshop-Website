@@ -1,4 +1,5 @@
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
+import { getBusinessMessagingConfig, sendViaBusiness } from '../utils/sendSMS.js';
 
 // Helper function to generate receipt number - now uses database sequence
 const generateReceiptNumber = () => {
@@ -51,6 +52,7 @@ export const recordPayment = asyncHandler(async (req, res) => {
         select: {
           id: true,
           clientName: true,
+          clientPhone: true,
           jobType: true,
         },
       },
@@ -157,7 +159,7 @@ export const recordPayment = asyncHandler(async (req, res) => {
       },
     });
 
-    return { payment, receipt, updatedInvoice };
+    return { payment, receipt, updatedInvoice, businessName: businessSettings.name };
   });
 
   // Fetch complete payment with relations
@@ -174,6 +176,7 @@ export const recordPayment = asyncHandler(async (req, res) => {
           job: {
             select: {
               clientName: true,
+              clientPhone: true,
               jobType: true,
             },
           },
@@ -191,8 +194,8 @@ export const recordPayment = asyncHandler(async (req, res) => {
 
   res.status(201).json({
     success: true,
-    message: result.updatedInvoice.paymentStatus === 'paid' 
-      ? 'Payment recorded. Invoice fully paid!' 
+    message: result.updatedInvoice.paymentStatus === 'paid'
+      ? 'Payment recorded. Invoice fully paid!'
       : 'Partial payment recorded successfully',
     data: {
       payment: completePayment,
@@ -206,6 +209,19 @@ export const recordPayment = asyncHandler(async (req, res) => {
       },
     },
   });
+
+  // Fire-and-forget: payment confirmation SMS — runs after response is sent
+  const clientPhone = completePayment?.invoice?.job?.clientPhone;
+  if (clientPhone) {
+    const { amountDue } = result.updatedInvoice;
+    const clientName = completePayment.invoice.job.clientName;
+    const paidMsg = parseFloat(amountDue) <= 0.01
+      ? `Hi ${clientName}, we've received your payment of GH₵${paymentAmount.toFixed(2)} for invoice #${invoice.invoiceNumber}. Your balance is cleared. Thank you! – ${result.businessName}`
+      : `Hi ${clientName}, we've received GH₵${paymentAmount.toFixed(2)} for invoice #${invoice.invoiceNumber}. Remaining balance: GH₵${parseFloat(amountDue).toFixed(2)}. – ${result.businessName}`;
+    getBusinessMessagingConfig(req.user.businessId)
+      .then(config => sendViaBusiness(clientPhone, paidMsg, 'sms', config))
+      .catch(err => console.error('[SMS] Payment notification failed:', err.message));
+  }
 });
 
 // @desc    Get all payments

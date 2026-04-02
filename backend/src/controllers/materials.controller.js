@@ -746,7 +746,7 @@ export const receiveRestockOrder = asyncHandler(async (req, res) => {
   // Find all pending line items for this order
   const lineItems = await req.db.materialReorder.findMany({
     where: { orderId, businessId: req.user.businessId, status: 'pending' },
-    include: { material: { include: { alternateUnits: true } } },
+    include: { material: { include: { alternateUnits: true } }, vendor: true },
   });
 
   if (lineItems.length === 0) {
@@ -823,6 +823,17 @@ export const receiveRestockOrder = asyncHandler(async (req, res) => {
 
     return processed;
   });
+
+  // Notify vendor that their delivery has been received (non-blocking)
+  const vendor = lineItems[0]?.vendor;
+  if (vendor) {
+    const business = await req.db.business.findUnique({ where: { id: req.user.businessId }, select: { name: true } });
+    const itemSummary = lineItems.map(i => i.materialName).join(', ');
+    notifyVendor(vendor, {
+      businessId: req.user.businessId,
+      customMessage: `Dear ${vendor.contactName || vendor.companyName}, your delivery (Order ${orderId}) has been received: ${itemSummary}. Thank you. – ${business?.name || 'The Workshop'}`,
+    }).catch(() => {});
+  }
 
   res.status(200).json({
     success: true,

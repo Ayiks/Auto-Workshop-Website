@@ -97,7 +97,7 @@ export const sendJobCreatedEmail = async (job, businessName, businessEmail) => {
 
   try {
     await transporter.sendMail({
-      from: `"${businessName || 'Gray Manager'}" <${fromAddress}>`,
+      from: `"${businessName || 'Gray Manager'}" <${process.env.EMAIL_USER}>`,
       replyTo: fromAddress,
       to: job.clientEmail,
       subject: `Job Received — ${job.jobType?.charAt(0).toUpperCase()}${job.jobType?.slice(1)} Service`,
@@ -164,7 +164,7 @@ export const sendJobCompletedEmail = async (job, businessName, businessEmail) =>
 
   try {
     await transporter.sendMail({
-      from: `"${businessName || 'Gray Manager'}" <${fromAddress}>`,
+      from: `"${businessName || 'Gray Manager'}" <${process.env.EMAIL_USER}>`,
       replyTo: fromAddress,
       to: job.clientEmail,
       subject: `Your Vehicle is Ready — ${job.problemType}`,
@@ -227,7 +227,7 @@ export const sendReminderEmail = async (to, { customerName, message, type, busin
 
   try {
     await transporter.sendMail({
-      from: `"${businessName || 'Gray Manager'}" <${fromAddress}>`,
+      from: `"${businessName || 'Gray Manager'}" <${process.env.EMAIL_USER}>`,
       replyTo: fromAddress,
       to,
       subject,

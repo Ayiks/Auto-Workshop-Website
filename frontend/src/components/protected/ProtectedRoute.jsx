@@ -1,5 +1,5 @@
 import { Navigate } from 'react-router-dom';
-import useAuthStore from '../../store/authStore';
+import { useAuthStore } from '@stores/authStore'; // ← fixed: was pointing to old path
 
 export default function ProtectedRoute({ children, allowedRoles = [] }) {
   const { isAuthenticated, user } = useAuthStore();

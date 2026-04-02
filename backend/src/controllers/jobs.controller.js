@@ -1,5 +1,13 @@
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 import { sendJobCreatedEmail, sendJobCompletedEmail } from '../utils/sendEmail.js';
+import { getBusinessMessagingConfig, sendViaBusiness } from '../utils/sendSMS.js';
+
+// Fire-and-forget SMS helper — never throws, always resolves
+const sendJobSMS = (phone, message, businessId) => {
+  getBusinessMessagingConfig(businessId)
+    .then(config => sendViaBusiness(phone, message, 'sms', config))
+    .catch(err => console.error('[SMS] Job notification failed:', err.message));
+};
 
 // @desc    Create new job
 // @route   POST /api/jobs
@@ -233,6 +241,12 @@ export const createJob = asyncHandler(async (req, res) => {
   sendJobCreatedEmail(completeJob, business?.name, bizSettings?.email).catch(() => {});
 
   res.status(201).json({ success: true, message: 'Job created successfully', data: completeJob });
+
+  if (completeJob.clientPhone) {
+    const vehicle = [completeJob.vehicleMake, completeJob.vehicleModel].filter(Boolean).join(' ');
+    const msg = `Hi ${completeJob.clientName}, your vehicle${vehicle ? ` (${vehicle})` : ''} has been booked in for ${completeJob.problemType} at ${business?.name || 'the workshop'}. Job Ref: #${completeJob.id}. We'll update you when it's ready.`;
+    sendJobSMS(completeJob.clientPhone, msg, req.user.businessId);
+  }
 });
 
 // @desc    Get all jobs
@@ -500,6 +514,11 @@ export const completeJob = asyncHandler(async (req, res) => {
   sendJobCompletedEmail(updatedJob, business?.name ?? null, bizSettings?.email).catch(() => {});
 
   res.status(200).json({ success: true, message: 'Job completed successfully. Ready for invoicing.', data: updatedJob });
+
+  if (updatedJob.clientPhone) {
+    const msg = `Hi ${updatedJob.clientName}, great news! Your vehicle is ready for collection at ${business?.name || 'the workshop'}. Please quote Job Ref: #${updatedJob.id} when you arrive. Thank you!`;
+    sendJobSMS(updatedJob.clientPhone, msg, req.user.businessId);
+  }
 });
 
 // @desc    Delete job

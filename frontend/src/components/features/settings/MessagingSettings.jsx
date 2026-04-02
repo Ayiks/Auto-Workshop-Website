@@ -27,6 +27,7 @@ export default function MessagingSettings() {
   const [formData, setFormData] = useState({
     arkeselSenderId: '',
     arkeselWhatsAppSenderId: '',
+    smsEnabled: false,
   });
 
   useEffect(() => {
@@ -34,6 +35,7 @@ export default function MessagingSettings() {
       setFormData({
         arkeselSenderId: settings.arkeselSenderId || '',
         arkeselWhatsAppSenderId: settings.arkeselWhatsAppSenderId || '',
+        smsEnabled: settings.smsEnabled ?? false,
       });
     }
   }, [settings]);
@@ -60,11 +62,11 @@ export default function MessagingSettings() {
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleSave = () => {
     updateMutation.mutate({
       arkeselSenderId: formData.arkeselSenderId,
       arkeselWhatsAppSenderId: formData.arkeselWhatsAppSenderId,
+      smsEnabled: formData.smsEnabled,
     });
   };
 
@@ -72,6 +74,7 @@ export default function MessagingSettings() {
     setFormData({
       arkeselSenderId: settings?.arkeselSenderId || '',
       arkeselWhatsAppSenderId: settings?.arkeselWhatsAppSenderId || '',
+      smsEnabled: settings?.smsEnabled ?? false,
     });
     setIsEditing(false);
   };
@@ -104,7 +107,7 @@ export default function MessagingSettings() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="space-y-6">
         {/* SMS Section */}
         <div className="border border-gray-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2">
@@ -136,6 +139,41 @@ export default function MessagingSettings() {
             <p className="text-xs text-gray-400 mt-1">
               Enter a sender name (max 11 characters, no spaces) <em>or</em> your business phone number in international format (e.g. +233241234567). Using your phone number lets customers reply to your SMS.
             </p>
+          </div>
+
+          {/* SMS Enabled toggle */}
+          <div className="flex items-center justify-between pt-1">
+            <div>
+              <p className="text-sm font-medium text-gray-700">Enable SMS Notifications</p>
+              <p className="text-xs text-gray-400 mt-0.5">
+                Send automatic SMS to customers on job intake, completion, and payment.
+              </p>
+            </div>
+            {isEditing ? (
+              <button
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, smsEnabled: !prev.smsEnabled }))}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                  formData.smsEnabled ? 'bg-black' : 'bg-gray-200'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
+                    formData.smsEnabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            ) : (
+              <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${
+                settings?.smsEnabled ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-500'
+              }`}>
+                {settings?.smsEnabled ? (
+                  <><CheckCircle className="w-3 h-3" /> SMS Active</>
+                ) : (
+                  <><XCircle className="w-3 h-3" /> SMS Off</>
+                )}
+              </span>
+            )}
           </div>
         </div>
 
@@ -217,7 +255,7 @@ export default function MessagingSettings() {
             </Button>
           ) : (
             <>
-              <Button type="submit" variant="primary" loading={updateMutation.isPending}
+              <Button type="button" variant="primary" onClick={handleSave} loading={updateMutation.isPending}
                 className="bg-black hover:bg-gray-800 text-white">
                 Save Changes
               </Button>
@@ -229,7 +267,7 @@ export default function MessagingSettings() {
             </>
           )}
         </div>
-      </form>
+      </div>
 
       {/* Info box */}
       <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">

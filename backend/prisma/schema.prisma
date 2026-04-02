@@ -470,6 +470,7 @@ model BusinessSettings {
   arkeselSenderId         String?  @map("arkesel_sender_id") @db.VarChar(50)
   arkeselWhatsAppSenderId String?  @map("arkesel_whatsapp_sender_id") @db.VarChar(50)
   whatsappStatus          String?  @default("unregistered") @map("whatsapp_status") @db.VarChar(20)
+  smsEnabled              Boolean  @default(false) @map("sms_enabled")
   enabledJobTypes         String[] @default(["mechanic","sprayer","bodyworks","other"]) @map("enabled_job_types")
   updatedAt               DateTime @updatedAt @map("updated_at")
   businessId              String   @map("business_id")

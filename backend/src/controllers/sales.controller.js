@@ -17,9 +17,9 @@ const generateReceiptNumber = () => {
 // @route   POST /api/sales
 // @access  Private
 export const createSale = asyncHandler(async (req, res) => {
-  const { 
+  const {
     items, paymentMethod, saleDate: userProvidedDate, customerId,
-    customerName, paymentStatus, amountPaid, discount 
+    customerName, paymentStatus, amountPaid, discount, deductStock
   } = req.body;
 
   let finalSaleDate = new Date();
@@ -32,6 +32,12 @@ export const createSale = asyncHandler(async (req, res) => {
     datePart.setMilliseconds(timePart.getMilliseconds());
     finalSaleDate = datePart;
   }
+
+  // Backdated sales don't deduct stock by default; caller must explicitly opt in
+  const today = new Date();
+  const saleDay = new Date(finalSaleDate);
+  const isToday = saleDay.toDateString() === today.toDateString();
+  const shouldDeductStock = isToday || deductStock === true;
 
   if (!items || !Array.isArray(items) || items.length === 0) {
     throw new AppError('Please provide sale items', 400, 'VALIDATION_ERROR');
@@ -73,20 +79,22 @@ export const createSale = asyncHandler(async (req, res) => {
         quantityToDeduct = parseFloat(item.quantity) * parseFloat(selectedUnit.factor);
       }
 
-      // --- NEW: CHECK TOTAL RESERVED STOCK ---
-      const previouslyReserved = stockReservations[material.id] || 0;
-      const totalNeeded = previouslyReserved + quantityToDeduct;
+      // --- CHECK TOTAL RESERVED STOCK (only when deducting) ---
+      if (shouldDeductStock) {
+        const previouslyReserved = stockReservations[material.id] || 0;
+        const totalNeeded = previouslyReserved + quantityToDeduct;
 
-      if (parseFloat(material.quantity) < totalNeeded) {
-        throw new AppError(
-          `Insufficient stock for "${material.name}". Need total ${totalNeeded} (including duplicates), but only ${material.quantity} available.`, 
-          400, 
-          'INSUFFICIENT_STOCK'
-        );
+        if (parseFloat(material.quantity) < totalNeeded) {
+          throw new AppError(
+            `Insufficient stock for "${material.name}". Need total ${totalNeeded} (including duplicates), but only ${material.quantity} available.`,
+            400,
+            'INSUFFICIENT_STOCK'
+          );
+        }
+
+        stockReservations[material.id] = totalNeeded;
       }
-
-      stockReservations[material.id] = totalNeeded;
-      // ---------------------------------------
+      // ---------------------------------------------------------
 
       const subtotal = unitPriceUsed * parseFloat(item.quantity);      
       
@@ -134,7 +142,7 @@ export const createSale = asyncHandler(async (req, res) => {
         amountPaid: finalAmountPaid,
         balance: balance,
         paymentMethod,
-        paymentStatus: paymentStatus || 'paid',
+        paymentStatus: paymentStatus === 'partially' ? 'partial' : (paymentStatus || 'paid'),
         soldBy: req.user.id,
         status: 'completed',
         saleDate: finalSaleDate,
@@ -153,7 +161,7 @@ export const createSale = asyncHandler(async (req, res) => {
         },
       });
 
-      if (item.itemType === 'material') {
+      if (item.itemType === 'material' && shouldDeductStock) {
         await tx.material.update({
           where: { id: item.materialId },
           data: { quantity: { decrement: item.quantityToDeduct } },

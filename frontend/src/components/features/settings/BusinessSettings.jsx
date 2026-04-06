@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Wrench, Paintbrush, Car, MoreHorizontal } from 'lucide-react';
+import { Wrench, Paintbrush, Car, MoreHorizontal, Upload, CheckCircle } from 'lucide-react';
 import { settingsApi } from '@api/settings';
 import Card from '@components/common/Card';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
+import { uploadLogoToCloudinary } from '@/services/cloudinary';
 
 const JOB_TYPE_OPTIONS = [
   { value: 'mechanic',  label: 'Mechanic',    icon: Wrench,         desc: 'Engine, brakes, suspension, electrical' },
@@ -16,6 +17,9 @@ const JOB_TYPE_OPTIONS = [
 export default function BusinessSettings() {
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoPreview, setLogoPreview] = useState(null);
+  const logoInputRef = useRef(null);
 
   const { data: settingsResponse, isLoading } = useQuery({
     queryKey: ['business-settings'],
@@ -76,10 +80,27 @@ export default function BusinessSettings() {
 
   const handleCancel = () => {
     setIsEditing(false);
+    setLogoPreview(null);
     if (settings) setFormData({
       ...settings,
       enabledJobTypes: settings.enabledJobTypes ?? ['mechanic', 'sprayer', 'bodyworks', 'other'],
     });
+  };
+
+  const handleLogoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setLogoPreview(URL.createObjectURL(file));
+    setLogoUploading(true);
+    try {
+      const url = await uploadLogoToCloudinary(file);
+      await settingsApi.updateBusinessSettings({ logo: url });
+      queryClient.invalidateQueries(['business-settings']);
+    } catch {
+      setLogoPreview(null);
+    } finally {
+      setLogoUploading(false);
+    }
   };
 
   if (isLoading) return <div className="p-8 text-center"><LoadingSpinner /></div>;
@@ -102,6 +123,55 @@ export default function BusinessSettings() {
       </div>
 
       <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+        {/* Logo */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-start">
+          <label className="block text-xs sm:text-sm text-gray-700 sm:mt-2">Business Logo</label>
+          <div className="sm:col-span-2">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 flex items-center justify-center overflow-hidden shrink-0 bg-slate-50">
+                {logoPreview || settings?.logo ? (
+                  <img
+                    src={logoPreview || settings?.logo}
+                    alt="Business logo"
+                    className="w-full h-full object-contain"
+                  />
+                ) : (
+                  <span className="text-slate-700 font-bold text-lg">
+                    {(settings?.name || 'BZ').split(' ').map(w => w[0]).join('').toUpperCase().slice(0, 2)}
+                  </span>
+                )}
+              </div>
+              <div>
+                <input
+                  ref={logoInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleLogoUpload}
+                />
+                <button
+                  type="button"
+                  onClick={() => logoInputRef.current?.click()}
+                  disabled={logoUploading}
+                  className="flex items-center gap-2 px-3 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-700 hover:bg-slate-50 transition disabled:opacity-50"
+                >
+                  <Upload size={13} />
+                  {logoUploading ? 'Uploading...' : settings?.logo ? 'Change Logo' : 'Upload Logo'}
+                </button>
+                <p className="text-[11px] text-gray-400 mt-1.5">PNG, JPG or SVG. Max 5MB.</p>
+                {logoUploading && <p className="text-[11px] text-blue-600 mt-1">Uploading...</p>}
+                {!logoUploading && logoPreview && (
+                  <p className="text-[11px] text-green-600 mt-1 flex items-center gap-1">
+                    <CheckCircle size={11} /> Logo updated
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <hr className="border-gray-100" />
+
         {/* Name */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-start">
           <label className="block text-xs sm:text-sm text-gray-700 sm:mt-2">Business Name</label>

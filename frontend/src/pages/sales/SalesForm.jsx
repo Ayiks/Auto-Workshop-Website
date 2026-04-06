@@ -42,7 +42,9 @@ export default function SaleForm({ onCancel, isLoading }) {
   
   // Payment Details
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [saleDate, setSaleDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const today = format(new Date(), "yyyy-MM-dd");
+  const [saleDate, setSaleDate] = useState(today);
+  const [deductStock, setDeductStock] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [paymentStatus, setPaymentStatus] = useState("paid"); 
   
@@ -431,7 +433,8 @@ export default function SaleForm({ onCancel, isLoading }) {
         discount: validDiscount,
         amountPaid: finalAmountPaid,
         totalAmount: grandTotal,
-        isDraft: asDraft
+        isDraft: asDraft,
+        deductStock: saleDate !== today ? deductStock : true,
     };
 
     let payload;
@@ -708,9 +711,20 @@ export default function SaleForm({ onCancel, isLoading }) {
                     <div className="space-y-2">
                         <label className="text-sm font-bold text-gray-900">Sales date</label>
                         <div className="relative">
-                            <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full p-3 bg-gray-100 border-none rounded text-sm font-medium focus:ring-2 focus:ring-black" />
+                            <input type="date" value={saleDate} onChange={(e) => { setSaleDate(e.target.value); setDeductStock(false); }} className="w-full p-3 bg-gray-100 border-none rounded text-sm font-medium focus:ring-2 focus:ring-black" />
                             <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
                         </div>
+                        {saleDate !== today && saleType === 'counter' && (
+                            <label className="flex items-center gap-2 cursor-pointer select-none mt-2">
+                                <input
+                                    type="checkbox"
+                                    checked={deductStock}
+                                    onChange={(e) => setDeductStock(e.target.checked)}
+                                    className="rounded border-gray-300 text-gray-900 focus:ring-gray-900 h-4 w-4 shrink-0"
+                                />
+                                <span className="text-xs text-amber-700 font-medium">Deduct from current stock (backdated sale)</span>
+                            </label>
+                        )}
                     </div>
 
                     {/* Customer Selection */}

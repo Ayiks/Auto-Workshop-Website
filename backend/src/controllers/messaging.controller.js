@@ -86,8 +86,8 @@ export const bulkSend = async (req, res) => {
               perChannel.push({ channel: ch, status: 'skipped', reason: 'No email address' });
               continue;
             }
-            await sendReminderEmail(customer.email, { customerName: fullName, message, type: 'manual', businessName, businessEmail });
-            perChannel.push({ channel: ch, status: 'sent' });
+            const emailResult = await sendReminderEmail(customer.email, { customerName: fullName, message, type: 'manual', businessName, businessEmail });
+            perChannel.push({ channel: ch, status: emailResult?.success ? 'sent' : 'failed', reason: emailResult?.error || null });
           } else {
             if (!customer.phone) {
               perChannel.push({ channel: ch, status: 'skipped', reason: 'No phone number' });
@@ -104,6 +104,8 @@ export const bulkSend = async (req, res) => {
         return {
           customerId: customer.id,
           name: fullName,
+          phone: customer.phone || null,
+          email: customer.email || null,
           status: allSkipped ? 'skipped' : anySent ? 'sent' : 'failed',
           channels: perChannel,
           reason: allSkipped ? perChannel.map(c => c.reason).filter(Boolean).join('; ') : null,
@@ -115,6 +117,56 @@ export const bulkSend = async (req, res) => {
     const sentCount    = summary.filter(r => r.status === 'sent').length;
     const failedCount  = summary.filter(r => r.status === 'failed').length;
     const skippedCount = summary.filter(r => r.status === 'skipped').length;
+
+    // Save the broadcast log (awaited so we have the ID for recipient rows)
+    let createdLog = null;
+    try {
+      createdLog = await prisma.messageLog.create({
+        data: {
+          businessId,
+          sentBy: req.user.id,
+          channels: channelList,
+          purpose: purpose || 'transactional',
+          message: message.trim(),
+          subject: subject?.trim() || null,
+          recipientCount: customers.length,
+          sentCount,
+          failedCount,
+          skippedCount,
+        },
+      });
+    } catch (err) {
+      console.error('[messaging] Failed to save log:', err.message);
+    }
+
+    // Save per-recipient delivery rows — fire-and-forget
+    if (createdLog) {
+      const recipientRows = [];
+      for (const r of summary) {
+        if (!r.customerId) continue;
+        for (const ch of (r.channels || [])) {
+          recipientRows.push({
+            logId: createdLog.id,
+            businessId,
+            customerId: r.customerId,
+            customerName: r.name,
+            phone: r.phone || null,
+            email: r.email || null,
+            channel: ch.channel,
+            status: ch.status,
+            reason: ch.reason || null,
+          });
+        }
+      }
+      if (recipientRows.length) {
+        try {
+          prisma.messageRecipient.createMany({ data: recipientRows })
+            .catch(err => console.error('[messaging] Failed to save recipients:', err.message));
+        } catch (err) {
+          console.error('[messaging] Failed to save recipients (client not ready?):', err.message);
+        }
+      }
+    }
 
     res.json({
       success: true,
@@ -174,8 +226,8 @@ export const singleSend = async (req, res) => {
     for (const ch of channelList) {
       if (ch === 'email') {
         if (!customer.email) { perChannel.push({ channel: ch, status: 'skipped', reason: 'No email' }); continue; }
-        await sendReminderEmail(customer.email, { customerName: fullName, message, type: 'manual', businessName, businessEmail });
-        perChannel.push({ channel: ch, status: 'sent' });
+        const emailResult = await sendReminderEmail(customer.email, { customerName: fullName, message, type: 'manual', businessName, businessEmail });
+        perChannel.push({ channel: ch, status: emailResult?.success ? 'sent' : 'failed', reason: emailResult?.error || null });
       } else {
         if (!customer.phone) { perChannel.push({ channel: ch, status: 'skipped', reason: 'No phone' }); continue; }
         if (!messagingConfig) { perChannel.push({ channel: ch, status: 'failed', reason: 'Messaging not configured' }); continue; }
@@ -187,6 +239,49 @@ export const singleSend = async (req, res) => {
     res.json({ success: true, channels: perChannel });
   } catch (err) {
     console.error('singleSend error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/messaging/logs
+ * Return paginated broadcast history for this business.
+ */
+export const getLogs = async (req, res) => {
+  try {
+    const { limit = 20, offset = 0 } = req.query;
+    const where = { businessId: req.user.businessId };
+    const [logs, total] = await Promise.all([
+      prisma.messageLog.findMany({
+        where,
+        orderBy: { createdAt: 'desc' },
+        take: parseInt(limit),
+        skip: parseInt(offset),
+        include: { user: { select: { fullName: true, username: true } } },
+      }),
+      prisma.messageLog.count({ where }),
+    ]);
+    res.json({ success: true, data: logs, total });
+  } catch (err) {
+    console.error('getLogs error:', err);
+    res.status(500).json({ success: false, message: err.message });
+  }
+};
+
+/**
+ * GET /api/messaging/logs/:id/recipients
+ * Return per-recipient delivery rows for a single broadcast log.
+ */
+export const getRecipients = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const recipients = await prisma.messageRecipient.findMany({
+      where: { logId: parseInt(id), businessId: req.user.businessId },
+      orderBy: [{ customerName: 'asc' }, { channel: 'asc' }],
+    });
+    res.json({ success: true, data: recipients });
+  } catch (err) {
+    console.error('getRecipients error:', err);
     res.status(500).json({ success: false, message: err.message });
   }
 };

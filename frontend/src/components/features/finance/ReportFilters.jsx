@@ -43,6 +43,18 @@ export default function ReportFilters({
       start = format(new Date(now.getFullYear(), 0, 1), 'yyyy-MM-dd');
       end = format(now, 'yyyy-MM-dd');
       break;
+    case '3-months':
+      start = format(new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()), 'yyyy-MM-dd');
+      end = format(now, 'yyyy-MM-dd');
+      break;
+    case '6-months':
+      start = format(new Date(now.getFullYear(), now.getMonth() - 6, now.getDate()), 'yyyy-MM-dd');
+      end = format(now, 'yyyy-MM-dd');
+      break;
+    case '12-months':
+      start = format(new Date(now.getFullYear(), now.getMonth() - 12, now.getDate()), 'yyyy-MM-dd');
+      end = format(now, 'yyyy-MM-dd');
+      break;
     default:
       return;
   }
@@ -82,13 +94,20 @@ export default function ReportFilters({
         {/* Action Group */}
         <div className="flex flex-wrap items-center gap-1 sm:gap-2 w-full sm:w-auto">
           <div className="flex bg-gray-100 p-0.5 sm:p-1 rounded-lg gap-0.5 sm:gap-1 flex-wrap sm:flex-nowrap">
-            {['today', 'this-week', 'this-month'].map((preset) => (
+            {[
+              { id: 'today',     label: 'Today' },
+              { id: 'this-week', label: 'This Week' },
+              { id: 'this-month', label: 'This Month' },
+              { id: '3-months',  label: '3 Months' },
+              { id: '6-months',  label: '6 Months' },
+              { id: '12-months', label: '12 Months' },
+            ].map(({ id, label }) => (
                <button
-                 key={preset}
-                 onClick={() => setPresetRange(preset)}
-                 className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs text-gray-600 hover:text-gray-900 hover:bg-white rounded-md transition-all capitalize"
+                 key={id}
+                 onClick={() => setPresetRange(id)}
+                 className="px-2 sm:px-3 py-1 sm:py-1.5 text-[10px] sm:text-xs text-gray-600 hover:text-gray-900 hover:bg-white rounded-md transition-all"
                >
-                 {preset.replace('-', ' ')}
+                 {label}
                </button>
             ))}
           </div>

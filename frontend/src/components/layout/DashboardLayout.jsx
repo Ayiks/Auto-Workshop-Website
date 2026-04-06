@@ -118,6 +118,16 @@ export default function DashboardLayout() {
       title: "Admin",
       items: [
         {
+          name: "Messaging",
+          path: "/app/messaging",
+          icon: (
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+            </svg>
+          ),
+          show: hasPermission("messaging", "send") || user?.role === "admin" || user?.role === "manager",
+        },
+        {
           name: "Contacts",
           path: "/app/contacts",
           icon: (
@@ -183,25 +193,29 @@ export default function DashboardLayout() {
           <div className="h-14 sm:h-16 flex items-center justify-between px-3 sm:px-4 border-b border-gray-100">
             {isSidebarOpen ? (
               <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                <div className="w-7 h-7 sm:w-8 sm:h-8 bg-black rounded-lg flex items-center justify-center shadow-sm flex-shrink-0">
-                  <span className="text-white font-bold text-xs sm:text-sm">
-                    {businessLogo ?? businessInitials}
-                  </span>
+                <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center shadow-sm shrink-0 overflow-hidden ${businessLogo ? '' : 'bg-black'}`}>
+                  {businessLogo ? (
+                    <img src={businessLogo} alt={businessName} className="w-full h-full object-contain" />
+                  ) : (
+                    <span className="text-white font-bold text-xs sm:text-sm">{businessInitials}</span>
+                  )}
                 </div>
                 <h1 className="text-xs sm:text-sm text-gray-900 tracking-tight truncate">
                   {businessName.toUpperCase()}
                 </h1>
               </div>
             ) : (
-              <div className="w-7 h-7 sm:w-8 sm:h-8 p-1.5 sm:p-2 bg-black rounded-lg flex items-center justify-center mx-auto shadow-sm flex-shrink-0">
-                <span className="text-white font-bold text-xs sm:text-sm">
-                  {businessLogo ?? businessInitials}
-                </span>
+              <div className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center mx-auto shadow-sm shrink-0 overflow-hidden ${businessLogo ? '' : 'bg-black p-1.5 sm:p-2'}`}>
+                {businessLogo ? (
+                  <img src={businessLogo} alt={businessName} className="w-full h-full object-contain" />
+                ) : (
+                  <span className="text-white font-bold text-xs sm:text-sm">{businessInitials}</span>
+                )}
               </div>
             )}
             <button
               onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="p-1 sm:p-1.5 rounded-md hover:bg-gray-100 text-gray-500 transition-colors flex-shrink-0"
+              className="p-1 sm:p-1.5 rounded-md hover:bg-gray-100 text-gray-500 transition-colors shrink-0"
             >
               <svg className="w-4 h-4 sm:w-5 sm:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isSidebarOpen ? (

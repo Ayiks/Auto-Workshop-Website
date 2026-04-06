@@ -38,6 +38,13 @@ export default function Receipt({ receipt, sale }) {
         {/* Header */}
         <div className="text-center mb-6 sm:mb-8">
           <div className="mb-4">
+            {receipt.businessLogo && (
+              <img
+                src={receipt.businessLogo}
+                alt={receipt.businessName}
+                className="h-14 mx-auto mb-3 object-contain"
+              />
+            )}
             <h1 className="text-xl sm:text-2xl font-bold text-gray-900 tracking-tight uppercase">
               {receipt.businessName || 'Business Name'}
             </h1>

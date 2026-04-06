@@ -678,7 +678,7 @@ function SalesTab({ sales, dateRange }) {
   const paymentMethodData = Array.isArray(sales.salesByMethod)
     ? sales.salesByMethod.map((method) => ({
         name: (method?.method || method?.paymentMethod || "Unknown").toUpperCase(),
-        revenue: Number(method?._sum?.totalAmount || 0),
+        revenue: Number(method?._sum?.amountPaid || 0),
         count: method?._count || 0,
       }))
     : [];

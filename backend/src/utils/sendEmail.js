@@ -100,20 +100,21 @@ export const sendJobCreatedEmail = async (job, businessName, businessEmail) => {
       from: `"${businessName || 'Gray Manager'}" <${process.env.EMAIL_USER}>`,
       replyTo: fromAddress,
       to: job.clientEmail,
-      subject: `Job Received — ${job.jobType?.charAt(0).toUpperCase()}${job.jobType?.slice(1)} Service`,
+      subject: `Work Started — ${job.jobType?.charAt(0).toUpperCase()}${job.jobType?.slice(1)} Service`,
       html: `
         <div style="font-family:Arial,sans-serif;max-width:600px;margin:0 auto;color:#111;">
           <div style="background:#111827;padding:24px 28px;border-radius:8px 8px 0 0;">
             <h2 style="color:#fff;margin:0;font-size:20px;">${businessName || 'Gray Manager'}</h2>
-            <p style="color:#9ca3af;margin:4px 0 0;font-size:13px;">Job Card Confirmation</p>
+            <p style="color:#9ca3af;margin:4px 0 0;font-size:13px;">Job Status Update</p>
           </div>
           <div style="padding:24px 28px;border:1px solid #e5e7eb;border-top:none;border-radius:0 0 8px 8px;">
             <p style="font-size:15px;">Dear <strong>${job.clientName}</strong>,</p>
-            <p>Your vehicle has been received and a job card has been created. Our team will begin work shortly.</p>
+            <p>Good news! Our team has started working on your vehicle. We will notify you as soon as it is ready for collection.</p>
 
             <table style="width:100%;border-collapse:collapse;margin:16px 0;font-size:13px;">
-              <tr><td style="padding:6px 0;color:#666;width:40%;">Job Type</td><td style="padding:6px 0;font-weight:600;text-transform:capitalize;">${job.jobType}</td></tr>
-              <tr><td style="padding:6px 0;color:#666;">Status</td><td style="padding:6px 0;"><span style="background:#fef3c7;color:#92400e;padding:2px 8px;border-radius:100px;font-size:12px;font-weight:600;">Pending</span></td></tr>
+              <tr><td style="padding:6px 0;color:#666;width:40%;">Job Ref</td><td style="padding:6px 0;font-weight:600;">#${job.id}</td></tr>
+              <tr><td style="padding:6px 0;color:#666;">Job Type</td><td style="padding:6px 0;font-weight:600;text-transform:capitalize;">${job.jobType}</td></tr>
+              <tr><td style="padding:6px 0;color:#666;">Status</td><td style="padding:6px 0;"><span style="background:#dbeafe;color:#1e40af;padding:2px 8px;border-radius:100px;font-size:12px;font-weight:600;">In Progress</span></td></tr>
               <tr><td style="padding:6px 0;color:#666;">Issue</td><td style="padding:6px 0;">${job.problemType}</td></tr>
               ${job.vehicleMake ? `<tr><td style="padding:6px 0;color:#666;">Vehicle</td><td style="padding:6px 0;">${job.vehicleMake} ${job.vehicleModel || ''} ${job.vehicleRegNumber ? '· ' + job.vehicleRegNumber : ''}</td></tr>` : ''}
             </table>
@@ -139,7 +140,7 @@ export const sendJobCreatedEmail = async (job, businessName, businessEmail) => {
             </table>
 
             <p style="margin-top:20px;font-size:12px;color:#9ca3af;">
-              This is an estimate. Final amount may vary. You will receive another email when the job is completed.
+              You will receive another notification when the job is completed and your vehicle is ready for collection.
             </p>
           </div>
         </div>
@@ -213,7 +214,7 @@ export const sendJobCompletedEmail = async (job, businessName, businessEmail) =>
 
 // ─── Reminder Email ───────────────────────────────────────────────────────────
 export const sendReminderEmail = async (to, { customerName, message, type, businessName, businessEmail }) => {
-  if (!to) return;
+  if (!to) return { success: false, error: 'No email address' };
   const transporter = createTransporter();
   const fromAddress = businessEmail || process.env.EMAIL_USER;
 
@@ -247,8 +248,9 @@ export const sendReminderEmail = async (to, { customerName, message, type, busin
       `,
     });
     console.log(`Reminder email sent to ${to}`);
+    return { success: true };
   } catch (err) {
     console.error('Failed to send reminder email:', err.message);
-    // Non-fatal — do not throw
+    return { success: false, error: err.message };
   }
 };

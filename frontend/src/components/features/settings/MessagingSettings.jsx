@@ -269,16 +269,56 @@ export default function MessagingSettings() {
         </div>
       </div>
 
-      {/* Info box */}
+      {/* WhatsApp setup guide — shown when not active */}
+      {whatsappStatus !== 'active' && (
+        <div className="p-4 bg-green-50 rounded-xl border border-green-200 space-y-3">
+          <div className="flex items-center gap-2">
+            <Phone className="w-4 h-4 text-green-700 flex-shrink-0" />
+            <p className="text-sm font-semibold text-green-800">How to activate WhatsApp Business</p>
+          </div>
+          <ol className="space-y-2 text-xs text-green-800">
+            <li className="flex gap-2">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-200 text-green-800 font-bold flex items-center justify-center text-[10px]">1</span>
+              <span>Enter your <strong>WhatsApp Business number</strong> above (e.g. +233241234567) and click <strong>Save Changes</strong>.</span>
+            </li>
+            <li className="flex gap-2">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-200 text-green-800 font-bold flex items-center justify-center text-[10px]">2</span>
+              <span>Click <strong>Activate WhatsApp</strong> — Arkesel will send a verification OTP to that WhatsApp number.</span>
+            </li>
+            <li className="flex gap-2">
+              <span className="flex-shrink-0 w-5 h-5 rounded-full bg-green-200 text-green-800 font-bold flex items-center justify-center text-[10px]">3</span>
+              <span>Once Arkesel verifies your number, the status changes to <strong>Active</strong> automatically. You can then send WhatsApp messages to customers.</span>
+            </li>
+          </ol>
+          <div className="flex gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <Info className="w-3.5 h-3.5 text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-xs text-amber-700">
+              The number must be a registered <strong>WhatsApp Business</strong> account. Personal WhatsApp numbers are not supported by Arkesel.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* WhatsApp active confirmation */}
+      {whatsappStatus === 'active' && (
+        <div className="p-4 bg-green-50 rounded-xl border border-green-200 flex items-center gap-3">
+          <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0" />
+          <div>
+            <p className="text-sm font-semibold text-green-800">WhatsApp Business is active</p>
+            <p className="text-xs text-green-700 mt-0.5">You can now send WhatsApp messages to customers via Broadcast and Reminders.</p>
+          </div>
+        </div>
+      )}
+
+      {/* SMS info */}
       <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">
         <Info className="w-4 h-4 text-blue-500 flex-shrink-0 mt-0.5" />
-        <div className="space-y-1.5 text-xs text-blue-700">
-          <p className="font-semibold">How messaging works</p>
+        <div className="space-y-1 text-xs text-blue-700">
+          <p className="font-semibold">SMS sender name tips</p>
           <ul className="space-y-1">
-            <li>• SMS and WhatsApp messages are sent via the platform's shared Arkesel account.</li>
-            <li>• Your SMS sender name (max 11 chars) identifies your business on text messages.</li>
-            <li>• To send WhatsApp messages, enter your business number and click <strong>Activate WhatsApp</strong>. Arkesel will send you an OTP to verify ownership.</li>
-            <li>• Once active, you can send WhatsApp reminders and broadcast messages to customers.</li>
+            <li>• Max <strong>11 characters</strong>, no spaces (e.g. <em>TopGarage</em>, <em>AceAutos</em>).</li>
+            <li>• Avoid Unicode characters like ₵ — they reduce the per-segment limit and increase cost.</li>
+            <li>• Enable SMS Notifications above to start sending automatic job and payment alerts.</li>
           </ul>
         </div>
       </div>

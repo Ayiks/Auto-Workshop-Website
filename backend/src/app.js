@@ -25,6 +25,7 @@ import reminderRoutes from './routes/reminders.routes.js';
 import sandboxRoutes from './routes/sandbox.routes.js';
 import messagingRoutes from './routes/messaging.routes.js';
 import vendorRoutes from './routes/vendors.routes.js';
+import webhooksRoutes from './routes/webhooks.routes.js';
 import { sendContactEmail } from './utils/sendEmail.js';
 
 const app = express();
@@ -104,6 +105,9 @@ app.use(`${API_PREFIX}/reminders`, reminderRoutes);
 app.use(`${API_PREFIX}/sandboxes`, sandboxRoutes);
 app.use(`${API_PREFIX}/messaging`, messagingRoutes);
 app.use(`${API_PREFIX}/vendors`, vendorRoutes);
+
+// Webhooks — public, no auth required
+app.use(`${API_PREFIX}/webhooks`, webhooksRoutes);
 
 // Public contact form
 app.post(`${API_PREFIX}/contact`, async (req, res) => {

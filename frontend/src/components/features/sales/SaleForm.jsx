@@ -18,7 +18,9 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   const [saleType, setSaleType] = useState("counter"); 
   const [items, setItems] = useState([]); 
   const [paymentMethod, setPaymentMethod] = useState("cash");
-  const [saleDate, setSaleDate] = useState(format(new Date(), "yyyy-MM-dd"));
+  const today = format(new Date(), "yyyy-MM-dd");
+  const [saleDate, setSaleDate] = useState(today);
+  const [deductStock, setDeductStock] = useState(false);
 
   // Customer
   const [selectedCustomer, setSelectedCustomer] = useState(null);
@@ -208,16 +210,18 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
         finalAmountPaid = parseFloat(partialAmount);
     }
 
+    const isBackdated = saleDate !== today;
     const commonData = {
         paymentMethod,
         saleDate: formattedDateTime,
         customerId: selectedCustomer?.type === 'registered' ? selectedCustomer.id : null,
         customerName: selectedCustomer?.name || 'Walking Customer',
         customerPhone: selectedCustomer?.phone || '',
-        paymentStatus, 
+        paymentStatus,
         discount: parseFloat(discount || 0),
         amountPaid: finalAmountPaid,
-        totalAmount: grandTotal
+        totalAmount: grandTotal,
+        deductStock: isBackdated ? deductStock : true,
     };
 
     if (saleType === "counter") {
@@ -439,7 +443,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
           <div className="grid grid-cols-2 gap-2 sm:gap-3 z-10 relative">
              <div>
                  <label className="text-xs sm:text-sm font-semibold text-gray-500 mb-1 block">Date</label>
-                 <input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="w-full p-1.5 sm:p-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white focus:ring-1 focus:ring-gray-900 focus:border-gray-900" />
+                 <input type="date" value={saleDate} onChange={(e) => { setSaleDate(e.target.value); setDeductStock(false); }} className="w-full p-1.5 sm:p-2 border border-gray-300 rounded-lg text-xs sm:text-sm bg-white focus:ring-1 focus:ring-gray-900 focus:border-gray-900" />
              </div>
              <div>
                 <label className="text-xs sm:text-sm font-semibold text-gray-500 mb-1 block">Method</label>
@@ -451,6 +455,20 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                 </select>
              </div>
           </div>
+
+          {/* BACKDATED SALE — optional stock deduction */}
+          {saleDate !== today && saleType === 'counter' && (
+            <label className="flex items-center gap-2 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                id="deductStock"
+                checked={deductStock}
+                onChange={(e) => setDeductStock(e.target.checked)}
+                className="rounded border-gray-300 text-gray-900 focus:ring-gray-900 h-4 w-4 shrink-0"
+              />
+              <span className="text-xs text-amber-700">Deduct from current stock (backdated sale)</span>
+            </label>
+          )}
 
           {/* PAYMENT STATUS */}
           <div className="z-0 relative">

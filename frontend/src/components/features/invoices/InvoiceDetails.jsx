@@ -1,7 +1,8 @@
 // src/components/features/invoices/InvoiceDetails.jsx
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, useQuery } from '@tanstack/react-query';
 import { paymentsApi } from '@api/jobs';
+import { settingsApi } from '@api/settings';
 import Modal from '@components/common/Modal';
 import Button from '@components/common/Button';
 import Card from '@components/common/Card';
@@ -24,6 +25,13 @@ export default function InvoiceDetails({ isOpen, onClose, invoice }) {
   const queryClient = useQueryClient();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
+  const { data: settingsData } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: settingsApi.getBusinessSettings,
+    staleTime: 10 * 60 * 1000,
+  });
+  const businessSettings = settingsData?.data;
+
   if (!invoice) return null;
 
   const materialsCost = parseFloat(invoice.materialsCost || 0);
@@ -45,6 +53,28 @@ export default function InvoiceDetails({ isOpen, onClose, invoice }) {
         size="large"
       >
         <div className="space-y-4 sm:space-y-6">
+          {/* Business Branding */}
+          {businessSettings && (
+            <div className="text-center pb-4 border-b border-gray-100">
+              {businessSettings.logo && (
+                <img
+                  src={businessSettings.logo}
+                  alt={businessSettings.name}
+                  className="h-12 mx-auto mb-2 object-contain"
+                />
+              )}
+              <p className="text-sm font-bold text-gray-900 uppercase tracking-wide">{businessSettings.name}</p>
+              {businessSettings.address && (
+                <p className="text-xs text-gray-500 mt-0.5">{businessSettings.address}</p>
+              )}
+              {(businessSettings.phone || businessSettings.email) && (
+                <p className="text-xs text-gray-500">
+                  {[businessSettings.phone, businessSettings.email].filter(Boolean).join(' · ')}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Invoice Header */}
           <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3 sm:gap-4">
             <div>
@@ -60,7 +90,7 @@ export default function InvoiceDetails({ isOpen, onClose, invoice }) {
                 </p>
               )}
             </div>
-            <span className={`inline-flex items-center px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm bg-${PAYMENT_STATUS_COLORS[invoice.paymentStatus]}-100 text-${PAYMENT_STATUS_COLORS[invoice.paymentStatus]}-800 flex-shrink-0`}>
+            <span className={`inline-flex items-center px-2.5 sm:px-3 py-0.5 sm:py-1 rounded-full text-xs sm:text-sm bg-${PAYMENT_STATUS_COLORS[invoice.paymentStatus]}-100 text-${PAYMENT_STATUS_COLORS[invoice.paymentStatus]}-800 shrink-0`}>
               {PAYMENT_STATUS_LABELS[invoice.paymentStatus]}
             </span>
           </div>

@@ -238,15 +238,7 @@ export const createJob = asyncHandler(async (req, res) => {
     req.db.business.findUnique({ where: { id: req.user.businessId }, select: { name: true } }),
     req.db.businessSettings.findFirst({ where: { businessId: req.user.businessId }, select: { email: true } }),
   ]);
-  sendJobCreatedEmail(completeJob, business?.name, bizSettings?.email).catch(() => {});
-
   res.status(201).json({ success: true, message: 'Job created successfully', data: completeJob });
-
-  if (completeJob.clientPhone) {
-    const vehicle = [completeJob.vehicleMake, completeJob.vehicleModel].filter(Boolean).join(' ');
-    const msg = `Hi ${completeJob.clientName}, your vehicle${vehicle ? ` (${vehicle})` : ''} has been booked in for ${completeJob.problemType} at ${business?.name || 'the workshop'}. Job Ref: #${completeJob.id}. We'll update you when it's ready.`;
-    sendJobSMS(completeJob.clientPhone, msg, req.user.businessId);
-  }
 });
 
 // @desc    Get all jobs
@@ -405,6 +397,20 @@ export const updateJob = asyncHandler(async (req, res) => {
     return updated;
   });
   res.status(200).json({ success: true, message: 'Job updated successfully', data: updatedJob });
+
+  // Notify client when job transitions to in_progress (i.e. work has started)
+  if (status === 'in_progress' && existingJob.status !== 'in_progress') {
+    const [business, bizSettings] = await Promise.all([
+      req.db.business.findUnique({ where: { id: req.user.businessId }, select: { name: true } }),
+      req.db.businessSettings.findFirst({ where: { businessId: req.user.businessId }, select: { email: true } }),
+    ]);
+    sendJobCreatedEmail(updatedJob, business?.name, bizSettings?.email).catch(() => {});
+    if (updatedJob.clientPhone) {
+      const vehicle = [updatedJob.vehicleMake, updatedJob.vehicleModel].filter(Boolean).join(' ');
+      const msg = `Hi ${updatedJob.clientName}, our team has started working on your vehicle${vehicle ? ` (${vehicle})` : ''} at ${business?.name || 'the workshop'}. Job Ref: #${updatedJob.id}. We will notify you when it is ready.`;
+      sendJobSMS(updatedJob.clientPhone, msg, req.user.businessId);
+    }
+  }
 });
 
 // @desc    Add material to job

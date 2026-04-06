@@ -277,9 +277,13 @@ export const getInvoice = asyncHandler(async (req, res) => {
     throw new AppError('Invoice not found', 404, 'NOT_FOUND');
   }
 
+  const businessSettings = await req.db.businessSettings.findFirst({
+    select: { name: true, logo: true, address: true, phone: true, email: true },
+  });
+
   res.status(200).json({
     success: true,
-    data: invoice,
+    data: { ...invoice, businessSettings },
   });
 });
 

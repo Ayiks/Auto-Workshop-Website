@@ -6,6 +6,7 @@ import { useAuthStore } from '@stores/authStore';
 import Button from '@components/common/Button';
 import Table from '@components/common/Table';
 import Modal from '@components/common/Modal';
+import { toast } from 'react-hot-toast';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import EmptyState from '@components/common/EmptyState';
 import GenerateInvoiceModal from '@components/features/invoices/GenerateInvoiceModal';
@@ -58,11 +59,9 @@ export default function Invoices() {
       queryClient.invalidateQueries(['invoice-stats']);
       queryClient.invalidateQueries(['jobs']);
       setShowGenerateModal(false);
-      alert('Invoice generated successfully!');
+      toast.success('Invoice generated successfully');
     },
-    onError: (error) => {
-      alert(error.response?.data?.error || 'Failed to generate invoice');
-    },
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to generate invoice'),
   });
 
   // Filter invoices by search term
@@ -81,7 +80,7 @@ export default function Invoices() {
       setSelectedInvoice(response.data);
       setShowDetailsModal(true);
     } catch (error) {
-      alert('Failed to load invoice details');
+      toast.error('Failed to load invoice details');
     }
   };
 

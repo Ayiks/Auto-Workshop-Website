@@ -6,6 +6,7 @@ import { settingsApi } from "@api/settings";
 import Button from "@components/common/Button";
 import CustomerSelect from "@components/common/CustomerSelect"; 
 import { format } from "date-fns";
+import { toast } from "react-hot-toast";
 
 const getItemColor = (id) => {
   const colors = ["bg-gray-800", "bg-gray-600", "bg-gray-700", "bg-black", "bg-gray-500"];
@@ -73,7 +74,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
       const existingItem = prevItems.find((i) => i.materialId === material.id);
       if (existingItem) {
         if (existingItem.quantity + 1 > material.quantity) {
-          alert("Max stock reached!");
+          toast.error("Max stock reached");
           return prevItems;
         }
         return prevItems.map((i) =>
@@ -107,7 +108,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
           
           if (newQty <= 0) return item; 
           if (newQty > item.maxQuantity) {
-            alert("Stock limit reached");
+            toast.error("Stock limit reached");
             return item;
           }
           return { ...item, quantity: newQty, subtotal: newQty * item.unitPrice };
@@ -189,14 +190,10 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
   const handleFinalSubmit = (e) => {
     e.preventDefault();
     
-    if (saleType === "counter" && items.length === 0) return alert("Cart is empty");
-    // Validate empty quantities
-    if (saleType === "counter" && items.some(i => i.quantity === "" || i.quantity <= 0)) {
-        return alert("Please enter valid quantities for all items");
-    }
-
-    if (saleType === "booth" && !selectedService?.id) return alert("Invalid Service");
-    if (paymentStatus === "partially" && (!partialAmount || partialAmount <= 0)) return alert("Please enter the amount paid");
+    if (saleType === "counter" && items.length === 0) { toast.error("Cart is empty"); return; }
+    if (saleType === "counter" && items.some(i => i.quantity === "" || i.quantity <= 0)) { toast.error("Please enter valid quantities for all items"); return; }
+    if (saleType === "booth" && !selectedService?.id) { toast.error("Please select a service"); return; }
+    if (paymentStatus === "partially" && (!partialAmount || partialAmount <= 0)) { toast.error("Please enter the amount paid"); return; }
 
     const now = new Date();
     const formattedDateTime = new Date(`${saleDate}T${format(now, "HH:mm:ss")}`).toISOString();

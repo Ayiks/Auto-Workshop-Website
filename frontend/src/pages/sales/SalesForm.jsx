@@ -9,6 +9,7 @@ import CustomerSelect from "@components/common/CustomerSelect";
 import Modal from "@components/common/Modal";
 import Receipt from "@components/features/sales/Receipt";
 import { format } from "date-fns";
+import { toast } from "react-hot-toast";
 import { 
   Trash2, Plus, Minus, Search, 
   ShoppingCart, ArrowRight, ArrowLeft, CreditCard,
@@ -100,12 +101,11 @@ export default function SaleForm({ onCancel, isLoading }) {
           setShowReceiptModal(true);
         } else {
           console.warn("Could not find hydrated receipt data in response", responsePayload);
-          alert("Sale completed, but receipt could not be loaded automatically.");
+          toast.success("Sale recorded — receipt unavailable");
         }
     },
     onError: (error) => {
-        console.error("Sale Error:", error);
-        alert(error.response?.data?.error?.message || "Failed to create sale. Please try again.");
+        toast.error(error.response?.data?.error?.message || "Failed to create sale. Please try again.");
     }
   });
 
@@ -171,7 +171,7 @@ export default function SaleForm({ onCancel, isLoading }) {
     const availableStock = material.quantity - currentReserved;
     
     if (availableStock <= 0) {
-        alert(`Insufficient Stock! Out of stock.`);
+        toast.error(`"${material.name}" is out of stock`);
         return;
     }
     
@@ -224,7 +224,7 @@ export default function SaleForm({ onCancel, isLoading }) {
     const otherReserved = getReservedStock(configItem.materialId, items);
 
     if (otherReserved + requiredForThisItem > configItem.maxStock) {
-        alert("Changing unit would exceed total available stock.");
+        toast.error("Changing unit would exceed available stock");
         return;
     }
 
@@ -322,7 +322,7 @@ export default function SaleForm({ onCancel, isLoading }) {
         const requiredForThisItem = item.quantity * newFactor;
 
         if (otherReserved + requiredForThisItem > item.maxStock) {
-            alert("Changing unit would exceed total available stock.");
+            toast.error("Changing unit would exceed available stock");
             return prev;
         }
 
@@ -414,7 +414,7 @@ export default function SaleForm({ onCancel, isLoading }) {
 
   // --- SUBMIT ---
   const handleFinalSubmit = (asDraft = false) => {
-    if (saleType === "counter" && items.length === 0) return alert("Cart is empty");
+    if (saleType === "counter" && items.length === 0) { toast.error("Cart is empty"); return; }
     
     const now = new Date();
     const formattedDateTime = new Date(`${saleDate}T${format(now, "HH:mm:ss")}`).toISOString();

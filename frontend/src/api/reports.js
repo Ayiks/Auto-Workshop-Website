@@ -46,6 +46,12 @@ export const reportsApi = {
   // Get trends data for charts
   getTrends: async (params) => {
     const response = await apiClient.get('/reports/trends', { params });
-    return response;  
+    return response;
+  },
+
+  // Get Accounts Payable & Receivable snapshot
+  getAPAR: async () => {
+    const response = await apiClient.get('/reports/ap-ar');
+    return response;
   },
 };

@@ -5,6 +5,7 @@ import { paymentsApi } from '@api/jobs';
 import { useAuthStore } from '@stores/authStore';
 import Modal from '@components/common/Modal';
 import Button from '@components/common/Button';
+import { toast } from 'react-hot-toast';
 import Input, { Textarea } from '@components/common/Input';
 import Select from '@components/common/Select';
 
@@ -45,11 +46,9 @@ export default function RecordPaymentModal({ isOpen, onClose, invoice }) {
       queryClient.invalidateQueries(['invoice-stats']);
       queryClient.invalidateQueries(['payments']);
       onClose();
-      alert('Payment recorded successfully!');
+      toast.success('Payment recorded successfully');
     },
-    onError: (error) => {
-      alert(error.response?.data?.error || 'Failed to record payment');
-    },
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to record payment'),
   });
 
   const handleChange = (e) => {

@@ -35,8 +35,8 @@ apiClient.interceptors.response.use(
     const code = error.response?.data?.error?.code || 'UNKNOWN_ERROR';
     const status = error.response?.status;
 
-    // Handle 401 - Unauthorized
-    if (status === 401) {
+    // Handle 401 - Unauthorized (but not on the login request itself)
+    if (status === 401 && !error.config?.url?.includes('/auth/login')) {
       localStorage.removeItem('token');
       localStorage.removeItem('user');
       window.location.href = '/login';

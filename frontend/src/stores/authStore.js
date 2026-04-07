@@ -100,8 +100,8 @@ export const useAuthStore = create((set, get) => ({
       if (userData.password.length < 8) {
         throw new Error('Password must be at least 8 characters long');
       }
-      await authApi.registerUser(userData);
-      return { success: true };
+      const result = await authApi.registerUser(userData);
+      return result;
     } catch (error) {
       set({ error: error.message || 'Registration failed' });
       throw error;
@@ -110,16 +110,18 @@ export const useAuthStore = create((set, get) => ({
 
   // Verify email
   verifyEmail: async (token) => {
-    set({ isLoading: true, error: null });
+    // NOTE: do NOT set isLoading:true here — it unmounts the BrowserRouter in App.jsx,
+    // destroying VerifyEmail mid-operation and causing an infinite retry loop.
+    set({ error: null });
     try {
       const { token: authToken, user } = await authApi.verifyEmail(token);
       if (!authToken || !user) throw new Error('Missing token or user data in response');
       localStorage.setItem('token', authToken);
       localStorage.setItem('user', JSON.stringify(user));
-      set({ user, isAuthenticated: true, isLoading: false, error: null });
+      set({ user, isAuthenticated: true, error: null });
       return { token: authToken, user };
     } catch (error) {
-      set({ error: error.message || 'Verification failed', isLoading: false });
+      set({ error: error.message || 'Verification failed' });
       throw error;
     }
   },

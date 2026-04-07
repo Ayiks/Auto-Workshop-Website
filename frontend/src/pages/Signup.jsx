@@ -1,39 +1,45 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@stores/authStore';
-import { Mail, Lock, User, Phone, ArrowRight, CheckCircle } from 'lucide-react';
-import Button from '@components/common/Button';
+import { Mail, Lock, User, Phone, ArrowRight } from 'lucide-react';
 
 export default function Register() {
-  const { registerUser, error } = useAuthStore();
+  const { registerUser } = useAuthStore();
   const navigate = useNavigate();
-  
+
   const [formData, setFormData] = useState({
     fullName: '', email: '', phone: '', password: ''
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitted, setSubmitted] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    setFormData({ ...formData, [e.target.name]: e.target.value });
+    setError('');
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    setError('');
     setIsSubmitting(true);
     try {
-
-      await registerUser(formData);
-      setIsSubmitting(true);
-      // window.location.replace(`/signup-success?email=${encodeURIComponent(formData.email)}`);
-      navigate(`/signup-success?email=${encodeURIComponent(formData.email)}`, { replace: true });
-
-   } catch (err) {
-      console.error("Signup failed", err);
+      const result = await registerUser(formData);
+      const emailSent = result?.emailSent !== false;
+      navigate(
+        `/signup-success?email=${encodeURIComponent(formData.email)}${emailSent ? '' : '&emailSent=false'}`,
+        { replace: true }
+      );
+    } catch (err) {
+      const message =
+        err.response?.data?.error?.message ||
+        err.response?.data?.message ||
+        err.message ||
+        'Registration failed. Please try again.';
+      setError(message);
     } finally {
       setIsSubmitting(false);
     }
   };
-
-if (submitted) return <div className="flex min-h-screen items-center justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-slate-900"/></div>;
 
   return (
     
@@ -48,7 +54,7 @@ if (submitted) return <div className="flex min-h-screen items-center justify-cen
         </div>
 
         {error && (
-          <div className="mb-4 rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-600 text-center animate-pulse">
+          <div className="mb-4 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 text-center">
             {error}
           </div>
         )}

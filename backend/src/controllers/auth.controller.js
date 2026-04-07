@@ -126,12 +126,21 @@ export const registerUser = asyncHandler(async (req, res) => {
     }
   });
 
-  // Send the email
-  await sendVerificationEmail(user.email, user.fullName, verificationToken);
+  // Send the email — non-fatal: user is created even if email fails
+  let emailSent = true;
+  try {
+    await sendVerificationEmail(user.email, user.fullName, verificationToken);
+  } catch (emailErr) {
+    console.error('[registerUser] Email send failed:', emailErr.message);
+    emailSent = false;
+  }
 
   res.status(201).json({
     success: true,
-    message: 'Account created. Please check your email for the verification link.'
+    emailSent,
+    message: emailSent
+      ? 'Account created. Please check your email for the verification link.'
+      : 'Account created but we could not deliver the verification email. Please try resending below.',
   });
 });
 
@@ -178,7 +187,11 @@ export const verifyEmail = asyncHandler(async (req, res) => {
     user: {
       id: updatedUser.id,
       email: updatedUser.email,
-      businessId: updatedUser.businessId
+      fullName: updatedUser.fullName,
+      username: updatedUser.username,
+      role: updatedUser.role,
+      permissions: updatedUser.permissions,
+      businessId: updatedUser.businessId,
     }
   });
 });
@@ -280,6 +293,15 @@ export const login = asyncHandler(async (req, res) => {
     throw new AppError('Account is deactivated', 401, 'ACCOUNT_DEACTIVATED');
   }
 
+  // Check email verification
+  if (!user.isEmailVerified) {
+    throw new AppError(
+      'Please verify your email before logging in. Check your inbox for the verification link.',
+      401,
+      'EMAIL_NOT_VERIFIED'
+    );
+  }
+
   // Verify password
   const isPasswordValid = await bcrypt.compare(password, user.passwordHash);
 
@@ -374,6 +396,50 @@ export const changePassword = asyncHandler(async (req, res) => {
   res.json({
     success: true,
     message: 'Password changed successfully',
+  });
+});
+
+// @desc    Resend verification email
+// @route   POST /api/auth/resend-verification
+// @access  Public
+export const resendVerificationEmail = asyncHandler(async (req, res) => {
+  const { email } = req.body;
+  if (!email) throw new AppError('Email is required', 400);
+
+  console.log(`[resendVerification] Request for: ${email}`);
+
+  const user = await prisma.user.findFirst({ where: { email } });
+
+  // Always return 200 — don't leak whether email exists
+  if (!user) {
+    console.log(`[resendVerification] No user found for: ${email}`);
+    return res.status(200).json({
+      success: true,
+      message: 'If that email is registered and unverified, a new verification link has been sent.',
+    });
+  }
+
+  if (user.isEmailVerified) {
+    console.log(`[resendVerification] User already verified: ${email}`);
+    return res.status(200).json({
+      success: true,
+      message: 'If that email is registered and unverified, a new verification link has been sent.',
+    });
+  }
+
+  const verificationToken = crypto.randomBytes(32).toString('hex');
+  const tokenExpiry = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+  await prisma.user.update({
+    where: { id: user.id },
+    data: { emailVerificationToken: verificationToken, verificationTokenExpiry: tokenExpiry },
+  });
+
+  await sendVerificationEmail(user.email, user.fullName, verificationToken);
+
+  res.status(200).json({
+    success: true,
+    message: 'Verification email sent. Please check your inbox.',
   });
 });
 

@@ -5,6 +5,7 @@ import { settingsApi } from '@api/settings';
 import { useAuthStore } from '@stores/authStore';
 import Card from '@components/common/Card';
 import Button from '@components/common/Button';
+import { toast } from 'react-hot-toast';
 import Input from '@components/common/Input'; // Assuming you have this component
 
 export default function ProfileSettings() {
@@ -62,12 +63,9 @@ export default function ProfileSettings() {
 
       queryClient.invalidateQueries(['profile']);
       setIsEditingProfile(false);
-      alert('Profile updated successfully!');
+      toast.success('Profile updated');
     },
-    onError: (error) => {
-      console.error("Update Error:", error);
-      alert(error.response?.data?.message || error.message || 'Failed to update profile');
-    },
+    onError: (error) => toast.error(error.response?.data?.message || error.message || 'Failed to update profile'),
   });
 
   const changePasswordMutation = useMutation({
@@ -75,9 +73,9 @@ export default function ProfileSettings() {
     onSuccess: () => {
       setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       setShowPasswordSection(false);
-      alert('Password changed successfully!');
+      toast.success('Password changed successfully');
     },
-    onError: (error) => alert(error.response?.data?.error || 'Failed to change password'),
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to change password'),
   });
 
   const handleProfileChange = (e) => {
@@ -95,8 +93,8 @@ export default function ProfileSettings() {
   };
   
   const handlePasswordSave = () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword) return alert("Passwords do not match");
-    if (passwordData.newPassword.length < 6) return alert("Password too short");
+    if (passwordData.newPassword !== passwordData.confirmPassword) { toast.error("Passwords do not match"); return; }
+    if (passwordData.newPassword.length < 6) { toast.error("Password must be at least 6 characters"); return; }
     changePasswordMutation.mutate({ currentPassword: passwordData.currentPassword, newPassword: passwordData.newPassword });
   };
 

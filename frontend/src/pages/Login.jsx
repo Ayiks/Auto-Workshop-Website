@@ -1,85 +1,75 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuthStore } from "@stores/authStore";
-import { useResponsive } from "@hooks/useResponsive";
-import { RESPONSIVE_SPACING } from "@utils/responsiveHelpers";
+import { authApi } from "@api/auth";
+import { Send, CheckCircle } from "lucide-react";
 
 export default function Login() {
   const navigate = useNavigate();
   const login = useAuthStore((state) => state.login);
-  const clearError = useAuthStore((state) => state.clearError);
 
   const [formData, setFormData] = useState({ username: "", password: "" });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [errorCode, setErrorCode] = useState("");
 
-  // Clear any previous auth errors when component mounts
-  useEffect(() => {
-    setError("");
-    // Clear auth store error if available
-    if (clearError) {
-      clearError();
-    }
-  }, [clearError]);
+  // Resend verification state
+  const [resendStatus, setResendStatus] = useState("idle"); // idle | sending | sent | error
+  const [resendError, setResendError] = useState("");
 
   const handleChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError("");
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    
+    setError("");
+    setErrorCode("");
+    setResendStatus("idle");
     try {
-      setError("");
       setIsLoading(true);
       const user = await login(formData);
-      
       if (user && user.businessId) {
-        // User has a business, go to dashboard
         navigate('/app/dashboard');
       } else if (user) {
-        // User logged in but no business yet, go to setup workspace
         navigate('/setup-workspace');
       } else {
-        // Login failed
         setError('Login failed. Please try again.');
       }
-      setIsLoading(false);
-      
     } catch (err) {
-      console.error("Login failed", err);
+      const message =
+        err.response?.data?.error?.message ||
+        err.response?.data?.message ||
+        err.message ||
+        'Incorrect username or password.';
+      const code =
+        err.response?.data?.error?.code ||
+        err.code ||
+        '';
+      setError(message);
+      setErrorCode(code);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleResend = async () => {
+    const email = formData.username.trim();
+    if (!email || resendStatus === "sending" || resendStatus === "sent") return;
+    setResendStatus("sending");
+    setResendError("");
+    try {
+      await authApi.resendVerification(email);
+      setResendStatus("sent");
+    } catch (err) {
+      setResendError(err.message || "Failed to resend. Please try again.");
+      setResendStatus("error");
     }
   };
 
   return (
-    // Outer Container: Changed bg-white to bg-slate-50 to make the card pop
     <div className="flex min-h-screen w-full items-center justify-center bg-slate-50 font-sans p-4">
-      
-      {/* Card Container */}
       <div className="w-full max-w-md bg-white p-8 rounded-2xl shadow-lg border border-slate-100">
-        
-        {/* Logo */}
-        {/* <div className="mb-8 flex items-center justify-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-600 text-white shadow-md shadow-blue-200">
-            <svg
-              className="h-6 w-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"
-              />
-            </svg>
-          </div>
-          <h1 className="text-xl font-bold tracking-tight text-slate-900">
-            Gray Manager
-          </h1>
-        </div> */}
 
         <div className="mb-6 text-center">
           <h2 className="text-2xl font-bold text-slate-900">
@@ -92,8 +82,41 @@ export default function Login() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {error && (
-            <div className="rounded-lg border border-red-100 bg-red-50 p-3 text-sm text-red-600 animate-pulse text-center">
+            <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-600 text-center">
               {error}
+            </div>
+          )}
+
+          {/* Resend verification prompt when email not verified */}
+          {errorCode === "EMAIL_NOT_VERIFIED" && (
+            <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+              {resendStatus === "sent" ? (
+                <div className="text-center">
+                  <div className="flex items-center justify-center gap-2 text-sm text-green-700 font-medium">
+                    <CheckCircle size={15} />
+                    Verification email sent!
+                  </div>
+                  <p className="text-xs text-amber-700 mt-1">Check your inbox and spam/junk folder — it may take a few minutes.</p>
+                </div>
+              ) : (
+                <>
+                  <p className="text-xs text-amber-700 mb-2 text-center">
+                    A new verification link will be sent to <span className="font-bold">{formData.username}</span>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={resendStatus === "sending"}
+                    className="flex items-center justify-center gap-1.5 w-full text-xs font-bold text-amber-800 hover:text-amber-900 underline underline-offset-2 transition disabled:opacity-60"
+                  >
+                    <Send size={13} />
+                    {resendStatus === "sending" ? "Sending..." : "Resend verification email"}
+                  </button>
+                  {resendStatus === "error" && (
+                    <p className="text-xs text-red-600 mt-1 text-center">{resendError}</p>
+                  )}
+                </>
+              )}
             </div>
           )}
 

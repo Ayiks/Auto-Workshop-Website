@@ -18,6 +18,7 @@ import MaterialForm from "@components/features/materials/MaterialForm";
 import RestockWizard from "@components/features/materials/RestockWizard";
 import RestockOrdersList from "@components/features/materials/RestockOrdersList";
 import { Image as ImageIcon } from "lucide-react";
+import { toast } from 'react-hot-toast';
 
 export default function Materials() {
   const queryClient = useQueryClient();
@@ -175,7 +176,7 @@ export default function Materials() {
       setIsUploading(false);
     },
     onError: (err) => {
-      alert(err.message || "Failed to add material");
+      toast.error(err.response?.data?.message || err.message || "Failed to add material");
       setIsUploading(false);
     },
   });
@@ -187,9 +188,10 @@ export default function Materials() {
       setShowEditModal(false);
       setSelectedMaterial(null);
       setIsUploading(false);
+      toast.success("Material updated");
     },
     onError: (err) => {
-      alert(err.message || "Failed to update material");
+      toast.error(err.response?.data?.message || err.message || "Failed to update material");
       setIsUploading(false);
     },
   });
@@ -199,17 +201,19 @@ export default function Materials() {
     onSuccess: (data, variables) => {
       queryClient.invalidateQueries(["materials"]);
       setSelectedIds((prev) => prev.filter((id) => id !== variables));
+      toast.success("Material deleted");
     },
-    onError: (err) => alert(err.message || "Failed to delete material"),
+    onError: (err) => toast.error(err.response?.data?.message || err.message || "Failed to delete material"),
   });
 
   const toggleStatusMutation = useMutation({
     mutationFn: ({ id, isActive }) =>
       materialsApi.updateMaterial(id, { isActive }),
-    onSuccess: () => {
+    onSuccess: (_, vars) => {
       queryClient.invalidateQueries(["materials"]);
+      toast.success(vars.isActive ? "Material activated" : "Material deactivated");
     },
-    onError: (err) => alert(err.message || "Failed to update status"),
+    onError: (err) => toast.error(err.response?.data?.message || err.message || "Failed to update status"),
   });
 
   // Add this useEffect
@@ -233,7 +237,7 @@ useEffect(() => {
     } catch (error) {
       console.error("Error preparing upload:", error);
       setIsUploading(false);
-      alert("Failed to upload image. Please try again.");
+      toast.error("Failed to upload image. Please try again.");
     }
   };
 
@@ -253,7 +257,7 @@ useEffect(() => {
     } catch (error) {
       console.error("Error updating material:", error);
       setIsUploading(false);
-      alert("Failed to update material with image.");
+      toast.error("Failed to update material with image.");
     }
   };
 

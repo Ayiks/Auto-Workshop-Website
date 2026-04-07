@@ -4,6 +4,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '@api/users';
 import Modal from '@components/common/Modal';
 import Button from '@components/common/Button';
+import { toast } from 'react-hot-toast';
 import Input from '@components/common/Input';
 
 export default function ChangePasswordModal({ isOpen, onClose, user }) {
@@ -21,11 +22,9 @@ export default function ChangePasswordModal({ isOpen, onClose, user }) {
       queryClient.invalidateQueries(['users']);
       onClose();
       setFormData({ newPassword: '', confirmPassword: '' });
-      alert('Password changed successfully!');
+      toast.success('Password changed successfully');
     },
-    onError: (error) => {
-      alert(error.response?.data?.error || 'Failed to change password');
-    },
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to change password'),
   });
 
   const handleChange = (e) => {

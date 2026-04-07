@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { customersApi } from '@api/customers';
 import { useAuthStore } from '@stores/authStore';
 import Button from '@components/common/Button';
+import { toast } from 'react-hot-toast';
 import Modal from '@components/common/Modal';
 import CustomerForm from './CustomerForm';
 import LoadingSpinner from '@components/common/LoadingSpinner';
@@ -51,13 +52,16 @@ export default function CustomersManager() {
       const id = res?.data?.id || res?.id;
       if (id) navigate(`/app/customers/${id}`);
     },
-    onError: (err) => alert(err.response?.data?.error?.message || 'Failed to create customer'),
+    onError: (err) => toast.error(err.response?.data?.error?.message || 'Failed to create customer'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: customersApi.deleteCustomer,
-    onSuccess: () => queryClient.invalidateQueries(['allCustomers']),
-    onError: (err) => alert(err.response?.data?.error?.message || 'Failed to delete customer'),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['allCustomers']);
+      toast.success('Customer deleted');
+    },
+    onError: (err) => toast.error(err.response?.data?.error?.message || 'Failed to delete customer'),
   });
 
   const handleDelete = (e, id) => {

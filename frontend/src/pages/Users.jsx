@@ -5,6 +5,7 @@ import { usersApi } from '@api/users';
 import { useAuthStore } from '@stores/authStore';
 import { useResponsive } from '@hooks/useResponsive';
 import { RESPONSIVE_SPACING } from '@utils/responsiveHelpers';
+import { toast } from 'react-hot-toast';
 import Modal from '@components/common/Modal';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import EmptyState from '@components/common/EmptyState';
@@ -99,8 +100,9 @@ export default function Users() {
       queryClient.invalidateQueries(['users']);
       queryClient.invalidateQueries(['user-stats']);
       setShowCreateModal(false);
+      toast.success('User created successfully');
     },
-    onError: (error) => console.error('Failed to create user:', error),
+    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to create user'),
   });
 
   const updateMutation = useMutation({
@@ -109,8 +111,9 @@ export default function Users() {
       queryClient.invalidateQueries(['users']);
       setShowEditModal(false);
       setSelectedUser(null);
+      toast.success('User updated successfully');
     },
-    onError: (error) => console.error('Failed to update user:', error),
+    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to update user'),
   });
 
   const deactivateMutation = useMutation({
@@ -118,8 +121,9 @@ export default function Users() {
     onSuccess: () => {
       queryClient.invalidateQueries(['users']);
       queryClient.invalidateQueries(['user-stats']);
+      toast.success('User deactivated');
     },
-    onError: (error) => console.error('Failed to deactivate user:', error),
+    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to deactivate user'),
   });
 
   const activateMutation = useMutation({
@@ -127,8 +131,9 @@ export default function Users() {
     onSuccess: () => {
       queryClient.invalidateQueries(['users']);
       queryClient.invalidateQueries(['user-stats']);
+      toast.success('User activated');
     },
-    onError: (error) => console.error('Failed to activate user:', error),
+    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to activate user'),
   });
 
   const deleteMutation = useMutation({
@@ -136,8 +141,9 @@ export default function Users() {
     onSuccess: () => {
       queryClient.invalidateQueries(['users']);
       queryClient.invalidateQueries(['user-stats']);
+      toast.success('User removed');
     },
-    onError: (error) => console.error('Failed to delete user:', error),
+    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.message || 'Failed to remove user'),
   });
 
   // Handlers

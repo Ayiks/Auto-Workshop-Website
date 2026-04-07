@@ -8,6 +8,7 @@ import {
   getMaterialUsageReport,
   getDashboardOverview,
   getTrends,
+  getAPARReport,
 } from '../controllers/report.controller.js';
 import { protect, requirePermission } from '../middleware/auth.js';
 
@@ -66,6 +67,13 @@ router.get(
   '/trends',
   requirePermission('reports', 'view'),
   getTrends
+);
+
+// Accounts Payable & Receivable snapshot
+router.get(
+  '/ap-ar',
+  requirePermission('reports', 'view'),
+  getAPARReport
 );
 
 export default router;

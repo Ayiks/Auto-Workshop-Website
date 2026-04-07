@@ -12,6 +12,7 @@ import {
   getInventorySnapshot,
   getRestockOrders,
   receiveRestockOrder,
+  markRestockOrderPaid,
   updateRestockOrder,
   adminEditReceivedOrder,
   cancelRestockOrder,
@@ -37,6 +38,7 @@ router.post('/bulk-reorder', requirePermission('materials', 'reorder'), bulkReor
 // Restock orders
 router.get('/restock-orders', requirePermission('materials', 'view'), getRestockOrders);
 router.post('/restock-orders/:orderId/receive', requirePermission('materials', 'reorder'), receiveRestockOrder);
+router.post('/restock-orders/:orderId/mark-paid', requirePermission('materials', 'reorder'), markRestockOrderPaid);
 router.put('/restock-orders/:orderId', authorize('admin'), updateRestockOrder);
 router.put('/restock-orders/:orderId/admin-correct', authorize('admin'), adminEditReceivedOrder);
 router.put('/restock-orders/:orderId/cancel', authorize('admin'), cancelRestockOrder);

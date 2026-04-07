@@ -4,6 +4,7 @@ import { settingsApi } from '@api/settings';
 import Card from '@components/common/Card';
 import Button from '@components/common/Button';
 import Modal from '@components/common/Modal';
+import { toast } from 'react-hot-toast';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 
 export default function ServiceSettings() {
@@ -39,11 +40,9 @@ export default function ServiceSettings() {
       queryClient.invalidateQueries(['booth-services']);
       resetForm();
       setShowModal(false);
-      alert('Booth service created successfully!');
+      toast.success('Booth service created');
     },
-    onError: (error) => {
-      alert(error.response?.data?.message || error.message || 'Failed to create booth service');
-    },
+    onError: (error) => toast.error(error.response?.data?.message || error.message || 'Failed to create booth service'),
   });
 
   const updateMutation = useMutation({
@@ -52,22 +51,18 @@ export default function ServiceSettings() {
       queryClient.invalidateQueries(['booth-services']);
       resetForm();
       setShowModal(false);
-      alert('Booth service updated successfully!');
+      toast.success('Booth service updated');
     },
-    onError: (error) => {
-      alert(error.response?.data?.message || error.message || 'Failed to update booth service');
-    },
+    onError: (error) => toast.error(error.response?.data?.message || error.message || 'Failed to update booth service'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: settingsApi.deleteBoothService,
     onSuccess: () => {
       queryClient.invalidateQueries(['booth-services']);
-      alert('Booth service deleted successfully!');
+      toast.success('Booth service deleted');
     },
-    onError: (error) => {
-      alert(error.response?.data?.message || error.message || 'Failed to delete booth service');
-    },
+    onError: (error) => toast.error(error.response?.data?.message || error.message || 'Failed to delete booth service'),
   });
 
   const toggleMutation = useMutation({
@@ -75,9 +70,7 @@ export default function ServiceSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries(['booth-services']);
     },
-    onError: (error) => {
-      alert(error.response?.data?.message || error.message || 'Failed to update booth service status');
-    },
+    onError: (error) => toast.error(error.response?.data?.message || error.message || 'Failed to update booth service status'),
   });
 
   const resetForm = () => {

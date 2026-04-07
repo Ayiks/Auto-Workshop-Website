@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { remindersApi } from '@api/reminders';
 import Modal from '@components/common/Modal';
 import Button from '@components/common/Button';
+import { toast } from 'react-hot-toast';
 
 const REMINDER_TYPES = [
   { value: 'manual',            label: 'General Message' },
@@ -51,10 +52,10 @@ export default function ReminderModal({ customer, onClose }) {
     mutationFn: remindersApi.createReminder,
     onSuccess: () => {
       queryClient.invalidateQueries(['reminders', customer.id]);
-      alert('Reminder scheduled successfully.');
+      toast.success('Reminder scheduled');
       onClose();
     },
-    onError: (err) => alert(err.response?.data?.error?.message || err.message || 'Failed to send reminder'),
+    onError: (err) => toast.error(err.response?.data?.error?.message || err.message || 'Failed to schedule reminder'),
   });
 
   const updateMutation = useMutation({
@@ -62,14 +63,18 @@ export default function ReminderModal({ customer, onClose }) {
     onSuccess: () => {
       queryClient.invalidateQueries(['reminders', customer.id]);
       setEditingReminder(null);
+      toast.success('Reminder updated');
     },
-    onError: (err) => alert(err.response?.data?.error?.message || err.message || 'Failed to update reminder'),
+    onError: (err) => toast.error(err.response?.data?.error?.message || err.message || 'Failed to update reminder'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: remindersApi.deleteReminder,
-    onSuccess: () => queryClient.invalidateQueries(['reminders', customer.id]),
-    onError: (err) => alert(err.response?.data?.error?.message || err.message || 'Failed to cancel reminder'),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['reminders', customer.id]);
+      toast.success('Reminder cancelled');
+    },
+    onError: (err) => toast.error(err.response?.data?.error?.message || err.message || 'Failed to cancel reminder'),
   });
 
   const toggleChannel = (val) =>

@@ -6,6 +6,7 @@ import Card from '@components/common/Card';
 import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { uploadLogoToCloudinary } from '@/services/cloudinary';
+import { toast } from 'react-hot-toast';
 
 const JOB_TYPE_OPTIONS = [
   { value: 'mechanic',  label: 'Mechanic',    icon: Wrench,         desc: 'Engine, brakes, suspension, electrical' },
@@ -62,11 +63,9 @@ export default function BusinessSettings() {
     onSuccess: () => {
       queryClient.invalidateQueries(['business-settings']);
       setIsEditing(false);
-      alert('Business settings updated successfully!');
+      toast.success('Business settings updated');
     },
-    onError: (error) => {
-      alert(error.response?.data?.error || 'Failed to update settings');
-    },
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to update settings'),
   });
 
   const handleChange = (e) => {

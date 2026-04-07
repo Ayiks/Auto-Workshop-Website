@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { usersApi } from '@api/users';
 import Modal from '@components/common/Modal';
 import Button from '@components/common/Button';
+import { toast } from 'react-hot-toast';
 
 // 1. DEFINE YOUR MODULES
 const PERMISSION_MODULES = [
@@ -63,8 +64,9 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
     onSuccess: () => {
       queryClient.invalidateQueries(['users']);
       onClose();
+      toast.success('Permissions updated');
     },
-    onError: (error) => alert(error.response?.data?.error || 'Failed update'),
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to update permissions'),
   });
 
   // --- LOGIC: Recursive Permission Adder ---

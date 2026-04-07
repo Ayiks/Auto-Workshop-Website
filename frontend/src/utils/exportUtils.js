@@ -5,8 +5,7 @@
  */
 export const exportToCSV = (data, filename) => {
   if (!data || data.length === 0) {
-    alert('No data to export');
-    return;
+    throw new Error('No data to export');
   }
 
   // Get headers from first object
@@ -118,8 +117,7 @@ export const exportProfitLoss = (pl, dateRange) => {
  */
 export const exportMaterialUsage = (materials, dateRange) => {
   if (!materials || materials.length === 0) {
-    alert('No material usage data to export');
-    return;
+    throw new Error('No material usage data to export');
   }
 
   const data = materials.map(m => ({

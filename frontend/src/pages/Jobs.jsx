@@ -14,6 +14,7 @@ import EmptyState from '@components/common/EmptyState';
 import JobForm from '@components/features/jobs/JobForm';
 import JobDetailsWithInvoice from '@components/features/jobs/JobDetailsWithInvoice';
 import { format } from 'date-fns';
+import { toast } from 'react-hot-toast';
 
 // We keep colors ONLY for status/invoice states (Trends/Data)
 const STATUS_STYLES = {
@@ -104,10 +105,10 @@ export default function Jobs() {
       if (customerId && (user?.role === 'admin' || user?.role === 'sales')) {
         setProfilePrompt({ customerId });
       } else {
-        alert('Job created successfully!');
+        toast.success('Job created successfully');
       }
     },
-    onError: (e) => alert(e.response?.data?.error || 'Failed to create job'),
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to create job'),
   });
 
   const updateMutation = useMutation({
@@ -116,9 +117,9 @@ export default function Jobs() {
       queryClient.invalidateQueries(['jobs']);
       setShowEditModal(false);
       setSelectedJob(null);
-      alert('Job updated successfully!');
+      toast.success('Job updated successfully');
     },
-    onError: (e) => alert(e.response?.data?.error || 'Failed to update job'),
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to update job'),
   });
 
   const deleteMutation = useMutation({
@@ -128,9 +129,9 @@ export default function Jobs() {
       queryClient.invalidateQueries(['jobs-stats']);
       setShowDetailsModal(false);
       setSelectedJob(null);
-      alert('Job deleted successfully!');
+      toast.success('Job deleted');
     },
-    onError: (e) => alert(e.response?.data?.error || 'Failed to delete job'),
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to delete job'),
   });
 
   const updateStatusMutation = useMutation({
@@ -138,8 +139,9 @@ export default function Jobs() {
     onSuccess: () => {
       queryClient.invalidateQueries(['jobs']);
       queryClient.invalidateQueries(['jobs-stats']);
+      toast.success('Status updated');
     },
-    onError: (e) => alert(e.response?.data?.error || 'Failed to update status'),
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to update status'),
   });
 
   const completeMutation = useMutation({
@@ -147,8 +149,9 @@ export default function Jobs() {
     onSuccess: () => {
       queryClient.invalidateQueries(['jobs']);
       queryClient.invalidateQueries(['jobs-stats']);
+      toast.success('Job marked as complete');
     },
-    onError: (e) => alert(e.response?.data?.error || 'Failed to complete job'),
+    onError: (e) => toast.error(e.response?.data?.error || 'Failed to complete job'),
   });
 
   // Filters
@@ -182,7 +185,7 @@ export default function Jobs() {
       setSelectedJob(response.data);
       setShowDetailsModal(true);
     } catch (error) {
-      alert('Failed to load job details');
+      toast.error('Failed to load job details');
     }
   };
 

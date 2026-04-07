@@ -6,6 +6,7 @@ import { useAuthStore } from '@stores/authStore';
 import Button from '@components/common/Button';
 import CustomerSelect from '@components/common/CustomerSelect';
 import { uploadToCloudinary } from '@/services/cloudinary';
+import { toast } from 'react-hot-toast';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -61,13 +62,13 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = '';
-    if (file.size > 5 * 1024 * 1024) { alert('Photo must be less than 5MB'); return; }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Photo must be less than 5MB'); return; }
     setUploadingBefore(true);
     try {
       const url = await uploadToCloudinary(file);
       setBeforePhotos(prev => [...prev, { url, publicId: url.split('/').slice(-2).join('/') }]);
     } catch {
-      alert('Photo upload failed. Please try again.');
+      toast.error('Photo upload failed. Please try again.');
     } finally {
       setUploadingBefore(false);
     }

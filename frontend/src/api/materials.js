@@ -68,8 +68,8 @@ export const materialsApi = {
   },
 
   // Mark all items in a restock order as received (orderId is a UUID string)
-  receiveRestockOrder: async (orderId) => {
-    const response = await apiClient.post(`/materials/restock-orders/${orderId}/receive`);
+  receiveRestockOrder: async (orderId, data = {}) => {
+    const response = await apiClient.post(`/materials/restock-orders/${orderId}/receive`, data);
     return response;
   },
 
@@ -88,6 +88,12 @@ export const materialsApi = {
   // Admin: cancel a pending restock order
   cancelRestockOrder: async (orderId) => {
     const response = await apiClient.put(`/materials/restock-orders/${orderId}/cancel`);
+    return response;
+  },
+
+  // Mark a restock order as paid to the vendor
+  markRestockOrderPaid: async (orderId) => {
+    const response = await apiClient.post(`/materials/restock-orders/${orderId}/mark-paid`);
     return response;
   },
 };

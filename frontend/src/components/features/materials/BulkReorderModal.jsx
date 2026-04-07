@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import Button from '@components/common/Button';
+import { toast } from 'react-hot-toast';
 
 export default function BulkReorderModal({ selectedMaterials, onReorder, onClose, isLoading }) {
 
@@ -86,7 +87,7 @@ export default function BulkReorderModal({ selectedMaterials, onReorder, onClose
       }));
 
     if (validItems.length === 0) {
-      alert("Please enter a quantity for at least one item.");
+      toast.error("Please enter a quantity for at least one item.");
       return;
     }
 

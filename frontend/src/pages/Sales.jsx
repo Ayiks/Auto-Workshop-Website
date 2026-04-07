@@ -2,6 +2,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { salesApi, receiptsApi } from "@api/sales";
+import { toast } from 'react-hot-toast';
 import { useAuthStore } from "@stores/authStore";
 import { format, startOfMonth, endOfMonth } from "date-fns";
 import { useNavigate } from "react-router-dom"; // Import useNavigate
@@ -116,9 +117,7 @@ export default function Sales() {
       setSelectedReceipt(response.data.receipt);
       setShowReceiptModal(true);
     },
-    onError: (error) => {
-      alert(error.response?.data?.error || "Failed to create sale");
-    },
+    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.error || "Failed to create sale"),
   });
 
   // Top Up Mutation
@@ -132,8 +131,7 @@ export default function Sales() {
       setSelectedReceipt(response.data.receipt);
       setShowReceiptModal(true);
     },
-    onError: (error) =>
-      alert(error.response?.data?.error || "Failed to process payment top-up"),
+    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.error || "Failed to process payment"),
   });
 
   // Update sale mutation
@@ -147,10 +145,9 @@ export default function Sales() {
       queryClient.invalidateQueries({ queryKey: ["dashboard"] });
       setShowEditModal(false);
       setSelectedSale(null);
-      alert("Sale updated successfully!");
+      toast.success("Sale updated successfully");
     },
-    onError: (error) =>
-      alert(error.response?.data?.error || "Failed to update sale"),
+    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.error || "Failed to update sale"),
   });
 
   // Delete sale mutation
@@ -161,10 +158,9 @@ export default function Sales() {
       queryClient.invalidateQueries(["dashboard"]);
       setShowDeleteModal(false);
       setSelectedSale(null);
-      alert("Sale deleted successfully!");
+      toast.success("Sale deleted");
     },
-    onError: (error) =>
-      alert(error.response?.data?.error || "Failed to delete sale"),
+    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.error || "Failed to delete sale"),
   });
 
   const handleTopUp = (formData) =>
@@ -181,7 +177,7 @@ export default function Sales() {
       setSelectedReceipt(response.data);
       setShowReceiptModal(true);
     } catch (error) {
-      alert("Failed to load receipt");
+      toast.error("Failed to load receipt");
     }
   };
 
@@ -195,7 +191,7 @@ export default function Sales() {
       setSelectedSale(response.data);
       setShowEditModal(true);
     } catch (error) {
-      alert("Failed to load sale details");
+      toast.error("Failed to load sale details");
     }
   };
   const openDeleteModal = async (sale) => {
@@ -204,7 +200,7 @@ export default function Sales() {
       setSelectedSale(response.data);
       setShowDeleteModal(true);
     } catch (error) {
-      alert("Failed to load sale details");
+      toast.error("Failed to load sale details");
     }
   };
 

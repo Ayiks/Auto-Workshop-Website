@@ -159,6 +159,7 @@ model MaterialReorder {
   receivedBy       Int?          @map("received_by")
   notificationSent Boolean       @default(false) @map("notification_sent")
   orderId          String?       @db.VarChar(36) @map("order_id")
+  paymentStatus    String        @default("unpaid") @map("payment_status") @db.VarChar(20)
   business         Business      @relation(fields: [businessId], references: [id])
   expense          Expense?      @relation(fields: [expenseId], references: [id])
   material         Material      @relation(fields: [materialId], references: [id])

@@ -8,6 +8,7 @@ import CustomerForm from '@components/features/settings/CustomerForm';
 import VehicleList from '@components/features/settings/VehicleList';
 import CustomerJobHistory from '@components/features/settings/CustomerJobHistory';
 import Button from '@components/common/Button';
+import { toast } from 'react-hot-toast';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 
 const REMINDER_TYPES = [
@@ -64,8 +65,9 @@ export default function CustomerDetail() {
     onSuccess: () => {
       queryClient.invalidateQueries(['customer', id]);
       queryClient.invalidateQueries(['allCustomers']);
+      toast.success('Customer updated');
     },
-    onError: (err) => alert(err.response?.data?.error?.message || 'Failed to update customer'),
+    onError: (err) => toast.error(err.response?.data?.error?.message || 'Failed to update customer'),
   });
 
   // --- Delete ---
@@ -75,7 +77,7 @@ export default function CustomerDetail() {
       queryClient.invalidateQueries(['allCustomers']);
       navigate('/app/customers');
     },
-    onError: (err) => alert(err.response?.data?.error?.message || 'Failed to delete customer'),
+    onError: (err) => toast.error(err.response?.data?.error?.message || 'Failed to delete customer'),
   });
 
   const handleDelete = () => {
@@ -244,13 +246,13 @@ function RemindersPanel({ customerId, canEdit }) {
       queryClient.invalidateQueries(['reminders', customerId]);
       setSubTab('history');
     },
-    onError: (err) => alert(err.response?.data?.error?.message || 'Failed to schedule reminder'),
+    onError: (err) => toast.error(err.response?.data?.error?.message || 'Failed to schedule reminder'),
   });
 
   const deleteMutation = useMutation({
     mutationFn: remindersApi.deleteReminder,
     onSuccess: () => queryClient.invalidateQueries(['reminders', customerId]),
-    onError: (err) => alert(err.response?.data?.error?.message || 'Failed to cancel reminder'),
+    onError: (err) => toast.error(err.response?.data?.error?.message || 'Failed to cancel reminder'),
   });
 
   const handleSubmit = (e) => {

@@ -6,6 +6,7 @@ import { useAuthStore } from '@stores/authStore';
 import Button from '@components/common/Button';
 import Table from '@components/common/Table';
 import Modal from '@components/common/Modal';
+import { toast } from 'react-hot-toast';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import EmptyState from '@components/common/EmptyState';
 import BoothServiceForm from '@components/features/boothServices/BoothServiceForm';
@@ -43,8 +44,9 @@ export default function BoothServices() {
       queryClient.invalidateQueries(['booth-services']);
       queryClient.invalidateQueries(['booth-service-stats']);
       setShowCreateModal(false);
+      toast.success('Booth service created');
     },
-    onError: (error) => alert(error.response?.data?.error || 'Failed to create booth service'),
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to create booth service'),
   });
 
   const updateMutation = useMutation({
@@ -53,8 +55,9 @@ export default function BoothServices() {
       queryClient.invalidateQueries(['booth-services']);
       setShowEditModal(false);
       setSelectedService(null);
+      toast.success('Booth service updated');
     },
-    onError: (error) => alert(error.response?.data?.error || 'Failed to update booth service'),
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to update booth service'),
   });
 
   const deleteMutation = useMutation({
@@ -62,8 +65,9 @@ export default function BoothServices() {
     onSuccess: () => {
       queryClient.invalidateQueries(['booth-services']);
       queryClient.invalidateQueries(['booth-service-stats']);
+      toast.success('Booth service deleted');
     },
-    onError: (error) => alert(error.response?.data?.error || 'Failed to delete booth service'),
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to delete booth service'),
   });
 
   const toggleMutation = useMutation({
@@ -72,7 +76,7 @@ export default function BoothServices() {
       queryClient.invalidateQueries(['booth-services']);
       queryClient.invalidateQueries(['booth-service-stats']);
     },
-    onError: (error) => alert(error.response?.data?.error || 'Failed to toggle booth service'),
+    onError: (error) => toast.error(error.response?.data?.error || 'Failed to update booth service status'),
   });
 
   const filteredServices = services.filter((service) => {

@@ -151,6 +151,7 @@
 import { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
+import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@stores/authStore';
 import { queryClient } from './queryClient';
 
@@ -191,17 +192,23 @@ function App() {
     initAuth();
   }, [initAuth]);
 
-  // Show loading spinner while checking auth
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
-      </div>
-    );
-  }
-
   return (
     <QueryClientProvider client={queryClient}>
+      {/* Toaster must always be mounted — never inside a conditional block */}
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          success: { duration: 3000 },
+          error: { duration: 8000 },
+          style: { fontSize: '14px', maxWidth: '380px' },
+        }}
+      />
+      {isLoading ? (
+        <div className="flex items-center justify-center min-h-screen">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      ) : (
       <BrowserRouter>
         <Routes>
           {/* Public Routes */}
@@ -245,6 +252,7 @@ function App() {
           <Route path="*" element={<Navigate to="/app/dashboard" replace />} />
         </Routes>
       </BrowserRouter>
+      )}
     </QueryClientProvider>
   );
 }

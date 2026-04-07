@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { vehiclesApi } from '@api/vehicles';
 import Button from '@components/common/Button';
+import { toast } from 'react-hot-toast';
 
 const EMPTY_VEHICLE = { make: '', model: '', year: '', regNumber: '', color: '', vin: '', mileage: '' };
 
@@ -27,7 +28,7 @@ export default function VehicleList({ customerId, canEdit }) {
       queryClient.invalidateQueries(['allCustomers']);
       resetForm();
     },
-    onError: (e) => alert(e.response?.data?.error?.message || 'Failed to add vehicle'),
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to add vehicle'),
   });
 
   const updateMutation = useMutation({
@@ -35,8 +36,9 @@ export default function VehicleList({ customerId, canEdit }) {
     onSuccess: () => {
       queryClient.invalidateQueries(['vehicles', customerId]);
       resetForm();
+      toast.success('Vehicle updated');
     },
-    onError: (e) => alert(e.response?.data?.error?.message || 'Failed to update vehicle'),
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to update vehicle'),
   });
 
   const deleteMutation = useMutation({
@@ -44,8 +46,9 @@ export default function VehicleList({ customerId, canEdit }) {
     onSuccess: () => {
       queryClient.invalidateQueries(['vehicles', customerId]);
       queryClient.invalidateQueries(['allCustomers']);
+      toast.success('Vehicle removed');
     },
-    onError: (e) => alert(e.response?.data?.error?.message || 'Failed to remove vehicle'),
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to remove vehicle'),
   });
 
   const resetForm = () => {

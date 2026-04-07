@@ -705,6 +705,7 @@ export const getRestockOrders = asyncHandler(async (req, res) => {
         totalCost: 0,
         // Will be computed below
         status: 'received',
+        paymentStatus: item.paymentStatus,
         receivedDate: item.receivedDate,
         receivedUser: item.receivedUser,
       });
@@ -742,6 +743,7 @@ export const getRestockOrders = asyncHandler(async (req, res) => {
 // @access  Private
 export const receiveRestockOrder = asyncHandler(async (req, res) => {
   const { orderId } = req.params;
+  const { markAsPaid } = req.body;
 
   // Find all pending line items for this order
   const lineItems = await req.db.materialReorder.findMany({
@@ -805,6 +807,7 @@ export const receiveRestockOrder = asyncHandler(async (req, res) => {
           receivedDate: receivedAt,
           receivedBy: req.user.id,
           expenseId: expense.id,
+          ...(markAsPaid ? { paymentStatus: 'paid' } : {}),
         },
       });
 
@@ -842,6 +845,42 @@ export const receiveRestockOrder = asyncHandler(async (req, res) => {
   });
 });
 
+
+// @desc    Mark all items in a restock order as paid to the vendor
+// @route   POST /api/materials/restock-orders/:orderId/mark-paid
+// @access  Private
+export const markRestockOrderPaid = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+
+  const items = await req.db.materialReorder.findMany({
+    where: { orderId, businessId: req.user.businessId },
+  });
+
+  if (items.length === 0) {
+    throw new AppError('Order not found', 404, 'NOT_FOUND');
+  }
+
+  if (items[0].paymentStatus === 'paid') {
+    throw new AppError('Order is already marked as paid', 400, 'INVALID_OPERATION');
+  }
+
+  await req.db.materialReorder.updateMany({
+    where: { orderId, businessId: req.user.businessId },
+    data: { paymentStatus: 'paid' },
+  });
+
+  await req.db.auditLog.create({
+    data: {
+      userId: req.user.id,
+      action: 'MARK_RESTOCK_PAID',
+      entity: 'MaterialReorder',
+      entityId: items[0].materialId,
+      description: `Marked restock order ${orderId} as paid to vendor.`,
+    },
+  });
+
+  res.status(200).json({ success: true, message: 'Order marked as paid.' });
+});
 
 // @desc    Admin: update quantities/costs on a pending restock order
 // @route   PUT /api/materials/restock-orders/:orderId

@@ -4,6 +4,7 @@ import { invoicesApi, paymentsApi } from '@api/jobs';
 import JobPhotos from './JobPhotos';
 import { settingsApi } from '@api/settings';
 import Modal from '@components/common/Modal';
+import { toast } from 'react-hot-toast';
 import Button from '@components/common/Button';
 import Card from '@components/common/Card';
 import RecordPaymentModal from '@components/features/invoices/RecordPaymentModal';
@@ -53,9 +54,7 @@ export default function JobDetailsWithInvoice({
       queryClient.invalidateQueries(['jobs']);
       onRefresh();
     },
-    onError: (error) => {
-      alert(error.response?.data?.message || 'Failed to generate invoice');
-    },
+    onError: (error) => toast.error(error.response?.data?.message || 'Failed to generate invoice'),
   });
 
   const voidPaymentMutation = useMutation({
@@ -64,10 +63,9 @@ export default function JobDetailsWithInvoice({
       setVoidConfirmId(null);
       queryClient.invalidateQueries(['jobs']);
       onRefresh();
+      toast.success('Payment voided');
     },
-    onError: (error) => {
-      alert(error.response?.data?.message || 'Failed to void payment');
-    },
+    onError: (error) => toast.error(error.response?.data?.message || 'Failed to void payment'),
   });
 
   const handlePrint = () => {

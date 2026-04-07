@@ -17,9 +17,15 @@ const statusBadge = (status) => {
   return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-600 capitalize">{status}</span>;
 };
 
-function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onEditClick, onCancel, isCancelling }) {
+const paymentBadge = (paymentStatus) => {
+  if (paymentStatus === 'paid') return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Paid</span>;
+  return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Unpaid</span>;
+};
+
+function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onEditClick, onCancel, isCancelling, onMarkPaid, isMarkingPaid }) {
   const [confirming, setConfirming] = useState(false);
   const [cancelConfirming, setCancelConfirming] = useState(false);
+  const [markPaidOnReceive, setMarkPaidOnReceive] = useState(false);
   const orderedBy = order.user?.fullName || order.user?.username || '—';
   const receivedBy = order.receivedUser?.fullName || order.receivedUser?.username || '—';
   const grandTotal = parseFloat(order.totalCost);
@@ -39,8 +45,9 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
               Placed {order.reorderDate ? format(new Date(order.reorderDate), 'dd MMM yyyy · HH:mm') : '—'}
             </p>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             {statusBadge(order.status)}
+            {order.status !== 'cancelled' && paymentBadge(order.paymentStatus)}
             <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -128,15 +135,26 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
           )}
         </div>
 
-        {/* Footer — admin correction for received orders */}
-        {order.status === 'received' && isAdmin && (
-          <div className="px-6 py-4 border-t border-gray-100">
-            <button
-              onClick={() => onEditClick(order)}
-              className="w-full py-2 text-sm font-medium border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
-            >
-              Edit Order (Admin Correction)
-            </button>
+        {/* Footer — received orders: Mark as Paid + admin correction */}
+        {order.status === 'received' && (
+          <div className="px-6 py-4 border-t border-gray-100 space-y-2">
+            {order.paymentStatus !== 'paid' && (
+              <button
+                onClick={() => onMarkPaid(order.orderId)}
+                disabled={isMarkingPaid}
+                className="w-full py-2.5 text-sm font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition-colors"
+              >
+                {isMarkingPaid ? 'Processing…' : 'Mark as Paid to Vendor'}
+              </button>
+            )}
+            {isAdmin && (
+              <button
+                onClick={() => onEditClick(order)}
+                className="w-full py-2 text-sm font-medium border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
+              >
+                Edit Order (Admin Correction)
+              </button>
+            )}
           </div>
         )}
 
@@ -201,6 +219,15 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
                     Total expense of{' '}
                     <strong>GH₵{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> will be logged.
                   </p>
+                  <label className="flex items-center gap-2 cursor-pointer select-none px-1">
+                    <input
+                      type="checkbox"
+                      checked={markPaidOnReceive}
+                      onChange={e => setMarkPaidOnReceive(e.target.checked)}
+                      className="w-4 h-4 rounded accent-emerald-600"
+                    />
+                    <span className="text-sm text-gray-600">Also mark as paid to vendor</span>
+                  </label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setConfirming(false)}
@@ -209,7 +236,7 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
                       Back
                     </button>
                     <button
-                      onClick={() => onReceive(order.orderId)}
+                      onClick={() => onReceive(order.orderId, markPaidOnReceive)}
                       disabled={isReceiving}
                       className="flex-1 py-2.5 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50"
                     >
@@ -382,19 +409,32 @@ export default function RestockOrdersList() {
   });
 
   const receiveMutation = useMutation({
-    mutationFn: (orderId) => materialsApi.receiveRestockOrder(orderId),
-    onSuccess: (_, orderId) => {
+    mutationFn: ({ orderId, markAsPaid }) => materialsApi.receiveRestockOrder(orderId, { markAsPaid }),
+    onSuccess: (_, { orderId, markAsPaid }) => {
       queryClient.invalidateQueries(['restockOrders']);
       queryClient.invalidateQueries(['materials']);
+      queryClient.invalidateQueries(['ap-ar']);
       setSelectedOrder(prev =>
         prev?.orderId === orderId
           ? {
               ...prev,
               status: 'received',
+              paymentStatus: markAsPaid ? 'paid' : prev.paymentStatus,
               receivedDate: new Date().toISOString(),
               items: prev.items.map(i => ({ ...i, status: 'received' })),
             }
           : prev
+      );
+    },
+  });
+
+  const markPaidMutation = useMutation({
+    mutationFn: (orderId) => materialsApi.markRestockOrderPaid(orderId),
+    onSuccess: (_, orderId) => {
+      queryClient.invalidateQueries(['restockOrders']);
+      queryClient.invalidateQueries(['ap-ar']);
+      setSelectedOrder(prev =>
+        prev?.orderId === orderId ? { ...prev, paymentStatus: 'paid' } : prev
       );
     },
   });
@@ -475,7 +515,8 @@ export default function RestockOrdersList() {
                 <th className="px-4 py-3 text-right">Total</th>
                 <th className="px-4 py-3 text-left">Vendor</th>
                 <th className="px-4 py-3 text-left">Ordered By</th>
-                <th className="px-4 py-3 text-left">Status</th>
+                <th className="px-4 py-3 text-left">Delivery</th>
+                <th className="px-4 py-3 text-left">Payment</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -517,6 +558,9 @@ export default function RestockOrdersList() {
                         </div>
                       )}
                     </td>
+                    <td className="px-4 py-3">
+                      {order.status !== 'cancelled' && paymentBadge(order.paymentStatus)}
+                    </td>
                   </tr>
                 );
               })}
@@ -530,12 +574,14 @@ export default function RestockOrdersList() {
         <OrderDetailPanel
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
-          onReceive={(orderId) => receiveMutation.mutate(orderId)}
+          onReceive={(orderId, markAsPaid) => receiveMutation.mutate({ orderId, markAsPaid })}
           isReceiving={receiveMutation.isPending}
           isAdmin={isAdmin}
           onEditClick={(order) => setEditingOrder(order)}
           onCancel={(orderId) => cancelMutation.mutate(orderId)}
           isCancelling={cancelMutation.isPending}
+          onMarkPaid={(orderId) => markPaidMutation.mutate(orderId)}
+          isMarkingPaid={markPaidMutation.isPending}
         />
       )}
 

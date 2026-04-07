@@ -1,5 +1,6 @@
 // src/pages/Finance.jsx
 import { useState } from "react";
+import { toast } from "react-hot-toast";
 import { useQuery } from "@tanstack/react-query";
 import { materialsApi } from "@api/materials";
 import { reportsApi } from "@api/reports";
@@ -76,6 +77,10 @@ export default function Finance() {
       queryFn: () => reportsApi.getMaterialUsageReport(dateRange),
     }
   );
+  const { data: aparData, isLoading: loadingAPAR } = useQuery({
+    queryKey: ["ap-ar"],
+    queryFn: () => reportsApi.getAPAR(),
+  });
 
   // --- DATA MAPPING ---
   const sales = {
@@ -188,9 +193,14 @@ export default function Finance() {
   //   );
   // }
 
+  const apar = {
+    ar: aparData?.data?.ar || { total: 0, invoices: { total: 0, count: 0, items: [] }, sales: { total: 0, count: 0, items: [] } },
+    ap: aparData?.data?.ap || { total: 0, count: 0, items: [] },
+  };
+
   const isFetching =
   loadingSales || loadingJobs || loadingExpenses ||
-  loadingPL || loadingRevenue || loadingMaterialUsage;
+  loadingPL || loadingRevenue || loadingMaterialUsage || loadingAPAR;
 
 
   return (
@@ -229,6 +239,7 @@ export default function Finance() {
               { id: "pl", label: "P&L" },
               { id: "materials", label: "Materials" },
               { id: "inventory", label: "Inventory" },
+              { id: "apar", label: "AP/AR" },
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -274,6 +285,7 @@ export default function Finance() {
             />
           )}
           {activeTab === "inventory" && <InventorySnapshotTab />}
+          {activeTab === "apar" && <APARTab apar={apar} />}
         </div>
       </div>
     </div>
@@ -521,7 +533,7 @@ function ExpensesTab({ expenses, dateRange }) {
   }));
   const recentExpenses = expenses?.recentExpenses || [];
 
-  const handleExport = () => exportExpensesReport(expenses, dateRange);
+  const handleExport = () => { try { exportExpensesReport(expenses, dateRange); } catch (e) { toast.error(e.message); } };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -693,7 +705,7 @@ function SalesTab({ sales, dateRange }) {
   const boothItems = sales.breakdown?.booth?.items || [];
   const recentSales = sales.recentSales || [];
 
-  const handleExport = () => exportSalesReport(sales, dateRange);
+  const handleExport = () => { try { exportSalesReport(sales, dateRange); } catch (e) { toast.error(e.message); } };
 
   return (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
@@ -880,7 +892,7 @@ const JOB_TYPE_COLORS = {
 };
 
 function JobsTab({ jobs, dateRange }) {
-  const handleExport = () => exportJobsReport(jobs, dateRange);
+  const handleExport = () => { try { exportJobsReport(jobs, dateRange); } catch (e) { toast.error(e.message); } };
 
   const revenueByTypeData = Object.entries(jobs.revenueByType || {})
     .map(([type, data]) => ({
@@ -1090,7 +1102,7 @@ function JobsTab({ jobs, dateRange }) {
 }
 
 function PLTab({ pl, dateRange }) {
-  const handleExport = () => exportProfitLoss(pl, dateRange);
+  const handleExport = () => { try { exportProfitLoss(pl, dateRange); } catch (e) { toast.error(e.message); } };
   const netProfit = Number(pl.netProfit || 0);
 
   return (
@@ -1235,8 +1247,7 @@ function PLRow({ label, value, isNegative, isTotal }) {
 }
 
 function MaterialUsageTab({ materialUsage, dateRange }) {
-  const handleExport = () =>
-    exportMaterialUsage(materialUsage.allMaterials, dateRange);
+  const handleExport = () => { try { exportMaterialUsage(materialUsage.allMaterials, dateRange); } catch (e) { toast.error(e.message); } };
   const materials = materialUsage.allMaterials || [];
 
   return (
@@ -1655,6 +1666,177 @@ function InventorySnapshotTab() {
                         <span className={`font-medium ${change > 0 ? 'text-green-600' : change < 0 ? 'text-red-500' : 'text-gray-400'}`}>
                           {change > 0 ? '+' : ''}{change.toFixed(2)}
                         </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// --- AP/AR TAB ---
+function APARTab({ apar }) {
+  const { ar, ap } = apar;
+
+  const fmt = (n) => Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const fmtDate = (d) => { try { return format(new Date(d), 'dd MMM yyyy'); } catch { return '—'; } };
+
+  return (
+    <div className="space-y-8">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="bg-blue-50 border border-blue-100 rounded-xl p-5">
+          <p className="text-xs font-semibold text-blue-600 uppercase tracking-wide mb-1">Accounts Receivable (AR)</p>
+          <p className="text-3xl font-bold text-gray-900">GH₵{fmt(ar.total)}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {ar.invoices.count} job invoice{ar.invoices.count !== 1 ? 's' : ''} · {ar.sales.count} sale{ar.sales.count !== 1 ? 's' : ''} outstanding
+          </p>
+        </div>
+        <div className="bg-orange-50 border border-orange-100 rounded-xl p-5">
+          <p className="text-xs font-semibold text-orange-600 uppercase tracking-wide mb-1">Accounts Payable (AP)</p>
+          <p className="text-3xl font-bold text-gray-900">GH₵{fmt(ap.total)}</p>
+          <p className="text-xs text-gray-500 mt-1">
+            {ap.count} unpaid restock order{ap.count !== 1 ? 's' : ''}
+          </p>
+        </div>
+      </div>
+
+      {/* AR — Job Invoices */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-gray-900">AR — Outstanding Job Invoices</h3>
+          <span className="text-sm font-semibold text-blue-600">GH₵{fmt(ar.invoices.total)}</span>
+        </div>
+        {ar.invoices.items.length === 0 ? (
+          <p className="text-sm text-gray-400 py-6 text-center bg-gray-50 rounded-xl">No outstanding job invoices</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr className="text-xs text-gray-500 uppercase font-medium">
+                  <th className="px-4 py-3 text-left">Invoice</th>
+                  <th className="px-4 py-3 text-left">Client</th>
+                  <th className="px-4 py-3 text-left">Vehicle</th>
+                  <th className="px-4 py-3 text-right">Total</th>
+                  <th className="px-4 py-3 text-right">Paid</th>
+                  <th className="px-4 py-3 text-right">Balance Due</th>
+                  <th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {ar.invoices.items.map((inv) => (
+                  <tr key={inv.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-mono text-xs text-gray-600">{inv.invoiceNumber}</td>
+                    <td className="px-4 py-3 font-medium text-gray-900">{inv.job?.clientName || '—'}</td>
+                    <td className="px-4 py-3 text-gray-500">{inv.job?.vehicleRegNumber || '—'}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">GH₵{fmt(inv.totalAmount)}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">GH₵{fmt(inv.amountPaid)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-red-600">GH₵{fmt(inv.amountDue)}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(inv.invoiceDate)}</td>
+                    <td className="px-4 py-3">
+                      {inv.paymentStatus === 'partial'
+                        ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Partial</span>
+                        : <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Unpaid</span>
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* AR — Sales */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-gray-900">AR — Outstanding Sales</h3>
+          <span className="text-sm font-semibold text-blue-600">GH₵{fmt(ar.sales.total)}</span>
+        </div>
+        {ar.sales.items.length === 0 ? (
+          <p className="text-sm text-gray-400 py-6 text-center bg-gray-50 rounded-xl">No outstanding sales</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr className="text-xs text-gray-500 uppercase font-medium">
+                  <th className="px-4 py-3 text-left">Customer</th>
+                  <th className="px-4 py-3 text-left">Phone</th>
+                  <th className="px-4 py-3 text-right">Total</th>
+                  <th className="px-4 py-3 text-right">Paid</th>
+                  <th className="px-4 py-3 text-right">Balance Due</th>
+                  <th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-left">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {ar.sales.items.map((sale) => (
+                  <tr key={sale.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-3 font-medium text-gray-900">{sale.customerName || 'Walk-in'}</td>
+                    <td className="px-4 py-3 text-gray-500">{sale.customerPhone || '—'}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">GH₵{fmt(sale.totalAmount)}</td>
+                    <td className="px-4 py-3 text-right text-gray-700">GH₵{fmt(sale.amountPaid)}</td>
+                    <td className="px-4 py-3 text-right font-semibold text-red-600">GH₵{fmt(sale.balance)}</td>
+                    <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(sale.saleDate)}</td>
+                    <td className="px-4 py-3">
+                      {sale.paymentStatus === 'partial'
+                        ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Partial</span>
+                        : <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Unpaid</span>
+                      }
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {/* AP — Unpaid Restock Orders */}
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h3 className="text-sm font-bold text-gray-900">AP — Unpaid Restock Orders</h3>
+          <span className="text-sm font-semibold text-orange-600">GH₵{fmt(ap.total)}</span>
+        </div>
+        {ap.items.length === 0 ? (
+          <p className="text-sm text-gray-400 py-6 text-center bg-gray-50 rounded-xl">No unpaid restock orders</p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr className="text-xs text-gray-500 uppercase font-medium">
+                  <th className="px-4 py-3 text-left">Vendor</th>
+                  <th className="px-4 py-3 text-left">Items</th>
+                  <th className="px-4 py-3 text-right">Total Owed</th>
+                  <th className="px-4 py-3 text-left">Order Date</th>
+                  <th className="px-4 py-3 text-left">Delivery</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {ap.items.map((order, idx) => {
+                  const itemSummary = order.items.length === 1
+                    ? order.items[0].materialName
+                    : `${order.items[0].materialName} +${order.items.length - 1} more`;
+                  return (
+                    <tr key={order.orderId || idx} className="hover:bg-gray-50">
+                      <td className="px-4 py-3 font-medium text-gray-900">{order.vendor?.companyName || '—'}</td>
+                      <td className="px-4 py-3 text-gray-600">
+                        <p>{itemSummary}</p>
+                        <p className="text-xs text-gray-400">{order.items.length} item{order.items.length !== 1 ? 's' : ''}</p>
+                      </td>
+                      <td className="px-4 py-3 text-right font-semibold text-orange-600">GH₵{fmt(order.totalCost)}</td>
+                      <td className="px-4 py-3 text-gray-500 whitespace-nowrap">{fmtDate(order.reorderDate)}</td>
+                      <td className="px-4 py-3">
+                        {order.status === 'pending'
+                          ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">Pending</span>
+                          : <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">Received</span>
+                        }
                       </td>
                     </tr>
                   );

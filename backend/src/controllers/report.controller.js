@@ -1153,3 +1153,105 @@ export const getTrends = asyncHandler(async (req, res) => {
 
   res.status(200).json({ success: true, data: periodData });
 });
+
+// @desc    Get Accounts Payable & Receivable snapshot
+// @route   GET /api/reports/ap-ar
+// @access  Private (requires 'reports:view' permission)
+export const getAPARReport = asyncHandler(async (req, res) => {
+  // --- AR: Outstanding Job Invoices ---
+  const outstandingInvoices = await req.db.invoice.findMany({
+    where: { paymentStatus: { in: ['unpaid', 'partial'] } },
+    include: {
+      job: {
+        select: {
+          id: true, jobType: true, clientName: true,
+          clientPhone: true, vehicleRegNumber: true,
+        },
+      },
+    },
+    orderBy: { invoiceDate: 'asc' },
+  });
+
+  const invoiceARTotal = outstandingInvoices.reduce(
+    (sum, inv) => sum + parseFloat(inv.amountDue), 0
+  );
+
+  // --- AR: Outstanding Sales ---
+  const outstandingSales = await req.db.sale.findMany({
+    where: { status: 'completed', balance: { gt: 0.01 } },
+    select: {
+      id: true, totalAmount: true, amountPaid: true, balance: true,
+      paymentStatus: true, customerName: true, customerPhone: true,
+      saleDate: true, paymentMethod: true,
+    },
+    orderBy: { saleDate: 'asc' },
+  });
+
+  const salesARTotal = outstandingSales.reduce(
+    (sum, s) => sum + parseFloat(s.balance), 0
+  );
+
+  // --- AP: Unpaid Restock Orders ---
+  const unpaidReorders = await req.db.materialReorder.findMany({
+    where: {
+      businessId: req.user.businessId,
+      paymentStatus: 'unpaid',
+      status: { not: 'cancelled' },
+    },
+    include: {
+      vendor: { select: { id: true, companyName: true, contactName: true } },
+      user: { select: { fullName: true } },
+    },
+    orderBy: { reorderDate: 'asc' },
+  });
+
+  // Group AP by orderId
+  const apGroupMap = new Map();
+  for (const item of unpaidReorders) {
+    const key = item.orderId || `__legacy__${item.id}`;
+    if (!apGroupMap.has(key)) {
+      apGroupMap.set(key, {
+        orderId: item.orderId,
+        reorderDate: item.reorderDate,
+        vendor: item.vendor,
+        user: item.user,
+        status: item.status,
+        paymentStatus: item.paymentStatus,
+        items: [],
+        totalCost: 0,
+      });
+    }
+    const group = apGroupMap.get(key);
+    group.items.push({ materialName: item.materialName, quantityOrdered: item.quantityOrdered, totalCost: item.totalCost });
+    group.totalCost += parseFloat(item.totalCost);
+    if (item.status === 'pending') group.status = 'pending';
+  }
+
+  const apOrders = Array.from(apGroupMap.values())
+    .sort((a, b) => new Date(a.reorderDate) - new Date(b.reorderDate));
+  const apTotal = apOrders.reduce((sum, o) => sum + o.totalCost, 0);
+
+  res.status(200).json({
+    success: true,
+    data: {
+      ar: {
+        total: invoiceARTotal + salesARTotal,
+        invoices: {
+          total: invoiceARTotal,
+          count: outstandingInvoices.length,
+          items: outstandingInvoices,
+        },
+        sales: {
+          total: salesARTotal,
+          count: outstandingSales.length,
+          items: outstandingSales,
+        },
+      },
+      ap: {
+        total: apTotal,
+        count: apOrders.length,
+        items: apOrders,
+      },
+    },
+  });
+});

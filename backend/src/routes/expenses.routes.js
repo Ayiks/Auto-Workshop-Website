@@ -9,6 +9,7 @@ import {
   getCOGSExpenses,
   getExpenseStats,
   adminCorrectExpense,
+  adminDeleteExpense,
 } from '../controllers/expenses.controller.js';
 import { protect, requirePermission, authorize } from '../middleware/auth.js';
 
@@ -51,6 +52,9 @@ router
 
 // Admin-only: correct the amount on a locked (COG/auto-generated) expense record
 router.put('/:id/admin-correct', authorize('admin'), adminCorrectExpense);
+
+// Admin-only: delete a locked (COG/auto-generated) expense record
+router.delete('/:id/admin-delete', authorize('admin'), adminDeleteExpense);
 
 
 export default router;

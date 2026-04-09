@@ -1224,3 +1224,38 @@ export const adminCorrectExpense = asyncHandler(async (req, res) => {
     data: updated,
   });
 });
+
+// @desc    Admin-only: delete a locked (isReadOnly) expense record
+// @route   DELETE /api/expenses/:id/admin-delete
+// @access  Private (Admin only)
+export const adminDeleteExpense = asyncHandler(async (req, res) => {
+  const { id } = req.params;
+
+  const expense = await req.db.expense.findFirst({
+    where: { id: parseInt(id), businessId: req.user.businessId },
+  });
+
+  if (!expense) {
+    throw new AppError('Expense not found', 404, 'NOT_FOUND');
+  }
+
+  await req.db.expense.delete({
+    where: { id: parseInt(id) },
+  });
+
+  await req.db.auditLog.create({
+    data: {
+      userId: req.user.id,
+      action: 'DELETE',
+      entity: 'Expense',
+      entityId: parseInt(id),
+      businessId: req.user.businessId,
+      description: `Admin deleted expense #${id} (${expense.category}): ${expense.description} — GH₵${parseFloat(expense.amount).toFixed(2)}`,
+    },
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Expense deleted successfully',
+  });
+});

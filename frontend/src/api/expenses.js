@@ -65,6 +65,13 @@ export const expensesApi = {
     const response = await apiClient.put(`/expenses/${id}/admin-correct`, data);
     return response;
   },
+
+  // Admin-only: delete a locked (COG/auto-generated) expense
+  // Route: DELETE /api/expenses/:id/admin-delete
+  adminDeleteExpense: async (id) => {
+    const response = await apiClient.delete(`/expenses/${id}/admin-delete`);
+    return response;
+  },
 };
 
 export default expensesApi;

@@ -32,6 +32,8 @@ export default function Expenses() {
   const [showCorrectModal, setShowCorrectModal] = useState(false);
   const [correctingExpense, setCorrectingExpense] = useState(null);
   const [correctAmount, setCorrectAmount] = useState("");
+  const [showAdminDeleteModal, setShowAdminDeleteModal] = useState(false);
+  const [deletingLockedExpense, setDeletingLockedExpense] = useState(null);
 
   // Date Filters
   const dateFilters = {
@@ -100,6 +102,18 @@ export default function Expenses() {
     onError: () => toast.error("Failed to delete expense"),
   });
 
+  const adminDeleteMutation = useMutation({
+    mutationFn: (id) => expensesApi.adminDeleteExpense(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(["expenses"]);
+      queryClient.invalidateQueries(["expense-stats"]);
+      setShowAdminDeleteModal(false);
+      setDeletingLockedExpense(null);
+      toast.success("Expense deleted");
+    },
+    onError: (err) => toast.error(err.response?.data?.error?.message || "Failed to delete expense"),
+  });
+
   const correctMutation = useMutation({
     mutationFn: ({ id, amount }) => expensesApi.adminCorrectExpense(id, { amount }),
     onSuccess: () => {
@@ -117,6 +131,11 @@ export default function Expenses() {
     setCorrectingExpense(expense);
     setCorrectAmount(parseFloat(expense.amount).toFixed(2));
     setShowCorrectModal(true);
+  };
+
+  const handleAdminDeleteClick = (expense) => {
+    setDeletingLockedExpense(expense);
+    setShowAdminDeleteModal(true);
   };
 
   // Handlers
@@ -252,13 +271,24 @@ export default function Expenses() {
                 LOCKED
               </span>
               {isAdmin && (
-                <button
-                  onClick={() => handleOpenCorrect(expense)}
-                  className="text-[10px] font-medium px-2 py-1 text-amber-700 bg-amber-50 border border-amber-200 rounded hover:bg-amber-100 transition-colors"
-                  title="Correct amount (admin only)"
-                >
-                  Correct
-                </button>
+                <>
+                  <button
+                    onClick={() => handleOpenCorrect(expense)}
+                    className="text-[10px] font-medium px-2 py-1 text-amber-700 bg-amber-50 border border-amber-200 rounded hover:bg-amber-100 transition-colors"
+                    title="Correct amount (admin only)"
+                  >
+                    Correct
+                  </button>
+                  <button
+                    onClick={() => handleAdminDeleteClick(expense)}
+                    className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded transition-colors"
+                    title="Delete expense (admin only)"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                    </svg>
+                  </button>
+                </>
               )}
             </div>
           )}
@@ -440,6 +470,67 @@ export default function Expenses() {
       <Modal isOpen={showEditModal} onClose={() => { setShowEditModal(false); setSelectedExpense(null); }} title="Edit Expense" size="md">
         <div className="p-1">
           <ExpenseForm expense={selectedExpense} onSubmit={(data) => updateMutation.mutate({ id: selectedExpense.id, data })} onCancel={() => { setShowEditModal(false); setSelectedExpense(null); }} isLoading={updateMutation.isPending} />
+        </div>
+      </Modal>
+
+      {/* Admin: Delete locked expense */}
+      <Modal
+        isOpen={showAdminDeleteModal}
+        onClose={() => { setShowAdminDeleteModal(false); setDeletingLockedExpense(null); }}
+        title="Delete Expense"
+        size="sm"
+      >
+        <div className="space-y-4">
+          {/* Warning banner */}
+          <div className="bg-red-50 border-l-4 border-red-500 p-3 rounded-r-md flex gap-2.5">
+            <svg className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+              <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+            </svg>
+            <div>
+              <p className="text-sm font-semibold text-red-800">This action cannot be undone</p>
+              <p className="text-xs text-red-700 mt-0.5">
+                Deleting this expense will remove it from all financial calculations, reports, and expense totals.
+              </p>
+            </div>
+          </div>
+
+          {/* Expense summary */}
+          {deletingLockedExpense && (
+            <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 space-y-1 text-xs text-gray-600">
+              <p className="font-semibold text-gray-900 truncate">{deletingLockedExpense.description}</p>
+              <div className="flex justify-between">
+                <span>Amount</span>
+                <span className="font-semibold text-gray-900">GH₵{parseFloat(deletingLockedExpense.amount).toFixed(2)}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Category</span>
+                <span className="capitalize">{deletingLockedExpense.category.replace("_", " ")}</span>
+              </div>
+              <div className="flex justify-between">
+                <span>Date</span>
+                <span>{format(new Date(deletingLockedExpense.expenseDate), "MMM d, yyyy")}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button
+              type="button"
+              onClick={() => { setShowAdminDeleteModal(false); setDeletingLockedExpense(null); }}
+              disabled={adminDeleteMutation.isPending}
+              className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg hover:bg-gray-50 disabled:opacity-50"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={adminDeleteMutation.isPending}
+              onClick={() => adminDeleteMutation.mutate(deletingLockedExpense.id)}
+              className="px-4 py-1.5 text-sm font-semibold bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50"
+            >
+              {adminDeleteMutation.isPending ? "Deleting…" : "Delete Expense"}
+            </button>
+          </div>
         </div>
       </Modal>
 

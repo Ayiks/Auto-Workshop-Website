@@ -7,6 +7,9 @@ import Button from '@components/common/Button';
 import LoadingSpinner from '@components/common/LoadingSpinner';
 import { uploadLogoToCloudinary } from '@/services/cloudinary';
 import { toast } from 'react-hot-toast';
+import PhoneInput from '@components/common/PhoneInput';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const JOB_TYPE_OPTIONS = [
   { value: 'mechanic',  label: 'Mechanic',    icon: Wrench,         desc: 'Engine, brakes, suspension, electrical' },
@@ -196,23 +199,26 @@ export default function BusinessSettings() {
             <div>
                 <label className="block text-xs text-gray-500 mb-1">Email Address</label>
                 <input
-                type="email"
-                name="email"
-                value={isEditing ? formData.email : settings?.email || ''}
-                onChange={handleChange}
-                disabled={!isEditing}
-                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
+                  type="email"
+                  name="email"
+                  value={isEditing ? formData.email : settings?.email || ''}
+                  onChange={handleChange}
+                  onBlur={(e) => {
+                    if (isEditing && e.target.value && !EMAIL_RE.test(e.target.value)) {
+                      toast.error('Please enter a valid email address');
+                    }
+                  }}
+                  disabled={!isEditing}
+                  className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
                 />
             </div>
             <div>
                 <label className="block text-xs text-gray-500 mb-1">Phone Number</label>
-                <input
-                type="tel"
-                name="phone"
-                value={isEditing ? formData.phone : settings?.phone || ''}
-                onChange={handleChange}
-                disabled={!isEditing}
-                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
+                <PhoneInput
+                  value={isEditing ? formData.phone : settings?.phone || ''}
+                  onChange={(v) => setFormData(prev => ({ ...prev, phone: v }))}
+                  disabled={!isEditing}
+                  placeholder="Local number"
                 />
             </div>
             <div>

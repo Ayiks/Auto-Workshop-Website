@@ -1,12 +1,13 @@
 // src/components/features/settings/ProfileSettings.jsx
-import { useState, useEffect } from 'react'; // Import useEffect
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { settingsApi } from '@api/settings';
 import { useAuthStore } from '@stores/authStore';
 import Card from '@components/common/Card';
 import Button from '@components/common/Button';
 import { toast } from 'react-hot-toast';
-import Input from '@components/common/Input'; // Assuming you have this component
+import Input from '@components/common/Input';
+import PhoneInput from '@components/common/PhoneInput';
 
 export default function ProfileSettings() {
   const queryClient = useQueryClient();
@@ -174,13 +175,11 @@ export default function ProfileSettings() {
                 </div>
                 <div>
                     <label className="block text-xs sm:text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">Phone Number</label>
-                    <input 
-                        type="tel" 
-                        name="phone"
-                        value={profileData.phone} 
-                        onChange={handleProfileChange}
+                    <PhoneInput
+                        value={profileData.phone}
+                        onChange={(v) => setProfileData(prev => ({ ...prev, phone: v }))}
                         disabled={!isEditingProfile}
-                        className="block w-full rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 text-xs sm:text-sm shadow-sm focus:border-gray-900 focus:ring-gray-900 disabled:bg-gray-50 disabled:text-gray-500 transition-colors" 
+                        placeholder="Local number"
                     />
                 </div>
              </div>

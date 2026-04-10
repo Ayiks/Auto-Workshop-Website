@@ -3,10 +3,13 @@ import { useNavigate } from 'react-router-dom';
 import { useAuthStore } from '@stores/authStore';
 import {
   Building2, ArrowRight, Wrench, Paintbrush, Car, MoreHorizontal,
-  MessageSquare, MapPin, Phone, Mail, Upload, CheckCircle, Info,
+  MessageSquare, MapPin, Mail, Upload, CheckCircle, Info,
 } from 'lucide-react';
 import Button from '@components/common/Button';
 import { uploadLogoToCloudinary } from '@/services/cloudinary';
+import PhoneInput, { isValidPhone } from '@components/common/PhoneInput';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const JOB_TYPE_OPTIONS = [
   { value: 'mechanic',  label: 'Mechanic',   icon: Wrench,         desc: 'Engine, brakes, suspension, electrical' },
@@ -42,6 +45,8 @@ export default function SetupWorkspace() {
   const [address, setAddress] = useState('');
   const [phone, setPhone] = useState('');
   const [email, setEmail] = useState('');
+  const [phoneError, setPhoneError] = useState('');
+  const [emailError, setEmailError] = useState('');
 
   // Step 4
   const [arkeselSenderId, setArkeselSenderId] = useState('');
@@ -81,7 +86,25 @@ export default function SetupWorkspace() {
     }
   };
 
-  const handleNext = () => setStep(s => s + 1);
+  const handleNext = () => {
+    if (step === 3) {
+      let valid = true;
+      if (email && !EMAIL_RE.test(email)) {
+        setEmailError('Please enter a valid email address');
+        valid = false;
+      } else {
+        setEmailError('');
+      }
+      if (phone && !isValidPhone(phone)) {
+        setPhoneError('Please enter a valid phone number');
+        valid = false;
+      } else {
+        setPhoneError('');
+      }
+      if (!valid) return;
+    }
+    setStep(s => s + 1);
+  };
   const handleBack = () => setStep(s => s - 1);
 
   const handleSubmit = async (e) => {
@@ -305,16 +328,12 @@ export default function SetupWorkspace() {
 
             <div>
               <label className="block text-sm font-bold text-gray-900 mb-1.5">Phone Number</label>
-              <div className="relative">
-                <Phone className="absolute top-1/2 -translate-y-1/2 left-3 h-4 w-4 text-slate-400" />
-                <input
-                  type="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-4 py-2.5 text-slate-900 text-sm transition focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-50 outline-none"
-                  placeholder="e.g. +233 24 000 0000"
-                />
-              </div>
+              <PhoneInput
+                value={phone}
+                onChange={(v) => { setPhone(v); setPhoneError(''); }}
+                placeholder="Local number"
+                error={phoneError}
+              />
             </div>
 
             <div>
@@ -324,11 +343,18 @@ export default function SetupWorkspace() {
                 <input
                   type="email"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="block w-full rounded-lg border border-slate-200 bg-slate-50 pl-9 pr-4 py-2.5 text-slate-900 text-sm transition focus:border-blue-600 focus:bg-white focus:ring-4 focus:ring-blue-50 outline-none"
+                  onChange={(e) => { setEmail(e.target.value); setEmailError(''); }}
+                  onBlur={() => {
+                    if (email && !EMAIL_RE.test(email)) setEmailError('Please enter a valid email address');
+                    else setEmailError('');
+                  }}
+                  className={`block w-full rounded-lg border bg-slate-50 pl-9 pr-4 py-2.5 text-slate-900 text-sm transition focus:bg-white focus:ring-4 outline-none ${
+                    emailError ? 'border-red-300 focus:border-red-400 focus:ring-red-50' : 'border-slate-200 focus:border-blue-600 focus:ring-blue-50'
+                  }`}
                   placeholder="e.g. info@autofix.com"
                 />
               </div>
+              {emailError && <p className="mt-1 text-xs text-red-600">{emailError}</p>}
             </div>
 
             <div className="flex gap-3">

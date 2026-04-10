@@ -1,5 +1,8 @@
 import { useState, useEffect } from 'react';
 import Button from '@components/common/Button';
+import PhoneInput, { isValidPhone } from '@components/common/PhoneInput';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function CustomerForm({ initialData, onSubmit, onCancel, isLoading }) {
   const [formData, setFormData] = useState({
@@ -11,20 +14,35 @@ export default function CustomerForm({ initialData, onSubmit, onCancel, isLoadin
     notes: '',
     preferredContact: 'email',
   });
+  const [errors, setErrors] = useState({});
 
   useEffect(() => {
-    if (initialData) {
-      setFormData(initialData);
-    }
+    if (initialData) setFormData(initialData);
   }, [initialData]);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) setErrors(prev => ({ ...prev, [name]: null }));
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    if (!formData.phone) {
+      newErrors.phone = 'Phone number is required';
+    } else if (!isValidPhone(formData.phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
+    }
+    if (formData.email && !EMAIL_RE.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!validate()) return;
     onSubmit(formData);
   };
 
@@ -57,14 +75,15 @@ export default function CustomerForm({ initialData, onSubmit, onCancel, isLoadin
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
         <div>
           <label className="block text-xs sm:text-xs font-semibold text-gray-700 uppercase tracking-wide mb-1.5">Phone Number <span className="text-red-500">*</span></label>
-          <input
-            type="tel"
-            name="phone"
-            required
-            placeholder="024 XXX XXXX"
-            className="block w-full rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 text-xs sm:text-sm shadow-sm focus:border-gray-900 focus:ring-gray-900 transition-shadow"
+          <PhoneInput
             value={formData.phone}
-            onChange={handleChange}
+            onChange={(v) => {
+              setFormData(prev => ({ ...prev, phone: v }));
+              if (errors.phone) setErrors(prev => ({ ...prev, phone: null }));
+            }}
+            disabled={isLoading}
+            placeholder="Local number"
+            error={errors.phone}
           />
         </div>
         <div>
@@ -72,10 +91,16 @@ export default function CustomerForm({ initialData, onSubmit, onCancel, isLoadin
           <input
             type="email"
             name="email"
-            className="block w-full rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 border border-gray-300 text-xs sm:text-sm shadow-sm focus:border-gray-900 focus:ring-gray-900 transition-shadow"
+            className={`block w-full rounded-lg px-2 sm:px-3 py-1.5 sm:py-2 border text-xs sm:text-sm shadow-sm focus:border-gray-900 focus:ring-gray-900 transition-shadow ${errors.email ? 'border-red-300 bg-red-50' : 'border-gray-300'}`}
             value={formData.email}
             onChange={handleChange}
+            onBlur={() => {
+              if (formData.email && !EMAIL_RE.test(formData.email)) {
+                setErrors(prev => ({ ...prev, email: 'Please enter a valid email address' }));
+              }
+            }}
           />
+          {errors.email && <p className="mt-1 text-xs text-red-600">{errors.email}</p>}
         </div>
       </div>
 

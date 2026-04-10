@@ -1,8 +1,9 @@
 // src/components/features/users/UserForm.jsx
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import Button from '@components/common/Button'; // reusing your common button
+import Button from '@components/common/Button';
 import { settingsApi } from '@api/settings';
+import PhoneInput, { isValidPhone } from '@components/common/PhoneInput';
 
 const ALL_ROLES = [
   { value: 'admin',     label: 'Admin' },
@@ -78,8 +79,11 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
     }
 
     if (!formData.role) newErrors.role = 'Role is required';
-    if (formData.email && !/\S+@\S+\.\S+/.test(formData.email)) {
+    if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Invalid email format';
+    }
+    if (formData.phone && !isValidPhone(formData.phone)) {
+      newErrors.phone = 'Please enter a valid phone number';
     }
 
     setErrors(newErrors);
@@ -147,7 +151,21 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
               disabled={isLoading}
               className={inputClass(errors.password)}
             />
-            {errors.password && <p className="mt-0.5 sm:mt-1 text-xs text-red-600">{errors.password}</p>}
+            {errors.password ? (
+              <p className="mt-0.5 sm:mt-1 text-xs text-red-600">{errors.password}</p>
+            ) : formData.password.length > 0 && (
+              formData.password.length < 6 ? (
+                <p className="mt-0.5 sm:mt-1 text-xs text-red-500 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" /></svg>
+                  Min 6 characters
+                </p>
+              ) : (
+                <p className="mt-0.5 sm:mt-1 text-xs text-green-600 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" /></svg>
+                  Password looks good
+                </p>
+              )
+            )}
           </div>
           <div>
             <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">
@@ -195,14 +213,15 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
         </div>
         <div>
           <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-0.5 sm:mb-1">Phone</label>
-          <input
-            type="tel"
-            name="phone"
+          <PhoneInput
             value={formData.phone}
-            onChange={handleChange}
+            onChange={(v) => {
+              setFormData(prev => ({ ...prev, phone: v }));
+              if (errors.phone) setErrors(prev => ({ ...prev, phone: null }));
+            }}
             disabled={isLoading}
-            className={inputClass(false)}
-            placeholder="+233..."
+            placeholder="Local number"
+            error={errors.phone}
           />
         </div>
       </div>
@@ -227,7 +246,7 @@ export default function UserForm({ user, onSubmit, onCancel, isLoading }) {
         {/* Role Helper Text */}
         <div className="mt-2 sm:mt-3 p-2 sm:p-3 bg-blue-50 border border-blue-100 rounded-md">
           <div className="flex gap-2">
-            <svg className="w-4 sm:w-5 h-4 sm:h-5 text-blue-600 flex-shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <svg className="w-4 sm:w-5 h-4 sm:h-5 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
             <p className="text-[10px] sm:text-xs text-blue-800 leading-4 sm:leading-5">

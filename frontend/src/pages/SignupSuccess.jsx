@@ -103,11 +103,11 @@ export default function SignupSuccess() {
         )}
 
         <button
-          onClick={() => navigate('/signup')}
+          onClick={() => navigate('/login')}
           className="flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm font-medium text-slate-600 hover:text-slate-900 border border-slate-200 rounded-lg hover:bg-slate-50 transition"
         >
           <ArrowLeft size={18} />
-          Back to Sign Up
+          Back to Login
         </button>
 
         {/* Brand & Version Footer */}

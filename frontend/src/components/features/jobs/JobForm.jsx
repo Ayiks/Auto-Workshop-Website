@@ -7,6 +7,7 @@ import Button from '@components/common/Button';
 import CustomerSelect from '@components/common/CustomerSelect';
 import { uploadToCloudinary } from '@/services/cloudinary';
 import { toast } from 'react-hot-toast';
+import PhoneInput, { isValidPhone } from '@components/common/PhoneInput';
 
 const CURRENT_YEAR = new Date().getFullYear();
 
@@ -234,7 +235,11 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
     const newErrors = {};
 
     if (!formData.clientName.trim()) newErrors.clientName = 'Client name is required';
-    if (!formData.clientPhone.trim()) newErrors.clientPhone = 'Client phone is required';
+    if (!formData.clientPhone) {
+      newErrors.clientPhone = 'Client phone is required';
+    } else if (!isValidPhone(formData.clientPhone)) {
+      newErrors.clientPhone = 'Please enter a valid phone number';
+    }
     if (!formData.problemType.trim()) newErrors.problemType = 'Problem type is required';
 
     if (formData.vehicleYear) {
@@ -353,16 +358,16 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-gray-700 mb-1">Phone *</label>
-                  <input
-                    type="tel"
-                    name="clientPhone"
+                  <PhoneInput
                     value={formData.clientPhone}
-                    onChange={handleChange}
-                    className={inputClass(errors.clientPhone)}
-                    placeholder="e.g. 024 456 7890"
+                    onChange={(v) => {
+                      setFormData(prev => ({ ...prev, clientPhone: v }));
+                      if (errors.clientPhone) setErrors(prev => ({ ...prev, clientPhone: null }));
+                    }}
                     disabled={isLoading}
+                    placeholder="Local number"
+                    error={errors.clientPhone}
                   />
-                  {errors.clientPhone && <p className="text-xs text-red-500 mt-1">{errors.clientPhone}</p>}
                 </div>
                 <div className="sm:col-span-2">
                   <label className="block text-xs font-medium text-gray-700 mb-1">Email (Optional)</label>

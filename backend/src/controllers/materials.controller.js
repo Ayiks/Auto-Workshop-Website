@@ -472,9 +472,9 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
   let finalUnitId = null;
 
   if (unitId) {
-    const selectedUnit = material.alternateUnits.find(u => u.unitId === parseInt(unitId));
+    const selectedUnit = material.alternateUnits.find(u => u.id === parseInt(unitId));
     if (selectedUnit) {
-      finalUnitId = selectedUnit.unitId;
+      finalUnitId = selectedUnit.id;
       conversionFactor = parseFloat(selectedUnit.factor);
     }
   }
@@ -591,9 +591,9 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
       let finalUnitId = null;
 
       if (item.unitId) {
-        const selectedUnit = material.alternateUnits.find(u => u.unitId === parseInt(item.unitId));
+        const selectedUnit = material.alternateUnits.find(u => u.id === parseInt(item.unitId));
         if (selectedUnit) {
-          finalUnitId = selectedUnit.unitId;
+          finalUnitId = selectedUnit.id;
           conversionFactor = parseFloat(selectedUnit.factor);
         }
       }
@@ -766,7 +766,7 @@ export const receiveRestockOrder = asyncHandler(async (req, res) => {
       let newBaseUnitCost = parseFloat(order.unitCost);
 
       if (order.materialUnitId) {
-        const selectedUnit = order.material.alternateUnits.find(u => u.unitId === order.materialUnitId);
+        const selectedUnit = order.material.alternateUnits.find(u => u.id === order.materialUnitId);
         if (selectedUnit) {
           conversionFactor = parseFloat(selectedUnit.factor);
           newBaseUnitCost = parseFloat(order.unitCost) / conversionFactor;
@@ -1024,7 +1024,7 @@ export const adminEditReceivedOrder = asyncHandler(async (req, res) => {
       let conversionFactor = 1;
       if (existing.materialUnitId) {
         const unit = existing.material.alternateUnits
-          .find(u => u.unitId === existing.materialUnitId);
+          .find(u => u.id === existing.materialUnitId);
         if (unit) conversionFactor = parseFloat(unit.factor);
       }
 

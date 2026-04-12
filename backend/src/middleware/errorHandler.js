@@ -1,3 +1,5 @@
+import basePrisma from '../config/database.js';
+
 // Custom Error Class
 export class AppError extends Error {
   constructor(message, statusCode = 500, code = 'INTERNAL_ERROR', details = null) {
@@ -22,6 +24,24 @@ export const errorHandler = (err, req, res, next) => {
     code: err.code,
     stack: process.env.NODE_ENV === 'development' ? err.stack : undefined,
   });
+
+  // Capture 5xx errors to SystemErrorLog (fire-and-forget)
+  const captureStatusCode = err.statusCode || 500;
+  if (!err.isOperational || captureStatusCode >= 500) {
+    basePrisma.systemErrorLog.create({
+      data: {
+        message: err.message || 'Unknown error',
+        stack: err.stack || null,
+        endpoint: req?.originalUrl || null,
+        method: req?.method || null,
+        statusCode: captureStatusCode,
+        userId: req?.user?.id || null,
+        businessId: req?.user?.businessId || null,
+      },
+    }).catch((dbErr) => {
+      console.error('[SystemErrorLog] Failed to write:', dbErr.message);
+    });
+  }
 
   // Prisma Errors
   if (err.code === 'P2002') {

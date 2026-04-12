@@ -564,3 +564,59 @@ enum Role {
   sprayer
   bodyworks
 }
+
+model SuperAdmin {
+  id           Int       @id @default(autoincrement())
+  email        String    @unique @db.VarChar(100)
+  passwordHash String    @map("password_hash") @db.VarChar(255)
+  fullName     String    @map("full_name") @db.VarChar(100)
+  createdAt    DateTime  @default(now()) @map("created_at")
+  lastLogin    DateTime? @map("last_login")
+  isActive     Boolean   @default(true) @map("is_active")
+
+  @@map("super_admins")
+}
+
+model FeatureFlag {
+  id                 Int      @id @default(autoincrement())
+  key                String   @unique @db.VarChar(100)
+  name               String   @db.VarChar(100)
+  description        String?  @db.Text
+  isGloballyEnabled  Boolean  @default(false) @map("is_globally_enabled")
+  enabledBusinessIds String[] @map("enabled_business_ids")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("feature_flags")
+}
+
+model SystemErrorLog {
+  id         Int       @id @default(autoincrement())
+  message    String    @db.Text
+  stack      String?   @db.Text
+  endpoint   String?   @db.VarChar(255)
+  method     String?   @db.VarChar(10)
+  statusCode Int?      @map("status_code")
+  userId     Int?      @map("user_id")
+  businessId String?   @map("business_id")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  resolved   Boolean   @default(false)
+  resolvedAt DateTime? @map("resolved_at")
+  resolvedBy Int?      @map("resolved_by")
+
+  @@map("system_error_logs")
+}
+
+model AdminAuditLog {
+  id           Int      @id @default(autoincrement())
+  superAdminId Int      @map("super_admin_id")
+  action       String   @db.VarChar(100)
+  targetType   String?  @map("target_type") @db.VarChar(50)
+  targetId     String?  @map("target_id") @db.VarChar(100)
+  description  String   @db.Text
+  rawSql       String?  @map("raw_sql") @db.Text
+  ipAddress    String?  @map("ip_address") @db.VarChar(50)
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@map("admin_audit_logs")
+}

@@ -73,7 +73,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
     setItems((prevItems) => {
       const existingItem = prevItems.find((i) => i.materialId === material.id);
       if (existingItem) {
-        if (existingItem.quantity + 1 > material.quantity) {
+        if (existingItem.quantity + 1 > existingItem.maxQuantity) {
           toast.error("Max stock reached");
           return prevItems;
         }
@@ -88,14 +88,39 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
           itemType: "material",
           materialId: material.id,
           materialName: material.name,
-          quantity: 1, // Default to 1 instead of 0 for better UX
-          maxQuantity: material.quantity,
+          quantity: 1,
+          baseQuantity: Number(material.quantity),
+          maxQuantity: Number(material.quantity),
+          baseUnitPrice: Number(material.sellingPrice),
           unitPrice: Number(material.sellingPrice),
+          unitId: null,
+          alternateUnits: material.alternateUnits || [],
           subtotal: Number(material.sellingPrice),
           imageUrl: material.imageUrl,
         }];
       }
     });
+  };
+
+  const changeItemUnit = (itemId, rawUnitId) => {
+    setItems((prevItems) =>
+      prevItems.map((item) => {
+        if (item.id !== itemId) return item;
+        if (!rawUnitId) {
+          // switching back to base unit
+          const newMax = item.baseQuantity;
+          const newQty = Math.min(parseFloat(item.quantity) || 1, newMax);
+          return { ...item, unitId: null, unitPrice: item.baseUnitPrice, maxQuantity: newMax, quantity: newQty, subtotal: newQty * item.baseUnitPrice };
+        }
+        const altUnit = item.alternateUnits.find((u) => u.id === parseInt(rawUnitId));
+        if (!altUnit) return item;
+        const factor = parseFloat(altUnit.factor);
+        const newMax = Math.floor(item.baseQuantity / factor);
+        const newQty = Math.min(parseFloat(item.quantity) || 1, newMax);
+        const newPrice = parseFloat(altUnit.price);
+        return { ...item, unitId: altUnit.id, unitPrice: newPrice, maxQuantity: newMax, quantity: newQty, subtotal: newQty * newPrice };
+      })
+    );
   };
 
   // 1. Handle Button Clicks (+/-)
@@ -226,6 +251,7 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
         itemType: "material",
         materialId: Number(item.materialId),
         quantity: parseFloat(item.quantity),
+        ...(item.unitId ? { unitId: item.unitId } : {}),
       }));
       onSubmit({ ...commonData, items: saleItems });
     } else {
@@ -377,11 +403,24 @@ export default function SaleForm({ onSubmit, onCancel, isLoading }) {
                 <div className="flex-1 min-w-0">
                   <div className="flex justify-between items-start mb-1">
                       <h4 className="font-medium text-sm text-gray-900 truncate pr-2">{item.materialName}</h4>
-                      {/* Calculate subtotal based on dynamic input */}
                       <span className="text-sm font-bold text-gray-900 whitespace-nowrap">
                         ₵{((item.quantity === "" ? 0 : parseFloat(item.quantity)) * item.unitPrice).toFixed(2)}
                       </span>
                   </div>
+                  {item.alternateUnits?.length > 0 && (
+                    <div className="mb-1.5">
+                      <select
+                        value={item.unitId ?? ""}
+                        onChange={(e) => changeItemUnit(item.id, e.target.value || null)}
+                        className="w-full text-xs border border-gray-200 rounded px-1.5 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-gray-400"
+                      >
+                        <option value="">Base unit</option>
+                        {item.alternateUnits.map((u) => (
+                          <option key={u.id} value={u.id}>{u.name}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
                   <div className="flex justify-between items-center">
                     
                     {/* QUANTITY INPUT SECTION */}

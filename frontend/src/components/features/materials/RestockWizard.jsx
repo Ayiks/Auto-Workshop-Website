@@ -144,7 +144,7 @@ export default function RestockWizard({ onClose, onSuccess }) {
       selected.map((m) => {
         const options = [
           { id: "base", name: m.baseUnit || "Base", factor: 1 },
-          ...(m.alternateUnits?.map((u) => ({ id: u.unitId, name: u.name, factor: parseFloat(u.factor || 1) })) || []),
+          ...(m.alternateUnits?.map((u) => ({ id: u.id, name: u.name, factor: parseFloat(u.factor || 1) })) || []),
         ];
         return { id: m.id, name: m.name, currentStock: m.quantity, baseUnit: m.baseUnit, quantityOrdered: "", unitCost: m.unitCost || 0, unitId: "base", options, baseCost: m.unitCost || 0 };
       })

@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "WebSearch",
-      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")"
+      "Bash(grep -E \"\\\\.\\(tsx?|jsx?\\)$\")",
+      "Bash(cmd /c \"del /f \\\\\"D:\\\\project\\\\Auto-Workshop-Website\\\\backend\\\\node_modules\\\\.prisma\\\\client\\\\query_engine-windows.dll.node.tmp*\\\\\"\")"
     ]
   }
 }

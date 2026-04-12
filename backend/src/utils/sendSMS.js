@@ -97,35 +97,6 @@ export const sendArkeselWhatsApp = async (phone, message, apiKey, senderId) => {
 };
 
 /**
- * Initiate WhatsApp Business number registration on Arkesel.
- * Arkesel sends an OTP to the WhatsApp number; once verified, status becomes 'active'.
- */
-export const registerWhatsAppSender = async (whatsappNumber, businessName, apiKey) => {
-  try {
-    const response = await fetch('https://sms.arkesel.com/api/v2/whatsapp/register', {
-      method: 'POST',
-      headers: {
-        'api-key': apiKey,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        number: normalizePhone(whatsappNumber),
-        name: businessName,
-      }),
-    });
-
-    const data = await response.json();
-
-    if (response.ok && (data.status === 'success' || data.code === 'ok')) {
-      return { success: true, data };
-    }
-    return { success: false, error: data.message || JSON.stringify(data) };
-  } catch (err) {
-    return { success: false, error: err.message };
-  }
-};
-
-/**
  * Normalize a phone number to international format (+233 for Ghana).
  */
 export const normalizePhone = (phone) => {

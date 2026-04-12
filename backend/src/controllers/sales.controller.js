@@ -210,11 +210,12 @@ export const createSale = asyncHandler(async (req, res) => {
       include: {
         items: {
           include: {
-            material: true, 
-            service: true,  
+            material: true,
+            service: true,
+            materialUnit: { select: { name: true } },
           },
         },
-        user: { 
+        user: {
           select: { fullName: true, username: true }
         },
         customer: true,
@@ -226,12 +227,16 @@ export const createSale = asyncHandler(async (req, res) => {
       where: { id: result.receipt.id },
       include: {
         user: {
-          select: { fullName: true, username: true } 
+          select: { fullName: true, username: true }
         },
         sale: {
            include: {
              items: {
-               include: { material: true, service: true }
+               include: {
+                 material: true,
+                 service: true,
+                 materialUnit: { select: { name: true } },
+               }
              },
              customer: true,
              user: { select: { fullName: true, username: true } }
@@ -716,12 +721,12 @@ export const getSale = asyncHandler(async (req, res) => {
       items: {
         include: {
           material: {
-            select: { name: true },
+            select: { name: true, baseUnit: true },
           },
           service: {
             select: { type: true },
           },
-          materialUnit: true,
+          materialUnit: { select: { name: true } },
         },
       },
       user: {
@@ -793,13 +798,14 @@ export const deleteSale = asyncHandler(async (req, res) => {
     if (reverseInventory) {
       for (const item of sale.items) {
         if (item.itemType === 'material' && item.materialId) {
+          let quantityToRestore = parseFloat(item.quantity);
+          if (item.materialUnitId) {
+            const unit = await tx.materialUnit.findUnique({ where: { id: item.materialUnitId } });
+            if (unit) quantityToRestore = quantityToRestore * parseFloat(unit.factor);
+          }
           await tx.material.update({
             where: { id: item.materialId },
-            data: {
-              quantity: {
-                increment: item.quantity,
-              },
-            },
+            data: { quantity: { increment: quantityToRestore } },
           });
         }
       }

@@ -26,6 +26,7 @@ import sandboxRoutes from './routes/sandbox.routes.js';
 import messagingRoutes from './routes/messaging.routes.js';
 import vendorRoutes from './routes/vendors.routes.js';
 import webhooksRoutes from './routes/webhooks.routes.js';
+import superadminRoutes from './routes/superadmin.routes.js';
 import { sendContactEmail } from './utils/sendEmail.js';
 
 const app = express();
@@ -108,6 +109,9 @@ app.use(`${API_PREFIX}/vendors`, vendorRoutes);
 
 // Webhooks — public, no auth required
 app.use(`${API_PREFIX}/webhooks`, webhooksRoutes);
+
+// Super admin — isolated system control panel
+app.use(`${API_PREFIX}/admin`, superadminRoutes);
 
 // Public contact form
 app.post(`${API_PREFIX}/contact`, async (req, res) => {

@@ -149,7 +149,7 @@
 // export default App;
 
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'react-hot-toast';
 import { useAuthStore } from '@stores/authStore';
@@ -181,6 +181,46 @@ import Contacts from '@pages/Contacts';
 import BoothServices from '@pages/BoothServices';
 import Messaging from '@pages/Messaging';
 import DashboardLayout from '@components/layout/DashboardLayout';
+
+// Admin — System Control Panel
+import AdminProtectedRoute from '@components/admin/AdminProtectedRoute';
+import AdminLayout from '@components/admin/AdminLayout';
+import AdminLogin from '@pages/admin/AdminLogin';
+import AdminDashboard from '@pages/admin/AdminDashboard';
+import AdminBusinesses from '@pages/admin/AdminBusinesses';
+import AdminBusinessDetail from '@pages/admin/AdminBusinessDetail';
+import AdminUsers from '@pages/admin/AdminUsers';
+import AdminAuditLogs from '@pages/admin/AdminAuditLogs';
+import AdminFeatureFlags from '@pages/admin/AdminFeatureFlags';
+import AdminQueryRunner from '@pages/admin/AdminQueryRunner';
+import AdminSystemLogs from '@pages/admin/AdminSystemLogs';
+
+// Impersonation shim — receives ?token= from admin, loads it, redirects to app
+function ImpersonateShim() {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const userParam = params.get('u');
+    if (token && userParam) {
+      try {
+        const user = JSON.parse(atob(userParam));
+        localStorage.setItem('token', token);
+        localStorage.setItem('user', JSON.stringify(user));
+        // Full page reload so authStore.initAuth() picks up both values fresh
+        window.location.replace('/app/dashboard');
+      } catch {
+        window.location.replace('/login');
+      }
+    } else {
+      window.location.replace('/login');
+    }
+  }, []);
+  return (
+    <div className="flex items-center justify-center min-h-screen bg-gray-900">
+      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-400" />
+    </div>
+  );
+}
 
 
 
@@ -217,10 +257,12 @@ function App() {
           <Route path="/signup" element={<Register />} />
           <Route path="/signup-success" element={<SignupSuccess />} />
           <Route path="/verify-email" element={<VerifyEmail />} />
-
           <Route path="/setup-workspace" element={<SetupWorkspace />} />
 
-          {/* Protected Routes */}
+          {/* Impersonation shim — used by super admin to open a user session */}
+          <Route path="/impersonate" element={<ImpersonateShim />} />
+
+          {/* Protected App Routes */}
           <Route
             path="/app"
             element={
@@ -235,8 +277,8 @@ function App() {
             <Route path="sales" element={<Sales />} />
             <Route path="sales/new" element={<SalesForm />} />
             <Route path="jobs" element={<Jobs />} />
-            <Route path='invoices' element={<Invoices />} />
-            <Route path='finance' element={<Finance />} />
+            <Route path="invoices" element={<Invoices />} />
+            <Route path="finance" element={<Finance />} />
             <Route path="expenses" element={<Expenses />} />
             <Route path="users" element={<Users />} />
             <Route path="customers" element={<Customers />} />
@@ -245,7 +287,26 @@ function App() {
             <Route path="contacts" element={<Contacts />} />
             <Route path="settings" element={<Settings />} />
             <Route path="booth" element={<BoothServices />} />
-            
+          </Route>
+
+          {/* Super Admin — System Control Panel (completely isolated) */}
+          <Route path="/admin/login" element={<AdminLogin />} />
+          <Route
+            path="/admin"
+            element={
+              <AdminProtectedRoute>
+                <AdminLayout />
+              </AdminProtectedRoute>
+            }
+          >
+            <Route index element={<AdminDashboard />} />
+            <Route path="businesses" element={<AdminBusinesses />} />
+            <Route path="businesses/:businessId" element={<AdminBusinessDetail />} />
+            <Route path="users" element={<AdminUsers />} />
+            <Route path="audit-logs" element={<AdminAuditLogs />} />
+            <Route path="feature-flags" element={<AdminFeatureFlags />} />
+            <Route path="query" element={<AdminQueryRunner />} />
+            <Route path="system-errors" element={<AdminSystemLogs />} />
           </Route>
 
           {/* 404 Route */}

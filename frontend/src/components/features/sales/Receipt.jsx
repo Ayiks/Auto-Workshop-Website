@@ -97,19 +97,20 @@ export default function Receipt({ receipt, sale }) {
               </thead>
               <tbody>
                 {sale?.items?.map((item, index) => {
-                const unitLabel = item.materialUnit;
-                console.log('Rendering item:', item, 'with unit label:', unitLabel);
-                return (
+                  const unitLabel = item.materialUnit?.name || (item.itemType === 'material' ? item.material?.baseUnit : null) || '';
+                  return (
                   <tr key={index} className="border-b border-gray-50 last:border-b-0">
                     <td className="py-1.5 sm:py-2 text-gray-900 text-xs sm:text-sm">
                       {item.itemType === 'material' ? item.materialName : 'Booth Service'}
                     </td>
-                    <td className="text-center py-1.5 sm:py-2 text-gray-600 text-xs sm:text-sm">{Number(item.quantity)} <span className="text-[10px] sm:text-xs font-medium">{item.materialUnit?.name || 'Unit'}</span></td>
+                    <td className="text-center py-1.5 sm:py-2 text-gray-600 text-xs sm:text-sm">
+                      {Number(item.quantity)}{unitLabel ? <span className="text-[10px] sm:text-xs font-medium ml-0.5">{unitLabel}</span> : null}
+                    </td>
                     <td className="text-right py-1.5 sm:py-2 text-gray-600 text-xs sm:text-sm">{val(item.unitPrice).toFixed(2)}</td>
                     <td className="text-right py-1.5 sm:py-2 font-medium text-gray-900 text-xs sm:text-sm">{val(item.subtotal).toFixed(2)}</td>
                   </tr>
                 )
-              
+
               })}
               </tbody>
             </table>

@@ -2,6 +2,7 @@ import { useState, Fragment } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invoicesApi, paymentsApi } from '@api/jobs';
 import JobPhotos from './JobPhotos';
+import Invoice from './Invoice';
 import { settingsApi } from '@api/settings';
 import Modal from '@components/common/Modal';
 import { toast } from 'react-hot-toast';
@@ -41,11 +42,12 @@ export default function JobDetailsWithInvoice({
   const [voidConfirmId, setVoidConfirmId] = useState(null);
 
   // 1. FETCH BUSINESS SETTINGS (Dynamic Header)
-  const { data: settings } = useQuery({
-    queryKey: ['businessSettings'],
-    queryFn: settingsApi.getSettings, // Ensure you have this API function
+  const { data: settingsResp } = useQuery({
+    queryKey: ['business-settings'],
+    queryFn: settingsApi.getBusinessSettings,
     staleTime: 1000 * 60 * 60, // Cache for 1 hour
   });
+  const settings = settingsResp?.data; // actual object: { name, logo, address, phone, email }
 
   // --- MUTATIONS ---
   const generateInvoiceMutation = useMutation({
@@ -69,6 +71,9 @@ export default function JobDetailsWithInvoice({
   });
 
   const handlePrint = () => {
+    // For invoiced jobs, trigger Invoice.jsx's new-window print by clicking its Print button
+    const invoicePrintBtn = document.querySelector('.invoice-print-btn');
+    if (invoicePrintBtn) { invoicePrintBtn.click(); return; }
     window.print();
   };
 
@@ -90,9 +95,12 @@ export default function JobDetailsWithInvoice({
   const canRecordPayment = hasInvoice && job.invoice.paymentStatus !== 'paid';
 
   // Sort payments by date (newest first)
-  const sortedPayments = job.invoice?.payments 
+  const sortedPayments = job.invoice?.payments
     ? [...job.invoice.payments].sort((a, b) => new Date(b.paymentDate) - new Date(a.paymentDate))
     : [];
+
+  // Composite invoice object for print template: Invoice.jsx expects invoice.job.* shape
+  const invoiceForPrint = hasInvoice ? { ...job.invoice, job } : null;
 
   const handleGenerateInvoice = () => {
     if (window.confirm('Approve Job? This will generate an Invoice.')) {
@@ -114,8 +122,14 @@ export default function JobDetailsWithInvoice({
           <div className="flex-1 overflow-y-auto p-1 print-p-0">
             <div className="print-content space-y-6">
               
-              {/* PRINT CSS & HEADER */}
-              <style>{`
+              {/* PRINT CSS — invoice template when invoice exists, estimate layout otherwise */}
+              <style>{hasInvoice ? `
+                @media print {
+                  .no-print { display: none !important; }
+                  .print-content { display: none !important; }
+                  .print-only-invoice { display: block !important; }
+                }
+              ` : `
                 @media print {
                   body * { visibility: hidden; }
                   .print-content, .print-content * { visibility: visible; }
@@ -343,6 +357,13 @@ export default function JobDetailsWithInvoice({
               </div>
 
             </div>
+
+            {/* PRINT-ONLY INVOICE TEMPLATE (hidden on screen, shown when printing an invoiced job) */}
+            {invoiceForPrint && (
+              <div className="print-only-invoice hidden">
+                <Invoice invoice={invoiceForPrint} businessSettings={settings} />
+              </div>
+            )}
           </div>
 
           {/* --- JOB PHOTOS (No Print) --- */}

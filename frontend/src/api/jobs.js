@@ -172,4 +172,30 @@ export const jobPhotosApi = {
   },
 };
 
-export default { jobsApi, invoicesApi, paymentsApi };
+// ============================================
+// QUOTES (STANDALONE INVOICES) API
+// ============================================
+export const quotesApi = {
+  createQuote: async (data) => {
+    const response = await apiClient.post('/quotes', data);
+    return response;
+  },
+  getQuotes: async (params = {}) => {
+    const response = await apiClient.get('/quotes', { params });
+    return response;
+  },
+  getQuote: async (id) => {
+    const response = await apiClient.get(`/quotes/${id}`);
+    return response;
+  },
+  updateQuote: async (id, data) => {
+    const response = await apiClient.put(`/quotes/${id}`, data);
+    return response;
+  },
+  convertToJob: async (id) => {
+    const response = await apiClient.post(`/quotes/${id}/convert`);
+    return response;
+  },
+};
+
+export default { jobsApi, invoicesApi, paymentsApi, quotesApi };

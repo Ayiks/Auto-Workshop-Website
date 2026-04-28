@@ -99,7 +99,8 @@ export default function RestockWizard({ onClose, onSuccess }) {
   const [search, setSearch] = useState("");
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [orderItems, setOrderItems] = useState([]);
-  const [vendor, setVendor] = useState(null);
+  const [vendors, setVendors] = useState([]);
+  const [addingVendor, setAddingVendor] = useState(null);
   const [showVendorCreate, setShowVendorCreate] = useState(false);
   const [notes, setNotes] = useState("");
   const [done, setDone] = useState(false);
@@ -176,10 +177,18 @@ export default function RestockWizard({ onClose, onSuccess }) {
       .filter((i) => parseFloat(i.quantityOrdered) > 0)
       .map((i) => ({ id: i.id, quantityOrdered: parseFloat(i.quantityOrdered), unitCost: parseFloat(i.unitCost), unitId: i.unitId === "base" ? null : Number(i.unitId) }));
     if (!validItems.length) return;
-    bulkMutation.mutate({ items: validItems, vendorId: vendor?.id || null, notes: notes.trim() || undefined });
+    bulkMutation.mutate({ items: validItems, vendorIds: vendors.map(v => v.id), notes: notes.trim() || undefined });
   };
 
-  const notifyChannel = vendor?.whatsappNumber ? "WhatsApp" : vendor?.email ? "email" : vendor?.phone ? "SMS" : null;
+  const removeVendor = (id) => setVendors((prev) => prev.filter(v => v.id !== id));
+
+  const handleAddingVendorChange = (v) => {
+    if (!v) { setAddingVendor(null); return; }
+    if (!vendors.some(existing => existing.id === v.id)) {
+      setVendors(prev => [...prev, v]);
+    }
+    setAddingVendor(null);
+  };
 
   // ── DONE ──────────────────────────────────────────────────────────────────
   if (done) {
@@ -192,7 +201,7 @@ export default function RestockWizard({ onClose, onSuccess }) {
         </div>
         <h3 className="text-lg font-bold text-gray-900 mb-1">Order Placed</h3>
         <p className="text-sm text-gray-500 mb-1">
-          {orderResult?.length || 0} item(s) ordered{vendor ? ` from ${vendor.name}` : ""}.
+          {orderResult?.length || 0} item(s) ordered{vendors.length ? ` — ${vendors.map(v => v.name).join(", ")} notified` : ""}.
         </p>
         <p className="text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-1.5 mb-6">
           Stock quantities will update when you mark goods as received.
@@ -419,16 +428,40 @@ export default function RestockWizard({ onClose, onSuccess }) {
         {/* STEP 2 — Vendor & Confirm */}
         {step === 2 && (
           <div className="space-y-4">
-            {/* Vendor Select */}
+            {/* Vendor Select — multi */}
             <div>
               <p className="text-sm font-semibold text-gray-700 mb-2">
-                Select Vendor <span className="text-xs font-normal text-gray-400">(optional)</span>
+                Notify Vendors <span className="text-xs font-normal text-gray-400">(optional — select one or more)</span>
               </p>
+
+              {/* Selected vendor chips */}
+              {vendors.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-2">
+                  {vendors.map(v => (
+                    <span key={v.id} className="inline-flex items-center gap-1.5 bg-gray-100 text-gray-800 text-xs font-medium px-2.5 py-1 rounded-full">
+                      {v.name}
+                      <button
+                        type="button"
+                        onClick={() => removeVendor(v.id)}
+                        className="text-gray-400 hover:text-red-500 leading-none"
+                      >
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Add vendor dropdown */}
               <VendorSelect
-                value={vendor}
-                onChange={(v) => { setVendor(v); if (v) setShowVendorCreate(false); }}
+                key={vendors.map(v => v.id).join(",")}
+                value={addingVendor}
+                onChange={handleAddingVendorChange}
                 label=""
               />
+
               <button
                 type="button"
                 onClick={() => setShowVendorCreate((s) => !s)}
@@ -439,16 +472,21 @@ export default function RestockWizard({ onClose, onSuccess }) {
               {showVendorCreate && (
                 <VendorCreateForm
                   onCreated={(v) => {
-                    setVendor({ id: v.id, name: v.companyName, contactName: v.contactName || null, phone: v.phone || null, email: v.email || null, whatsappNumber: v.whatsappNumber || null });
+                    const newVendor = { id: v.id, name: v.companyName, contactName: v.contactName || null, phone: v.phone || null, email: v.email || null, whatsappNumber: v.whatsappNumber || null };
+                    if (!vendors.some(existing => existing.id === newVendor.id)) {
+                      setVendors(prev => [...prev, newVendor]);
+                    }
                     setShowVendorCreate(false);
                     queryClient.invalidateQueries(["allVendors"]);
                   }}
                   onCancel={() => setShowVendorCreate(false)}
                 />
               )}
-              {vendor && notifyChannel && (
+              {vendors.length > 0 && (
                 <p className="text-xs text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-3 py-2 mt-2">
-                  Vendor will be notified via {notifyChannel} when the order is confirmed.
+                  {vendors.length === 1
+                    ? `${vendors[0].name} will be notified when the order is confirmed.`
+                    : `${vendors.length} vendors will be notified when the order is confirmed.`}
                 </p>
               )}
             </div>

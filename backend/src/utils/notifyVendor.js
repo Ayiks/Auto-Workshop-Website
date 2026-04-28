@@ -40,7 +40,7 @@ export const notifyVendor = async (vendor, { items, totalCost, businessName, ord
   // SMS-specific message — kept short and GSM-safe (no Unicode) to stay within 1 segment
   const smsMessage = customMessage
     ? customMessage.replace(/GH₵/g, 'GHC')
-    : `PO from ${businessName}: ${(items || []).length} item(s), Total GHC${parseFloat(totalCost).toFixed(2)}. Ordered by ${orderedBy}. Please confirm.`;
+    : `You have an Order from ${businessName}, Ordered by ${orderedBy}. Please Check`;
 
   // ── SMS ──────────────────────────────────────────────────────────────────────
   if (vendor.phone) {

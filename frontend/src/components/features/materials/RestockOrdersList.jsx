@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { materialsApi } from '@/api/materials';
 import { useAuthStore } from '@stores/authStore';
@@ -22,14 +22,130 @@ const paymentBadge = (paymentStatus) => {
   return <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Unpaid</span>;
 };
 
-function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onEditClick, onCancel, isCancelling, onMarkPaid, isMarkingPaid }) {
+// draftAmount  — controlled string from parent (so all rows share the same budget math)
+// maxAmount    — GH₵ ceiling this vendor can be assigned (grandTotal minus other vendors' drafts)
+// isDisabled   — budget fully allocated and this vendor has 0 draft
+function VendorPayRow({ row, orderId, onPay, isPaying, draftAmount, onDraftChange, maxAmount, isDisabled }) {
+  const [expanded, setExpanded] = useState(false);
+  const isPaid = row.paymentStatus === 'paid';
+  const numVal = parseFloat(draftAmount) || 0;
+  const isOverMax = numVal > maxAmount + 0.001; // tolerance for float rounding
+
+  const handlePay = () => {
+    if (isOverMax || numVal < 0) return;
+    onPay(orderId, { vendorId: row.vendorId, amount: numVal });
+    setExpanded(false);
+  };
+
+  const handleToggle = () => {
+    if (isDisabled) return;
+    setExpanded(s => !s);
+  };
+
+  return (
+    <div className={`border rounded-lg overflow-hidden transition-opacity ${isDisabled ? 'opacity-40 border-gray-200' : 'border-gray-200'}`}>
+      <button
+        type="button"
+        onClick={handleToggle}
+        disabled={isDisabled}
+        className="w-full flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50 transition-colors text-left disabled:cursor-not-allowed disabled:hover:bg-white"
+      >
+        <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600 shrink-0">
+          {row.vendor.companyName.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-gray-900">{row.vendor.companyName}</p>
+          {row.vendor.contactName && <p className="text-xs text-gray-500">{row.vendor.contactName}</p>}
+        </div>
+        <div className="flex items-center gap-2 shrink-0">
+          {isPaid ? (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">
+              Paid · GH₵{parseFloat(row.amountPaid).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </span>
+          ) : isDisabled ? (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-400">Budget full</span>
+          ) : (
+            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Unpaid</span>
+          )}
+          {!isDisabled && (
+            <svg className={`w-4 h-4 text-gray-400 transition-transform ${expanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+            </svg>
+          )}
+        </div>
+      </button>
+
+      {expanded && !isDisabled && (
+        <div className="px-3 py-3 border-t border-gray-100 bg-gray-50 space-y-2">
+          <div className="flex items-end gap-2">
+            <div className="flex-1">
+              <div className="flex justify-between items-center mb-1">
+                <label className="text-xs font-medium text-gray-600">Amount Paid (GH₵)</label>
+                <span className="text-xs text-gray-400">
+                  max <span className="font-semibold text-gray-600">GH₵{maxAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
+                </span>
+              </div>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={draftAmount}
+                onChange={e => onDraftChange(row.vendorId, e.target.value)}
+                placeholder="0.00"
+                autoFocus
+                className={`w-full border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-1 ${
+                  isOverMax
+                    ? 'border-red-400 bg-red-50 focus:ring-red-400'
+                    : 'border-gray-300 focus:ring-gray-900'
+                }`}
+              />
+            </div>
+            <button
+              onClick={handlePay}
+              disabled={isPaying || isOverMax || numVal < 0}
+              className="px-4 py-1.5 text-sm font-semibold bg-gray-900 text-white rounded-lg hover:bg-gray-700 disabled:opacity-50 shrink-0"
+            >
+              {isPaying ? '…' : 'Save'}
+            </button>
+          </div>
+          {isOverMax && (
+            <p className="text-xs text-red-600 font-medium">
+              Exceeds available balance by GH₵{(numVal - maxAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onEditClick, onCancel, isCancelling, onMarkPaid, isMarkingPaid, onPayVendor, isPayingVendor }) {
   const [confirming, setConfirming] = useState(false);
   const [cancelConfirming, setCancelConfirming] = useState(false);
-  const [markPaidOnReceive, setMarkPaidOnReceive] = useState(false);
+
+  // draftAmounts: live input values keyed by vendorId (strings so the input is uncontrolled-friendly)
+  const [draftAmounts, setDraftAmounts] = useState(
+    () => Object.fromEntries((order.vendors || []).map(v => [v.vendorId, String(parseFloat(v.amountPaid) || '')]))
+  );
+
+  // Re-sync after a payment saves (order.vendors updates via setSelectedOrder in parent)
+  useEffect(() => {
+    setDraftAmounts(
+      Object.fromEntries((order.vendors || []).map(v => [v.vendorId, String(parseFloat(v.amountPaid) || '')]))
+    );
+  }, [order.vendors]);
+
   const orderedBy = order.user?.fullName || order.user?.username || '—';
   const receivedBy = order.receivedUser?.fullName || order.receivedUser?.username || '—';
   const grandTotal = parseFloat(order.totalCost);
   const isPending = order.status === 'pending';
+  const hasMultiVendors = order.vendors?.length > 0;
+
+  // Budget math — updates live as the user types into any row
+  const totalAllocated = (order.vendors || []).reduce(
+    (sum, v) => sum + (parseFloat(draftAmounts[v.vendorId]) || 0), 0
+  );
+  const remaining = grandTotal - totalAllocated;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/40" onClick={onClose}>
@@ -47,7 +163,7 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
           </div>
           <div className="flex items-center gap-2">
             {statusBadge(order.status)}
-            {order.status !== 'cancelled' && paymentBadge(order.paymentStatus)}
+            {order.status !== 'cancelled' && !hasMultiVendors && paymentBadge(order.paymentStatus)}
             <button onClick={onClose} className="text-gray-400 hover:text-gray-700 p-1">
               <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -91,10 +207,65 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
             </div>
           </div>
 
-          {/* Vendor */}
+          {/* Vendors */}
           <div>
-            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Vendor</p>
-            {order.vendor ? (
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">
+              {hasMultiVendors ? `Vendors (${order.vendors.length}) — tap to record payment` : 'Vendor'}
+            </p>
+            {hasMultiVendors ? (
+              <div className="space-y-2">
+                {/* ── Balance bar ── */}
+                <div className="bg-gray-50 border border-gray-200 rounded-lg px-3 py-2.5 space-y-1 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Order total</span>
+                    <span className="font-semibold text-gray-900">
+                      GH₵{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Allocated</span>
+                    <span className={`font-semibold ${totalAllocated > grandTotal ? 'text-red-600' : 'text-gray-700'}`}>
+                      GH₵{totalAllocated.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                    </span>
+                  </div>
+                  <div className="flex justify-between border-t border-gray-200 pt-1">
+                    <span className={`font-medium text-xs ${remaining < 0 ? 'text-red-600' : remaining === 0 ? 'text-emerald-600' : 'text-amber-600'}`}>
+                      {remaining < 0 ? 'Over budget' : remaining === 0 ? 'Fully allocated' : 'Remaining'}
+                    </span>
+                    <span className={`font-bold text-xs ${remaining < 0 ? 'text-red-600' : remaining === 0 ? 'text-emerald-600' : 'text-amber-700'}`}>
+                      {remaining < 0
+                        ? `−GH₵${Math.abs(remaining).toLocaleString(undefined, { minimumFractionDigits: 2 })}`
+                        : `GH₵${remaining.toLocaleString(undefined, { minimumFractionDigits: 2 })}`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* ── Per-vendor rows ── */}
+                {order.vendors.map(row => {
+                  const thisVendorDraft = parseFloat(draftAmounts[row.vendorId]) || 0;
+                  // Max this vendor can receive = budget not claimed by the other vendors
+                  const otherAllocated = totalAllocated - thisVendorDraft;
+                  const maxAmount = Math.max(0, grandTotal - otherAllocated);
+                  // Gray out if budget is gone and this vendor has nothing entered
+                  const isDisabled = remaining <= 0.001 && thisVendorDraft === 0;
+                  return (
+                    <VendorPayRow
+                      key={row.vendorId}
+                      row={row}
+                      orderId={order.orderId}
+                      onPay={onPayVendor}
+                      isPaying={isPayingVendor}
+                      draftAmount={draftAmounts[row.vendorId] ?? ''}
+                      onDraftChange={(vendorId, val) =>
+                        setDraftAmounts(prev => ({ ...prev, [vendorId]: val }))
+                      }
+                      maxAmount={maxAmount}
+                      isDisabled={isDisabled}
+                    />
+                  );
+                })}
+              </div>
+            ) : order.vendor ? (
               <div className="flex items-center gap-3 border border-gray-200 rounded-lg px-3 py-2.5">
                 <div className="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-600">
                   {order.vendor.companyName.charAt(0).toUpperCase()}
@@ -135,10 +306,11 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
           )}
         </div>
 
-        {/* Footer — received orders: Mark as Paid + admin correction */}
+        {/* Footer — received orders: legacy single-vendor pay + admin correction */}
         {order.status === 'received' && (
           <div className="px-6 py-4 border-t border-gray-100 space-y-2">
-            {order.paymentStatus !== 'paid' && (
+            {/* Legacy: single vendor, no RestockOrderVendor rows yet */}
+            {!hasMultiVendors && order.vendor && order.paymentStatus !== 'paid' && (
               <button
                 onClick={() => onMarkPaid(order.orderId)}
                 disabled={isMarkingPaid}
@@ -219,15 +391,6 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
                     Total expense of{' '}
                     <strong>GH₵{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> will be logged.
                   </p>
-                  <label className="flex items-center gap-2 cursor-pointer select-none px-1">
-                    <input
-                      type="checkbox"
-                      checked={markPaidOnReceive}
-                      onChange={e => setMarkPaidOnReceive(e.target.checked)}
-                      className="w-4 h-4 rounded accent-emerald-600"
-                    />
-                    <span className="text-sm text-gray-600">Also mark as paid to vendor</span>
-                  </label>
                   <div className="flex gap-2">
                     <button
                       onClick={() => setConfirming(false)}
@@ -236,7 +399,7 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
                       Back
                     </button>
                     <button
-                      onClick={() => onReceive(order.orderId, markPaidOnReceive)}
+                      onClick={() => onReceive(order.orderId)}
                       disabled={isReceiving}
                       className="flex-1 py-2.5 text-sm font-semibold bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 disabled:opacity-50"
                     >
@@ -409,8 +572,8 @@ export default function RestockOrdersList() {
   });
 
   const receiveMutation = useMutation({
-    mutationFn: ({ orderId, markAsPaid }) => materialsApi.receiveRestockOrder(orderId, { markAsPaid }),
-    onSuccess: (_, { orderId, markAsPaid }) => {
+    mutationFn: (orderId) => materialsApi.receiveRestockOrder(orderId),
+    onSuccess: (_, orderId) => {
       queryClient.invalidateQueries(['restockOrders']);
       queryClient.invalidateQueries(['materials']);
       queryClient.invalidateQueries(['ap-ar']);
@@ -419,7 +582,6 @@ export default function RestockOrdersList() {
           ? {
               ...prev,
               status: 'received',
-              paymentStatus: markAsPaid ? 'paid' : prev.paymentStatus,
               receivedDate: new Date().toISOString(),
               items: prev.items.map(i => ({ ...i, status: 'received' })),
             }
@@ -436,6 +598,25 @@ export default function RestockOrdersList() {
       setSelectedOrder(prev =>
         prev?.orderId === orderId ? { ...prev, paymentStatus: 'paid' } : prev
       );
+    },
+  });
+
+  const vendorPayMutation = useMutation({
+    mutationFn: ({ orderId, vendorId, amount }) => materialsApi.payRestockOrderVendor(orderId, { vendorId, amount }),
+    onSuccess: (res, { orderId, vendorId, amount }) => {
+      queryClient.invalidateQueries(['restockOrders']);
+      const updated = res?.data?.data;
+      setSelectedOrder(prev => {
+        if (!prev || prev.orderId !== orderId) return prev;
+        return {
+          ...prev,
+          vendors: prev.vendors.map(v =>
+            v.vendorId === vendorId
+              ? { ...v, amountPaid: amount, paymentStatus: parseFloat(amount) > 0 ? 'paid' : 'unpaid' }
+              : v
+          ),
+        };
+      });
     },
   });
 
@@ -543,7 +724,13 @@ export default function RestockOrdersList() {
                     <td className="px-4 py-3 text-right font-semibold text-gray-900 whitespace-nowrap">
                       GH₵{parseFloat(order.totalCost).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-4 py-3 text-gray-600">{order.vendor?.companyName || <span className="text-gray-300">—</span>}</td>
+                    <td className="px-4 py-3 text-gray-600">
+                      {order.vendors?.length > 0
+                        ? order.vendors.length === 1
+                          ? order.vendors[0].vendor.companyName
+                          : `${order.vendors[0].vendor.companyName} +${order.vendors.length - 1}`
+                        : order.vendor?.companyName || <span className="text-gray-300">—</span>}
+                    </td>
                     <td className="px-4 py-3 text-gray-600">{orderedBy}</td>
                     <td className="px-4 py-3">
                       <div className="flex items-center gap-2">
@@ -559,7 +746,17 @@ export default function RestockOrdersList() {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      {order.status !== 'cancelled' && paymentBadge(order.paymentStatus)}
+                      {order.status !== 'cancelled' && order.vendors?.length > 0
+                        ? (() => {
+                            const paid = order.vendors.filter(v => v.paymentStatus === 'paid').length;
+                            const total = order.vendors.length;
+                            return paid === total
+                              ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-700">All Paid</span>
+                              : paid > 0
+                                ? <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-700">{paid}/{total} Paid</span>
+                                : <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-red-100 text-red-600">Unpaid</span>;
+                          })()
+                        : order.status !== 'cancelled' && paymentBadge(order.paymentStatus)}
                     </td>
                   </tr>
                 );
@@ -574,7 +771,7 @@ export default function RestockOrdersList() {
         <OrderDetailPanel
           order={selectedOrder}
           onClose={() => setSelectedOrder(null)}
-          onReceive={(orderId, markAsPaid) => receiveMutation.mutate({ orderId, markAsPaid })}
+          onReceive={(orderId) => receiveMutation.mutate(orderId)}
           isReceiving={receiveMutation.isPending}
           isAdmin={isAdmin}
           onEditClick={(order) => setEditingOrder(order)}
@@ -582,6 +779,8 @@ export default function RestockOrdersList() {
           isCancelling={cancelMutation.isPending}
           onMarkPaid={(orderId) => markPaidMutation.mutate(orderId)}
           isMarkingPaid={markPaidMutation.isPending}
+          onPayVendor={(orderId, { vendorId, amount }) => vendorPayMutation.mutate({ orderId, vendorId, amount })}
+          isPayingVendor={vendorPayMutation.isPending}
         />
       )}
 

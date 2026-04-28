@@ -6,6 +6,11 @@ import { getBusinessMessagingConfig, sendViaBusiness } from '../utils/sendSMS.js
 const sendJobSMS = (phone, message, businessId) => {
   getBusinessMessagingConfig(businessId)
     .then(config => sendViaBusiness(phone, message, 'sms', config))
+    .then(result => {
+      if (!result?.success) {
+        console.warn('[SMS] Not sent:', result?.error || 'check smsEnabled / arkeselSenderId in business settings');
+      }
+    })
     .catch(err => console.error('[SMS] Job notification failed:', err.message));
 };
 
@@ -239,6 +244,13 @@ export const createJob = asyncHandler(async (req, res) => {
     req.db.businessSettings.findFirst({ where: { businessId: req.user.businessId }, select: { email: true } }),
   ]);
   res.status(201).json({ success: true, message: 'Job created successfully', data: completeJob });
+
+  // Fire-and-forget: notify customer that their job has been received (all job types)
+  if (completeJob?.clientPhone) {
+    const vehicle = [completeJob.vehicleMake, completeJob.vehicleModel].filter(Boolean).join(' ');
+    const msg = `Hi ${completeJob.clientName}, your ${completeJob.jobType} job has been received at ${business?.name || 'our workshop'}. Ref: #${completeJob.id}${vehicle ? `. Vehicle: ${vehicle}` : ''}. We will keep you updated.`;
+    sendJobSMS(completeJob.clientPhone, msg, req.user.businessId);
+  }
 });
 
 // @desc    Get all jobs

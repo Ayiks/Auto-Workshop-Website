@@ -552,7 +552,7 @@ export const reorderMaterial = asyncHandler(async (req, res) => {
 // @route   POST /api/materials/bulk-reorder
 // @access  Private
 export const bulkReorderMaterials = asyncHandler(async (req, res) => {
-  const { items, vendorId, notes: orderNotes } = req.body;
+  const { items, vendorId, vendorIds: vendorIdsRaw, notes: orderNotes } = req.body;
 
   if (!Array.isArray(items) || items.length === 0) {
     throw new AppError('No items provided for reorder', 400);
@@ -566,13 +566,18 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
 
   const materialMap = new Map(materials.map(m => [m.id, m]));
 
-  // Load vendor if provided
-  let vendor = null;
-  if (vendorId) {
-    vendor = await req.db.vendor.findFirst({
-      where: { id: parseInt(vendorId), businessId: req.user.businessId },
-    });
-  }
+  // Support both vendorIds (array) and legacy vendorId (single)
+  const allVendorIds = Array.isArray(vendorIdsRaw) && vendorIdsRaw.length
+    ? vendorIdsRaw.map(id => parseInt(id))
+    : vendorId ? [parseInt(vendorId)] : [];
+
+  const vendors = allVendorIds.length
+    ? await req.db.vendor.findMany({
+        where: { id: { in: allVendorIds }, businessId: req.user.businessId },
+      })
+    : [];
+
+  const primaryVendor = vendors[0] || null;
 
   const orderId = randomUUID();
 
@@ -622,7 +627,7 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
           reorderedBy: req.user.id,
           notes: item.notes || orderNotes || null,
           status: 'pending',
-          vendorId: vendor?.id || null,
+          vendorId: primaryVendor?.id || null,
           businessId: req.user.businessId,
           orderId,
         },
@@ -650,17 +655,32 @@ export const bulkReorderMaterials = asyncHandler(async (req, res) => {
     return processedItems;
   });
 
-  // Notify vendor (non-blocking)
-  if (vendor) {
+  // Save all vendors against this order (for multi-vendor tracking + payment)
+  if (vendors.length) {
+    await Promise.all(
+      vendors.map(v =>
+        req.db.restockOrderVendor.upsert({
+          where: { orderId_vendorId: { orderId, vendorId: v.id } },
+          create: { orderId, vendorId: v.id, businessId: req.user.businessId },
+          update: {},
+        })
+      )
+    );
+  }
+
+  // Notify all vendors (non-blocking)
+  if (vendors.length) {
     const business = await req.db.business.findUnique({ where: { id: req.user.businessId }, select: { name: true } });
     const grandTotal = results.reduce((sum, i) => sum + i.totalCost, 0);
-    notifyVendor(vendor, {
-      items: results,
-      totalCost: grandTotal,
-      businessName: business?.name || 'The workshop',
-      orderedBy: req.user.fullName || req.user.username,
-      businessId: req.user.businessId,
-    }).catch(() => {});
+    for (const v of vendors) {
+      notifyVendor(v, {
+        items: results,
+        totalCost: grandTotal,
+        businessName: business?.name || 'The workshop',
+        orderedBy: req.user.fullName || req.user.username,
+        businessId: req.user.businessId,
+      }).catch(() => {});
+    }
   }
 
   res.status(201).json({
@@ -726,6 +746,25 @@ export const getRestockOrders = asyncHandler(async (req, res) => {
   }
 
   let groups = Array.from(groupMap.values());
+
+  // Attach multi-vendor payment rows (for orders that used multi-vendor select)
+  const orderIds = groups.map(g => g.orderId).filter(Boolean);
+  if (orderIds.length) {
+    const vendorRows = await req.db.restockOrderVendor.findMany({
+      where: { orderId: { in: orderIds }, businessId: req.user.businessId },
+      include: { vendor: { select: { id: true, companyName: true, contactName: true, phone: true, email: true, whatsappNumber: true } } },
+    });
+    const vendorsByOrder = {};
+    for (const row of vendorRows) {
+      if (!vendorsByOrder[row.orderId]) vendorsByOrder[row.orderId] = [];
+      vendorsByOrder[row.orderId].push(row);
+    }
+    for (const group of groups) {
+      group.vendors = vendorsByOrder[group.orderId] || [];
+    }
+  } else {
+    for (const group of groups) group.vendors = [];
+  }
 
   // Apply status filter at group level
   if (status && status !== 'all') {
@@ -880,6 +919,48 @@ export const markRestockOrderPaid = asyncHandler(async (req, res) => {
   });
 
   res.status(200).json({ success: true, message: 'Order marked as paid.' });
+});
+
+// @desc    Record payment to a specific vendor for a restock order
+// @route   POST /api/materials/restock-orders/:orderId/vendor-payment
+// @access  Private
+export const payRestockOrderVendor = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+  const { vendorId, amount } = req.body;
+
+  if (!vendorId || amount == null || parseFloat(amount) < 0) {
+    throw new AppError('vendorId and a valid amount are required', 400);
+  }
+
+  const row = await req.db.restockOrderVendor.findUnique({
+    where: { orderId_vendorId: { orderId, vendorId: parseInt(vendorId) } },
+  });
+
+  if (!row || row.businessId !== req.user.businessId) {
+    throw new AppError('Vendor not found on this order', 404);
+  }
+
+  const paid = parseFloat(amount);
+  const updated = await req.db.restockOrderVendor.update({
+    where: { orderId_vendorId: { orderId, vendorId: parseInt(vendorId) } },
+    data: {
+      amountPaid: paid,
+      paymentStatus: paid > 0 ? 'paid' : 'unpaid',
+      paidAt: paid > 0 ? new Date() : null,
+    },
+    include: { vendor: { select: { id: true, companyName: true } } },
+  });
+
+  await req.db.auditLog.create({
+    data: {
+      userId: req.user.id,
+      action: 'VENDOR_PAYMENT',
+      entity: 'RestockOrderVendor',
+      description: `Recorded GH₵${paid.toFixed(2)} payment to ${updated.vendor.companyName} for order ${orderId}.`,
+    },
+  });
+
+  res.status(200).json({ success: true, data: updated });
 });
 
 // @desc    Admin: update quantities/costs on a pending restock order

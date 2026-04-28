@@ -1,6 +1,7 @@
 import { useState, useRef } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation } from '@tanstack/react-query';
 import { materialsApi } from '@api/materials';
+import { invoicesApi, quotesApi } from '@api/jobs';
 import { settingsApi } from '@api/settings';
 import { useAuthStore } from '@stores/authStore';
 import Button from '@components/common/Button';
@@ -79,7 +80,11 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
   const [reminderEnabled, setReminderEnabled] = useState(job?.reminderEnabled || false);
   const [reminderIntervalMonths, setReminderIntervalMonths] = useState(job?.reminderIntervalMonths || 3);
   const [reminderTypes, setReminderTypes] = useState(job?.reminderTypes || []);
-  const [reminderChannels, setReminderChannels] = useState(['email']);
+  const [reminderChannels, setReminderChannels] = useState(['sms']);
+
+  // Invoice pre-fill picker (create mode only)
+  const [showInvoicePicker, setShowInvoicePicker] = useState(false);
+  const [invoiceSearch, setInvoiceSearch] = useState('');
 
   // Fetch inventory materials
   const { data: materialsData } = useQuery({
@@ -92,7 +97,62 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
     queryFn: settingsApi.getBusinessSettings,
   });
 
+  // Fetch invoices for pre-fill (lazy: only when picker is open)
+  const { data: invoicesResp } = useQuery({
+    queryKey: ['invoices-for-prefill'],
+    queryFn: () => invoicesApi.getInvoices({}),
+    enabled: showInvoicePicker && !job, // only in create mode
+    staleTime: 2 * 60 * 1000,
+  });
+  const allInvoices = invoicesResp?.data || [];
+  const filteredInvoices = invoiceSearch.trim()
+    ? allInvoices.filter(inv =>
+        inv.invoiceNumber?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+        inv.job?.clientName?.toLowerCase().includes(invoiceSearch.toLowerCase()) ||
+        inv.job?.vehicleRegNumber?.toLowerCase().includes(invoiceSearch.toLowerCase())
+      )
+    : allInvoices.slice(0, 20);
+
   const enabledJobTypes = settingsData?.data?.enabledJobTypes ?? ['mechanic', 'sprayer', 'bodyworks', 'other'];
+
+  // Generate standalone invoice mutation
+  const createQuoteMutation = useMutation({
+    mutationFn: (data) => quotesApi.createQuote(data),
+    onSuccess: (resp) => {
+      const quoteNumber = resp?.data?.quoteNumber || 'invoice';
+      toast.success(`Invoice ${quoteNumber} created`);
+      onCancel();
+    },
+    onError: (err) => {
+      toast.error(err?.response?.data?.message || 'Failed to create invoice');
+    },
+  });
+
+  const handleGenerateInvoice = () => {
+    if (!formData.clientName?.trim()) {
+      toast.error('Client name is required to generate an invoice');
+      return;
+    }
+    const payload = {
+      clientName: formData.clientName,
+      clientPhone: formData.clientPhone,
+      clientEmail: formData.clientEmail,
+      vehicleMake: formData.vehicleMake,
+      vehicleModel: formData.vehicleModel,
+      vehicleRegNumber: formData.vehicleRegNumber,
+      jobType: formData.jobType,
+      problemType: formData.problemType,
+      labourCost: parseFloat(formData.labourCost) || 0,
+      miscellaneousCost: parseFloat(formData.miscellaneousCost) || 0,
+      items: materials.map((m) => ({
+        materialName: m.name || m.materialName || 'Item',
+        quantity: parseFloat(m.quantity) || 1,
+        unitPrice: parseFloat(m.unitPrice) || 0,
+        isExternal: m.isExternal !== false,
+      })),
+    };
+    createQuoteMutation.mutate(payload);
+  };
 
   const inventoryMaterials = materialsData?.data || [];
 
@@ -155,6 +215,25 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
       setFormData(prev => ({ ...prev, clientName: selected.name }));
     }
     if (errors.clientName) setErrors(prev => ({ ...prev, clientName: null }));
+  };
+
+  const handleLoadFromInvoice = (inv) => {
+    const j = inv.job || {};
+    setFormData(prev => ({
+      ...prev,
+      clientName: j.clientName || prev.clientName,
+      clientPhone: j.clientPhone || prev.clientPhone,
+      clientEmail: j.clientEmail || prev.clientEmail,
+      vehicleMake: j.vehicleMake || prev.vehicleMake,
+      vehicleModel: j.vehicleModel || prev.vehicleModel,
+      vehicleRegNumber: j.vehicleRegNumber || prev.vehicleRegNumber,
+    }));
+    if (j.clientName) {
+      setCustomerSelectValue({ name: j.clientName, type: 'walking' });
+    }
+    setShowInvoicePicker(false);
+    setInvoiceSearch('');
+    toast.success(`Pre-filled from invoice ${inv.invoiceNumber}`);
   };
 
   const handleVehiclePick = (vehicleId) => {
@@ -337,6 +416,63 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
               })}
             </div>
           </div>
+
+          {/* LOAD FROM INVOICE — create mode only */}
+          {!job && (
+            <div className="bg-blue-50 rounded-lg border border-blue-200 p-3 sm:p-4 shadow-sm">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  <span className="text-sm font-semibold text-blue-900">Load from Past Invoice</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowInvoicePicker(p => !p)}
+                  className="text-xs text-blue-700 underline hover:text-blue-900"
+                >
+                  {showInvoicePicker ? 'Hide' : 'Show'}
+                </button>
+              </div>
+
+              {showInvoicePicker && (
+                <div className="mt-3">
+                  <input
+                    type="text"
+                    placeholder="Search by client name, reg number, or invoice #..."
+                    value={invoiceSearch}
+                    onChange={e => setInvoiceSearch(e.target.value)}
+                    className="w-full px-3 py-2 border border-blue-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-400"
+                  />
+                  <div className="mt-2 max-h-48 overflow-y-auto space-y-1">
+                    {filteredInvoices.length === 0 ? (
+                      <p className="text-xs text-gray-500 text-center py-3">No invoices found.</p>
+                    ) : (
+                      filteredInvoices.map(inv => (
+                        <button
+                          key={inv.id}
+                          type="button"
+                          onClick={() => handleLoadFromInvoice(inv)}
+                          className="w-full text-left px-3 py-2 bg-white border border-gray-200 rounded-lg hover:bg-blue-50 hover:border-blue-300 transition-colors"
+                        >
+                          <span className="font-mono text-xs text-gray-500">{inv.invoiceNumber}</span>
+                          {' — '}
+                          <span className="text-sm font-medium text-gray-900">{inv.job?.clientName || '—'}</span>
+                          {inv.job?.vehicleRegNumber && (
+                            <span className="text-xs text-gray-500 ml-2">· {inv.job.vehicleRegNumber}</span>
+                          )}
+                          {inv.job?.vehicleMake && (
+                            <span className="text-xs text-gray-400 ml-1">({inv.job.vehicleMake} {inv.job.vehicleModel})</span>
+                          )}
+                        </button>
+                      ))
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* 2. Client & Vehicle */}
           <div className="bg-white rounded-lg border border-gray-200 p-3 sm:p-5 shadow-sm space-y-4 sm:space-y-6">
@@ -788,15 +924,30 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
                 </div>
               </div>
 
-              <div className="p-2.5 sm:p-4 bg-gray-50 border-t border-gray-200 grid gap-2 sm:gap-3">
+              <div className="p-2.5 sm:p-4 bg-gray-50 border-t border-gray-200 space-y-2">
                 <Button type="submit" variant="primary" loading={isLoading}
                   className="w-full justify-center bg-black hover:bg-gray-800 text-white text-xs sm:text-sm">
                   {job ? 'Save Changes' : 'Create Job'}
                 </Button>
-                <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}
-                  className="w-full justify-center border-gray-300 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">
-                  Cancel
-                </Button>
+                {!job && (
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button type="button" variant="outline" onClick={handleGenerateInvoice}
+                      loading={createQuoteMutation.isPending} disabled={isLoading}
+                      className="w-full justify-center border-amber-400 text-amber-700 hover:bg-amber-50 text-xs sm:text-sm">
+                      Generate Invoice
+                    </Button>
+                    <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading || createQuoteMutation.isPending}
+                      className="w-full justify-center border-gray-300 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">
+                      Cancel
+                    </Button>
+                  </div>
+                )}
+                {job && (
+                  <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}
+                    className="w-full justify-center border-gray-300 text-gray-700 hover:bg-gray-100 text-xs sm:text-sm">
+                    Cancel
+                  </Button>
+                )}
               </div>
             </div>
 

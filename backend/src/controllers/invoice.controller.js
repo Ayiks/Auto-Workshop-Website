@@ -192,7 +192,10 @@ export const getInvoices = asyncHandler(async (req, res) => {
           jobType: true,
           clientName: true,
           clientPhone: true,
+          clientEmail: true,
           vehicleRegNumber: true,
+          vehicleMake: true,
+          vehicleModel: true,
           assignedTo: true,
           user: {
             select: {

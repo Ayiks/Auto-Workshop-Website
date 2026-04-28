@@ -96,4 +96,10 @@ export const materialsApi = {
     const response = await apiClient.post(`/materials/restock-orders/${orderId}/mark-paid`);
     return response;
   },
+
+  // Record payment to a specific vendor for a restock order
+  payRestockOrderVendor: async (orderId, { vendorId, amount }) => {
+    const response = await apiClient.post(`/materials/restock-orders/${orderId}/vendor-payment`, { vendorId, amount });
+    return response;
+  },
 };

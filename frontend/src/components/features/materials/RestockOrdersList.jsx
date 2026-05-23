@@ -8,6 +8,7 @@ const STATUS_TABS = [
   { key: 'all', label: 'All Orders' },
   { key: 'pending', label: 'Pending' },
   { key: 'received', label: 'Received' },
+  { key: 'cancelled', label: 'Cancelled' },
 ];
 
 const statusBadge = (status) => {
@@ -119,9 +120,10 @@ function VendorPayRow({ row, orderId, onPay, isPaying, draftAmount, onDraftChang
   );
 }
 
-function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onEditClick, onCancel, isCancelling, onMarkPaid, isMarkingPaid, onPayVendor, isPayingVendor }) {
+function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onEditClick, onCancel, isCancelling, onDelete, isDeleting, onMarkPaid, isMarkingPaid, onPayVendor, isPayingVendor }) {
   const [confirming, setConfirming] = useState(false);
   const [cancelConfirming, setCancelConfirming] = useState(false);
+  const [deleteConfirming, setDeleteConfirming] = useState(false);
 
   // draftAmounts: live input values keyed by vendorId (strings so the input is uncontrolled-friendly)
   const [draftAmounts, setDraftAmounts] = useState(
@@ -310,7 +312,7 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
         {order.status === 'received' && (
           <div className="px-6 py-4 border-t border-gray-100 space-y-2">
             {/* Legacy: single vendor, no RestockOrderVendor rows yet */}
-            {!hasMultiVendors && order.vendor && order.paymentStatus !== 'paid' && (
+            {!hasMultiVendors && order.vendor && order.paymentStatus !== 'paid' && !deleteConfirming && (
               <button
                 onClick={() => onMarkPaid(order.orderId)}
                 disabled={isMarkingPaid}
@@ -319,13 +321,78 @@ function OrderDetailPanel({ order, onClose, onReceive, isReceiving, isAdmin, onE
                 {isMarkingPaid ? 'Processing…' : 'Mark as Paid to Vendor'}
               </button>
             )}
-            {isAdmin && (
+            {isAdmin && !deleteConfirming && (
               <button
                 onClick={() => onEditClick(order)}
                 className="w-full py-2 text-sm font-medium border border-gray-300 rounded-xl hover:bg-gray-50 transition-colors"
               >
                 Edit Order (Admin Correction)
               </button>
+            )}
+            {isAdmin && !deleteConfirming && (
+              <button
+                onClick={() => setDeleteConfirming(true)}
+                className="w-full py-2 text-sm font-medium border border-red-200 text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+              >
+                Delete Order
+              </button>
+            )}
+            {isAdmin && deleteConfirming && (
+              <div className="space-y-2">
+                <p className="text-sm text-center text-gray-600">
+                  Delete this order? Stock for the {order.items.length} item{order.items.length !== 1 ? 's' : ''} will be removed and the COGS expense will be reversed.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setDeleteConfirming(false)}
+                    className="flex-1 py-2.5 text-sm border border-gray-300 rounded-xl hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => onDelete(order.orderId)}
+                    disabled={isDeleting}
+                    className="flex-1 py-2.5 text-sm font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Deleting…' : 'Yes, Delete'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Footer — cancelled orders: admin delete only */}
+        {order.status === 'cancelled' && isAdmin && (
+          <div className="px-6 py-4 border-t border-gray-100 space-y-2">
+            {!deleteConfirming ? (
+              <button
+                onClick={() => setDeleteConfirming(true)}
+                className="w-full py-2 text-sm font-medium border border-red-200 text-red-600 rounded-xl hover:bg-red-50 transition-colors"
+              >
+                Delete Order
+              </button>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-sm text-center text-gray-600">
+                  Delete this cancelled order? This removes the record permanently.
+                </p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setDeleteConfirming(false)}
+                    className="flex-1 py-2.5 text-sm border border-gray-300 rounded-xl hover:bg-gray-50"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={() => onDelete(order.orderId)}
+                    disabled={isDeleting}
+                    className="flex-1 py-2.5 text-sm font-semibold bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50"
+                  >
+                    {isDeleting ? 'Deleting…' : 'Yes, Delete'}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         )}
@@ -652,6 +719,21 @@ export default function RestockOrdersList() {
     },
   });
 
+  const deleteMutation = useMutation({
+    mutationFn: (orderId) => materialsApi.deleteRestockOrder(orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['restockOrders']);
+      queryClient.invalidateQueries(['materials']);
+      queryClient.invalidateQueries(['expenses']);
+      queryClient.invalidateQueries(['ap-ar']);
+      setSelectedOrder(null);
+    },
+    onError: (err) => {
+      const msg = err?.response?.data?.message || err?.message || 'Could not delete order';
+      alert(msg);
+    },
+  });
+
   const orders = data?.data?.data || data?.data || [];
 
   const filtered = activeTab === 'all' ? orders : orders.filter(o => o.status === activeTab);
@@ -777,6 +859,8 @@ export default function RestockOrdersList() {
           onEditClick={(order) => setEditingOrder(order)}
           onCancel={(orderId) => cancelMutation.mutate(orderId)}
           isCancelling={cancelMutation.isPending}
+          onDelete={(orderId) => deleteMutation.mutate(orderId)}
+          isDeleting={deleteMutation.isPending}
           onMarkPaid={(orderId) => markPaidMutation.mutate(orderId)}
           isMarkingPaid={markPaidMutation.isPending}
           onPayVendor={(orderId, { vendorId, amount }) => vendorPayMutation.mutate({ orderId, vendorId, amount })}

@@ -278,6 +278,7 @@ model SaleItem {
   unitCost       Decimal       @default(0) @map("unit_cost") @db.Decimal(10, 2)
   materialUnitId Int?
   businessId     String        @map("business_id")
+  stockDeducted  Boolean       @default(true) @map("stock_deducted")
   business       Business      @relation(fields: [businessId], references: [id])
   materialUnit   MaterialUnit? @relation(fields: [materialUnitId], references: [id])
   material       Material?     @relation(fields: [materialId], references: [id])

@@ -154,14 +154,20 @@ export const createSale = asyncHandler(async (req, res) => {
 
     for (const item of validatedItems) {
       const { quantityToDeduct, ...itemData } = item;
+      const didDeduct = item.itemType === 'material' && shouldDeductStock;
       await tx.saleItem.create({
         data: {
           saleId: sale.id,
           ...itemData,
+          // Record per-line whether stock was actually moved so deletes/edits
+          // can reverse only the lines that touched inventory. Backdated sales
+          // without the "Deduct from stock" tick never affect Material.quantity
+          // and so must never have their qty added back later.
+          stockDeducted: didDeduct,
         },
       });
 
-      if (item.itemType === 'material' && shouldDeductStock) {
+      if (didDeduct) {
         await tx.material.update({
           where: { id: item.materialId },
           data: { quantity: { decrement: item.quantityToDeduct } },
@@ -365,25 +371,33 @@ export const updateSale = asyncHandler(async (req, res) => {
     }
   }
 
+  // Decide whether the *new* lines should touch stock. Mirrors createSale:
+  // a sale on today's date always deducts; a backdated sale only deducts when
+  // the caller explicitly opts in.
+  const newSaleDate = saleDate ? new Date(saleDate) : new Date(existingSale.saleDate);
+  const isTodayUpdate = newSaleDate.toDateString() === new Date().toDateString();
+  const newStockDeducted = isTodayUpdate || req.body.deductStock === true;
+
   // Update Transaction
   const result = await req.db.$transaction(async (tx) => {
-    // 1. Reverse OLD inventory
+    // 1. Reverse OLD inventory — but only for lines that actually deducted
+    //    stock when the sale was created. Backdated lines with stockDeducted
+    //    = false never moved inventory; adding them back would silently
+    //    inflate stock.
     if (reverseInventory) {
       for (const item of existingSale.items) {
-        if (item.itemType === 'material') {
-          let quantityToAddBack = parseFloat(item.quantity);
-          
-          // Check if old item used a unit
-          if (item.materialUnitId) {
-             const unit = await tx.materialUnit.findUnique({ where: { id: item.materialUnitId }});
-             if (unit) quantityToAddBack = quantityToAddBack * parseFloat(unit.factor);
-          }
+        if (item.itemType !== 'material' || !item.stockDeducted) continue;
 
-          await tx.material.update({
-            where: { id: item.materialId },
-            data: { quantity: { increment: quantityToAddBack } },
-          });
+        let quantityToAddBack = parseFloat(item.quantity);
+        if (item.materialUnitId) {
+          const unit = await tx.materialUnit.findUnique({ where: { id: item.materialUnitId } });
+          if (unit) quantityToAddBack = quantityToAddBack * parseFloat(unit.factor);
         }
+
+        await tx.material.update({
+          where: { id: item.materialId },
+          data: { quantity: { increment: quantityToAddBack } },
+        });
       }
     }
 
@@ -404,13 +418,14 @@ export const updateSale = asyncHandler(async (req, res) => {
 
     // 4. Create NEW items & Deduct NEW inventory
     for (const item of validatedItems) {
-      const { quantityToDeduct, ...itemData } = item; // Extract helper
+      const { quantityToDeduct, ...itemData } = item;
+      const didDeduct = item.itemType === 'material' && newStockDeducted;
 
       await tx.saleItem.create({
-        data: { saleId: updatedSale.id, ...itemData },
+        data: { saleId: updatedSale.id, ...itemData, stockDeducted: didDeduct },
       });
 
-      if (item.itemType === 'material') {
+      if (didDeduct) {
         await tx.material.update({
           where: { id: item.materialId },
           data: { quantity: { decrement: quantityToDeduct } },
@@ -794,20 +809,24 @@ export const deleteSale = asyncHandler(async (req, res) => {
 
   // Start transaction to delete sale and optionally restore inventory
   await req.db.$transaction(async (tx) => {
-    // Restore inventory if requested
+    // Restore inventory ONLY for lines that actually deducted stock when sold.
+    // Backdated sales saved with the "Deduct from stock" tick OFF have
+    // stockDeducted = false on every material line; reversing them would
+    // create phantom stock the workshop never had.
     if (reverseInventory) {
       for (const item of sale.items) {
-        if (item.itemType === 'material' && item.materialId) {
-          let quantityToRestore = parseFloat(item.quantity);
-          if (item.materialUnitId) {
-            const unit = await tx.materialUnit.findUnique({ where: { id: item.materialUnitId } });
-            if (unit) quantityToRestore = quantityToRestore * parseFloat(unit.factor);
-          }
-          await tx.material.update({
-            where: { id: item.materialId },
-            data: { quantity: { increment: quantityToRestore } },
-          });
+        if (item.itemType !== 'material' || !item.materialId) continue;
+        if (!item.stockDeducted) continue;
+
+        let quantityToRestore = parseFloat(item.quantity);
+        if (item.materialUnitId) {
+          const unit = await tx.materialUnit.findUnique({ where: { id: item.materialUnitId } });
+          if (unit) quantityToRestore = quantityToRestore * parseFloat(unit.factor);
         }
+        await tx.material.update({
+          where: { id: item.materialId },
+          data: { quantity: { increment: quantityToRestore } },
+        });
       }
     }
 

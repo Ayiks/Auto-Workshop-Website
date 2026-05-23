@@ -91,6 +91,12 @@ export const materialsApi = {
     return response;
   },
 
+  // Admin: delete a restock order (reverses stock + expense for received orders)
+  deleteRestockOrder: async (orderId) => {
+    const response = await apiClient.delete(`/materials/restock-orders/${orderId}`);
+    return response;
+  },
+
   // Mark a restock order as paid to the vendor
   markRestockOrderPaid: async (orderId) => {
     const response = await apiClient.post(`/materials/restock-orders/${orderId}/mark-paid`);

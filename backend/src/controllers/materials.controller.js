@@ -723,8 +723,8 @@ export const getRestockOrders = asyncHandler(async (req, res) => {
         businessId: item.businessId,
         items: [],
         totalCost: 0,
-        // Will be computed below
-        status: 'received',
+        // Will be derived after all items collected
+        status: null,
         paymentStatus: item.paymentStatus,
         receivedDate: item.receivedDate,
         receivedUser: item.receivedUser,
@@ -733,15 +733,26 @@ export const getRestockOrders = asyncHandler(async (req, res) => {
     const group = groupMap.get(key);
     group.items.push(item);
     group.totalCost += parseFloat(item.totalCost);
-    // If ANY item is still pending, the whole order is pending
-    if (item.status === 'pending') {
-      group.status = 'pending';
-      group.receivedDate = null;
-      group.receivedUser = null;
-    }
     // Track latest reorderDate for display
     if (item.reorderDate > group.reorderDate) {
       group.reorderDate = item.reorderDate;
+    }
+  }
+
+  // Derive group status from line-item statuses.
+  // Precedence: any pending → pending; else any received → received; else cancelled.
+  for (const group of groupMap.values()) {
+    const statuses = group.items.map(i => i.status);
+    if (statuses.includes('pending')) {
+      group.status = 'pending';
+      group.receivedDate = null;
+      group.receivedUser = null;
+    } else if (statuses.includes('received')) {
+      group.status = 'received';
+    } else {
+      group.status = 'cancelled';
+      group.receivedDate = null;
+      group.receivedUser = null;
     }
   }
 
@@ -1069,6 +1080,117 @@ export const cancelRestockOrder = asyncHandler(async (req, res) => {
   });
 });
 
+// @desc    Admin: delete a restock order
+//   - Pending: just removes the order (stock was never touched).
+//   - Received: rolls stock back by the qty that was added, deletes the COGS
+//     expense, then deletes the order. Blocks when current stock is below
+//     what we'd need to remove (i.e. some of it was already sold/used).
+//   - Cancelled: just removes the order rows (no stock or expense impact).
+// @route   DELETE /api/materials/restock-orders/:orderId
+// @access  Private (Admin only)
+export const deleteRestockOrder = asyncHandler(async (req, res) => {
+  const { orderId } = req.params;
+
+  const lineItems = await req.db.materialReorder.findMany({
+    where: { orderId, businessId: req.user.businessId },
+    include: { material: { include: { alternateUnits: true } } },
+  });
+
+  if (lineItems.length === 0) {
+    throw new AppError('Order not found', 404, 'NOT_FOUND');
+  }
+
+  // Compute the base-unit stock each received line added, and verify current
+  // stock can absorb a reversal. If a material has been depleted below the
+  // received qty (sold or used on jobs), refuse — the user must reconcile.
+  const stockToReverse = []; // { materialId, baseUnits, materialName }
+  for (const item of lineItems) {
+    if (item.status !== 'received') continue;
+
+    let conversionFactor = 1;
+    if (item.materialUnitId) {
+      const unit = item.material.alternateUnits.find(u => u.id === item.materialUnitId);
+      if (unit) conversionFactor = parseFloat(unit.factor);
+    }
+    const baseUnits = parseFloat(item.quantityOrdered) * conversionFactor;
+
+    if (baseUnits > 0) {
+      stockToReverse.push({
+        materialId: item.materialId,
+        baseUnits,
+        materialName: item.materialName,
+        currentQuantity: parseFloat(item.material.quantity),
+      });
+    }
+  }
+
+  // Aggregate per material (an order can have multiple lines for the same item)
+  const reverseByMaterial = new Map();
+  for (const r of stockToReverse) {
+    const prev = reverseByMaterial.get(r.materialId) || {
+      baseUnits: 0,
+      materialName: r.materialName,
+      currentQuantity: r.currentQuantity,
+    };
+    prev.baseUnits += r.baseUnits;
+    reverseByMaterial.set(r.materialId, prev);
+  }
+
+  for (const { baseUnits, materialName, currentQuantity } of reverseByMaterial.values()) {
+    if (currentQuantity < baseUnits) {
+      throw new AppError(
+        `Cannot delete order: "${materialName}" stock has been used. Need to reverse ${baseUnits} but only ${currentQuantity} on hand.`,
+        400,
+        'INSUFFICIENT_STOCK'
+      );
+    }
+  }
+
+  const expenseIds = lineItems.map(i => i.expenseId).filter(Boolean);
+
+  await req.db.$transaction(async (tx) => {
+    // 1. Roll back stock for received lines
+    for (const [materialId, { baseUnits }] of reverseByMaterial.entries()) {
+      await tx.material.update({
+        where: { id: materialId },
+        data: { quantity: { decrement: baseUnits } },
+      });
+    }
+
+    // 2. Drop the per-vendor payment rows for the order (multi-vendor flow)
+    if (orderId) {
+      await tx.restockOrderVendor.deleteMany({
+        where: { orderId, businessId: req.user.businessId },
+      });
+    }
+
+    // 3. Delete the reorder rows (must come before expenses — expenseId FK)
+    await tx.materialReorder.deleteMany({
+      where: { orderId, businessId: req.user.businessId },
+    });
+
+    // 4. Delete the system-generated COGS expenses
+    if (expenseIds.length) {
+      await tx.expense.deleteMany({ where: { id: { in: expenseIds } } });
+    }
+
+    await tx.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'DELETE',
+        entity: 'MaterialReorder',
+        businessId: req.user.businessId,
+        description: `Admin deleted restock order ${orderId} (${lineItems.length} item(s)). Stock and expenses reversed.`,
+      },
+    });
+  });
+
+  res.status(200).json({
+    success: true,
+    message: 'Restock order deleted. Stock and expense records reversed.',
+  });
+});
+
 // @desc    Admin: correct quantities/costs on an already-received restock order
 // @route   PUT /api/materials/restock-orders/:orderId/admin-correct
 // @access  Private (Admin only)
@@ -1213,6 +1335,13 @@ export const getMaterialReorders = asyncHandler(async (req, res) => {
 // @desc    Get inventory snapshot — stock levels at a given date
 // @route   GET /api/materials/snapshot?date=YYYY-MM-DD
 // @access  Private
+//
+// All inflow/outflow rows store quantity in the *purchase unit* (e.g. 5 drums),
+// not the material's base unit (e.g. 1000 litres). The Material.quantity column
+// is in base units, so every inflow and outflow has to be multiplied by its
+// MaterialUnit.factor before aggregating, otherwise current vs snapshot will
+// not reconcile. Pending and cancelled reorders never touched stock — they're
+// excluded.
 export const getInventorySnapshot = asyncHandler(async (req, res) => {
   const businessId = req.user.businessId;
   const snapshotDate = req.query.date ? new Date(req.query.date) : (() => {
@@ -1220,67 +1349,69 @@ export const getInventorySnapshot = asyncHandler(async (req, res) => {
     return new Date(d.getFullYear(), d.getMonth(), 1); // First of current month
   })();
 
-  // End of the snapshot day (inclusive)
   const snapshotEnd = new Date(snapshotDate);
   snapshotEnd.setHours(23, 59, 59, 999);
 
-  // All active materials for this business
   const materials = await req.db.material.findMany({
     where: { businessId, isActive: true },
     select: { id: true, name: true, baseUnit: true, quantity: true },
     orderBy: { name: 'asc' },
   });
 
-  // Aggregate all reorders up to snapshot date
-  const reorders = await req.db.materialReorder.groupBy({
-    by: ['materialId'],
+  const toBaseUnits = (qty, unit) =>
+    parseFloat(qty || 0) * (unit ? parseFloat(unit.factor) : 1);
+
+  // Inflows: only received reorders that were received on/before the snapshot
+  // (pending or cancelled rows never hit stock). receivedDate is what actually
+  // moved inventory; reorderDate is just when the order was placed.
+  const reorders = await req.db.materialReorder.findMany({
     where: {
       businessId,
-      reorderDate: { lte: snapshotEnd },
+      status: 'received',
+      receivedDate: { lte: snapshotEnd },
     },
-    _sum: { quantityOrdered: true },
+    select: {
+      materialId: true,
+      quantityOrdered: true,
+      materialUnit: { select: { factor: true } },
+    },
   });
   const reorderMap = {};
   for (const r of reorders) {
-    reorderMap[r.materialId] = parseFloat(r._sum.quantityOrdered || 0);
+    reorderMap[r.materialId] = (reorderMap[r.materialId] || 0)
+      + toBaseUnits(r.quantityOrdered, r.materialUnit);
   }
 
-  // Aggregate all sales outflows up to snapshot date (base units)
-  const sales = await req.db.saleItem.groupBy({
-    by: ['materialId'],
+  // Outflows: counter sales that actually deducted stock
+  const sales = await req.db.saleItem.findMany({
     where: {
       businessId,
       materialId: { not: null },
-      sale: { createdAt: { lte: snapshotEnd } },
+      stockDeducted: true,
+      sale: { saleDate: { lte: snapshotEnd } },
     },
-    _sum: { quantity: true },
+    select: {
+      materialId: true,
+      quantity: true,
+      materialUnit: { select: { factor: true } },
+    },
   });
   const salesMap = {};
   for (const s of sales) {
-    if (s.materialId) salesMap[s.materialId] = parseFloat(s._sum.quantity || 0);
+    if (!s.materialId) continue;
+    salesMap[s.materialId] = (salesMap[s.materialId] || 0)
+      + toBaseUnits(s.quantity, s.materialUnit);
   }
 
-  // Aggregate job material usage up to snapshot date (internal stock only)
-  const jobUsage = await req.db.jobMaterial.groupBy({
-    by: ['materialId'],
-    where: {
-      businessId,
-      materialId: { not: null },
-      isExternal: false,
-      job: { createdAt: { lte: snapshotEnd } },
-    },
-    _sum: { quantity: true },
-  });
-  const jobMap = {};
-  for (const j of jobUsage) {
-    if (j.materialId) jobMap[j.materialId] = parseFloat(j._sum.quantity || 0);
-  }
+  // Job materials are *not* subtracted: the current job pipeline records
+  // materials on jobs without ever deducting them from inventory (see
+  // jobs.controller — no material.update on add). Including them here would
+  // make the snapshot smaller than reality.
 
   const snapshot = materials.map((m) => {
     const totalIn = reorderMap[m.id] || 0;
     const soldOut = salesMap[m.id] || 0;
-    const jobUsed = jobMap[m.id] || 0;
-    const stockAtDate = Math.max(0, totalIn - soldOut - jobUsed);
+    const stockAtDate = Math.max(0, totalIn - soldOut);
     const current = parseFloat(m.quantity);
     return {
       id: m.id,

@@ -17,6 +17,7 @@ import {
   updateRestockOrder,
   adminEditReceivedOrder,
   cancelRestockOrder,
+  deleteRestockOrder,
 } from '../controllers/materials.controller.js';
 import { protect, requirePermission, authorize } from '../middleware/auth.js';
 
@@ -44,6 +45,7 @@ router.post('/restock-orders/:orderId/vendor-payment', requirePermission('materi
 router.put('/restock-orders/:orderId', authorize('admin'), updateRestockOrder);
 router.put('/restock-orders/:orderId/admin-correct', authorize('admin'), adminEditReceivedOrder);
 router.put('/restock-orders/:orderId/cancel', authorize('admin'), cancelRestockOrder);
+router.delete('/restock-orders/:orderId', authorize('admin'), deleteRestockOrder);
 
 // CRUD routes
 router

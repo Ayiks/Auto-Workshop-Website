@@ -1,8 +1,0 @@
-{
-  "permissions": {
-    "allow": [
-      "Bash(find /d/project/Auto-Workshop-Website/frontend -type f \\\\\\(-name *validation* -o -name *schema* \\\\\\))",
-      "Bash(xargs grep:*)"
-    ]
-  }
-}

@@ -1,13 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query'; // Import Query hooks
 import { settingsApi } from '@api/settings'; // Import your settings API
+import { useAuthStore } from '@stores/authStore';
 import Button from '@components/common/Button';
 import UnitFormModal from '@components/features/settings/UnitFormModal'; // Import the new Modal
-import { Upload, X, Image as ImageIcon, Plus, Trash2, RefreshCw } from 'lucide-react';
+import { Upload, X, Image as ImageIcon, Plus, Trash2, RefreshCw, AlertTriangle } from 'lucide-react';
+
+const STOCK_ADJUSTMENT_REASONS = [
+  'Stocktake correction',
+  'Damaged / spoilt goods',
+  'Lost / stolen',
+  'Off-system restock',
+  'Returned to vendor',
+  'Other',
+];
 
 export default function MaterialForm({ material, onSubmit, onCancel, isLoading }) {
   const queryClient = useQueryClient();
   const [isUnitModalOpen, setIsUnitModalOpen] = useState(false);
+  const isAdmin = useAuthStore((s) => s.user?.role === 'admin');
+  // Original quantity locked at mount so we can detect adjustments. We deliberately
+  // don't recompute this from `material` prop changes — that would make typing
+  // the same value as the new "baseline" and silently bypass the reason check.
+  const originalQuantity = useMemo(
+    () => (material?.quantity !== undefined && material?.quantity !== null
+      ? String(material.quantity)
+      : ''),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [material?.id]
+  );
+  const canEditQuantity = !!material && isAdmin;
 
   // 1. Fetch Global Units
   const { data: unitsData, isLoading: unitsLoading } = useQuery({
@@ -25,8 +47,20 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
     sellingPrice: material?.sellingPrice || '',
     lowStockThreshold: material?.lowStockThreshold || 3,
     // Store the ID of the unit now, not just the string name
-    materialUnitId: material?.materialUnitId || material?.materialUnit?.id || '', 
+    materialUnitId: material?.materialUnitId || material?.materialUnit?.id || '',
+    quantityChangeReason: '',
+    quantityChangeNotes: '',
   });
+
+  // True when the admin has typed a different value into the quantity field
+  // (compared to what the material had when this form opened).
+  const hasQuantityChanged = useMemo(() => {
+    if (!material) return false;
+    const original = parseFloat(originalQuantity || 0);
+    const current = parseFloat(formData.quantity);
+    if (Number.isNaN(current)) return false;
+    return Math.abs(current - original) > 0.001;
+  }, [material, originalQuantity, formData.quantity]);
 
   // State for handling Alternate Units
   const [alternateUnits, setAlternateUnits] = useState(
@@ -38,6 +72,26 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
       price: parseFloat(u.price)
     })) || []
   );
+
+  // Backfill missing unitId by matching the saved name against the global units
+  // list. Historical rows (saved before the backend started persisting unitId
+  // on updates) have unitId=null, which would leave the dropdown showing
+  // "Select Unit..." even though the data exists. Runs once after globalUnits
+  // loads; only patches rows where unitId is empty so we don't clobber edits.
+  const [unitsBackfilled, setUnitsBackfilled] = useState(false);
+  useEffect(() => {
+    if (unitsBackfilled) return;
+    if (!globalUnits.length) return;
+    setAlternateUnits(prev => {
+      const patched = prev.map(u => {
+        if (u.unitId) return u;
+        const match = globalUnits.find(gu => gu.name === u.name);
+        return match ? { ...u, unitId: match.id } : u;
+      });
+      return patched;
+    });
+    setUnitsBackfilled(true);
+  }, [globalUnits, unitsBackfilled]);
 
   const [selectedFile, setSelectedFile] = useState(null);
   const [imagePreview, setImagePreview] = useState(material?.imageUrl || null);
@@ -107,7 +161,18 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
     // if (!formData.materialUnitId) newErrors.materialUnitId = 'Base unit is required';
     if (formData.unitCost <= 0) newErrors.unitCost = 'Unit cost must be > 0';
     if (formData.sellingPrice <= 0) newErrors.sellingPrice = 'Selling price must be > 0';
-    
+
+    // Stock adjustment validation — only when the admin actually changed the qty.
+    if (hasQuantityChanged) {
+      const newQty = parseFloat(formData.quantity);
+      if (Number.isNaN(newQty) || newQty < 0) {
+        newErrors.quantity = 'Quantity must be a non-negative number';
+      }
+      if (!formData.quantityChangeReason || !formData.quantityChangeReason.trim()) {
+        newErrors.quantityChangeReason = 'A reason is required when adjusting stock';
+      }
+    }
+
     // Validate Units
     if (alternateUnits.length > 0) {
       alternateUnits.forEach((unit, idx) => {
@@ -123,32 +188,59 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (validate()) {
+    if (!validate()) return;
 
-      // 1. Look up the base unit name
-      const selectedBaseUnit = globalUnits.find(u => u.id.toString() === formData.materialUnitId.toString());
+    // Stock adjustment is a delicate, audited write — confirm before submitting.
+    if (hasQuantityChanged) {
+      const oldQty = parseFloat(originalQuantity || 0);
+      const newQty = parseFloat(formData.quantity);
+      const delta = newQty - oldQty;
+      const sign = delta >= 0 ? '+' : '';
+      const ok = window.confirm(
+        `Confirm manual stock adjustment for "${formData.name}":\n\n` +
+        `  ${oldQty} → ${newQty}  (Δ ${sign}${delta.toFixed(2)})\n` +
+        `  Reason: ${formData.quantityChangeReason}\n\n` +
+        `This will be recorded in the audit log and affect inventory reports.`
+      );
+      if (!ok) return;
+    }
 
-      // 2. prepare alternate unit with names
-      const formattedAlternateUnits = alternateUnits.map(u => {
-        // find object and get its name
-        const unitObj = globalUnits.find(gu => gu.id.toString() === u.unitId.toString());
-        return {
+    // 1. Look up the base unit name
+    const selectedBaseUnit = globalUnits.find(u => u.id.toString() === formData.materialUnitId.toString());
+
+    // 2. prepare alternate unit with names
+    const formattedAlternateUnits = alternateUnits.map(u => {
+      // find object and get its name
+      const unitObj = globalUnits.find(gu => gu.id.toString() === u.unitId.toString());
+      return {
         ...u,
         name: unitObj ? unitObj.name : 'Unknown', // Send the name!
         unitId: parseInt(u.unitId), // Ensure ID is a number
         factor: parseFloat(u.factor),
         price: parseFloat(u.price)
       };
-      });
-      onSubmit({
-      ...formData,
+    });
+
+    // Strip the stock-adjustment fields when the quantity didn't change so the
+    // backend doesn't see an empty reason and reject, and so the audit log
+    // doesn't get a noise entry.
+    const { quantityChangeReason, quantityChangeNotes, ...rest } = formData;
+    const payload = {
+      ...rest,
       baseUnit: selectedBaseUnit ? selectedBaseUnit.name : 'Piece', // Send "KG", not "Piece"
       materialUnitId: parseInt(formData.materialUnitId),
       alternateUnits: formattedAlternateUnits,
       imageFile: selectedFile,
-      hasImage: !!imagePreview 
-    });
+      hasImage: !!imagePreview,
+    };
+    if (hasQuantityChanged) {
+      payload.quantityChangeReason = quantityChangeReason.trim();
+      if (quantityChangeNotes && quantityChangeNotes.trim()) {
+        payload.quantityChangeNotes = quantityChangeNotes.trim();
+      }
     }
+
+    onSubmit(payload);
   };
 
   return (
@@ -205,16 +297,22 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
                 name="quantity"
                 value={formData.quantity}
                 onChange={handleChange}
-                className="w-full px-3 sm:px-4 py-2 sm:py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed"
-                disabled={isLoading || material}
+                className={`w-full px-3 sm:px-4 py-2 sm:py-3 border rounded-lg focus:ring-2 focus:ring-blue-500 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-400 disabled:cursor-not-allowed ${errors.quantity ? 'border-red-500' : 'border-gray-300'}`}
+                disabled={isLoading || (material && !canEditQuantity)}
               />
               <span className="absolute right-3 sm:right-4 top-2.5 sm:top-3 text-gray-500 text-[10px] sm:text-xs font-medium uppercase pointer-events-none">
                  {getBaseUnitSymbol()}
               </span>
             </div>
-            {material && (
+            {errors.quantity && <p className="text-[10px] sm:text-xs text-red-600 mt-1">{errors.quantity}</p>}
+            {material && !canEditQuantity && (
               <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
-                Stock quantity is updated through restock orders.
+                Stock quantity is updated through restock orders. Only admins can adjust it manually.
+              </p>
+            )}
+            {material && canEditQuantity && !hasQuantityChanged && (
+              <p className="text-[10px] sm:text-xs text-gray-400 mt-1">
+                Normal supply should go through restock orders. Edit this only for stocktake corrections, damage, etc.
               </p>
             )}
           </div>
@@ -261,6 +359,60 @@ export default function MaterialForm({ material, onSubmit, onCancel, isLoading }
             </div>
           </div>
         </div>
+
+        {/* --- STOCK ADJUSTMENT REASON (only when qty was changed) --- */}
+        {hasQuantityChanged && (
+          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 sm:p-4">
+            <div className="flex items-start gap-2 sm:gap-3 mb-3">
+              <AlertTriangle className="w-4 sm:w-5 h-4 sm:h-5 text-amber-600 shrink-0 mt-0.5" />
+              <div>
+                <h4 className="text-xs sm:text-sm font-bold text-amber-900">Manual stock adjustment</h4>
+                <p className="text-[10px] sm:text-xs text-amber-800 mt-0.5">
+                  Changing from <strong>{originalQuantity || 0}</strong> to <strong>{formData.quantity || 0}</strong>.
+                  This bypasses the restock flow, will be recorded against your account in the audit log, and affects inventory reports.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-3">
+              <div>
+                <label className="block text-[10px] sm:text-xs font-bold uppercase text-amber-900 mb-1">
+                  Reason <span className="text-red-600">*</span>
+                </label>
+                <select
+                  name="quantityChangeReason"
+                  value={formData.quantityChangeReason}
+                  onChange={handleChange}
+                  className={`w-full px-3 py-2 border rounded-lg text-xs sm:text-sm bg-white focus:ring-2 focus:ring-amber-500 ${errors.quantityChangeReason ? 'border-red-500' : 'border-amber-300'}`}
+                  disabled={isLoading}
+                >
+                  <option value="">-- Select a reason --</option>
+                  {STOCK_ADJUSTMENT_REASONS.map(r => (
+                    <option key={r} value={r}>{r}</option>
+                  ))}
+                </select>
+                {errors.quantityChangeReason && (
+                  <p className="text-[10px] sm:text-xs text-red-600 mt-1">{errors.quantityChangeReason}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[10px] sm:text-xs font-bold uppercase text-amber-900 mb-1">
+                  Notes (optional)
+                </label>
+                <textarea
+                  name="quantityChangeNotes"
+                  value={formData.quantityChangeNotes}
+                  onChange={handleChange}
+                  rows={2}
+                  placeholder="Extra context for the audit trail (e.g. stocktake date, incident reference)"
+                  className="w-full px-3 py-2 border border-amber-300 rounded-lg text-xs sm:text-sm bg-white focus:ring-2 focus:ring-amber-500"
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* --- UNIT CONFIGURATION SECTION --- */}
         <div className="border-t border-gray-200 pt-4 sm:pt-6">

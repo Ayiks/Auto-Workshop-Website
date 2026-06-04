@@ -415,7 +415,8 @@ export default function SaleForm({ onCancel, isLoading }) {
   // --- SUBMIT ---
   const handleFinalSubmit = (asDraft = false) => {
     if (saleType === "counter" && items.length === 0) { toast.error("Cart is empty"); return; }
-    
+    if (saleDate > today) { toast.error("Sales date cannot be in the future"); return; }
+
     const now = new Date();
     const formattedDateTime = new Date(`${saleDate}T${format(now, "HH:mm:ss")}`).toISOString();
 
@@ -711,7 +712,21 @@ export default function SaleForm({ onCancel, isLoading }) {
                     <div className="space-y-2">
                         <label className="text-sm font-bold text-gray-900">Sales date</label>
                         <div className="relative">
-                            <input type="date" value={saleDate} onChange={(e) => { setSaleDate(e.target.value); setDeductStock(false); }} className="w-full p-3 bg-gray-100 border-none rounded text-sm font-medium focus:ring-2 focus:ring-black" />
+                            <input
+                                type="date"
+                                value={saleDate}
+                                max={today}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    if (value > today) {
+                                        toast.error("Sales date cannot be in the future");
+                                        return;
+                                    }
+                                    setSaleDate(value);
+                                    setDeductStock(false);
+                                }}
+                                className="w-full p-3 bg-gray-100 border-none rounded text-sm font-medium focus:ring-2 focus:ring-black"
+                            />
                             <Calendar className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 w-4 h-4 pointer-events-none" />
                         </div>
                         {saleDate !== today && saleType === 'counter' && (

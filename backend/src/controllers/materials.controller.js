@@ -193,6 +193,8 @@ export const updateMaterial = asyncHandler(async (req, res) => {
     imageUrl,
     baseUnit,
     alternateUnits,
+    quantityChangeReason,
+    quantityChangeNotes,
   } = req.body;
 
   const material = await req.db.material.findUnique({
@@ -211,6 +213,51 @@ export const updateMaterial = asyncHandler(async (req, res) => {
 
   if (sellingPrice !== undefined && sellingPrice <= 0) {
     throw new AppError('Selling price must be greater than 0', 400, 'VALIDATION_ERROR');
+  }
+
+  // --- Stock adjustment gate ---
+  // Direct edits to Material.quantity bypass the reorder/sale flow, so we need
+  // admin-only access, a non-empty reason, and a dedicated audit entry. The
+  // inventory snapshot reconciles received reorders vs deducted sales — an
+  // unaudited delta here will look like a phantom inflow/outflow forever.
+  let stockAdjustment = null;
+  if (quantity !== undefined) {
+    const newQty = parseFloat(quantity);
+    const oldQty = parseFloat(material.quantity);
+
+    if (Number.isNaN(newQty)) {
+      throw new AppError('Quantity must be a number', 400, 'VALIDATION_ERROR');
+    }
+    if (newQty < 0) {
+      throw new AppError('Quantity cannot be negative', 400, 'VALIDATION_ERROR');
+    }
+
+    // Only enforce admin + reason when the value actually changes. Round-trips
+    // from the edit form that resend the same value are a no-op.
+    if (Math.abs(newQty - oldQty) > 0.001) {
+      if (req.user.role !== 'admin') {
+        throw new AppError(
+          'Only admins can adjust stock quantity directly. Use restock orders for normal supply.',
+          403,
+          'PERMISSION_DENIED'
+        );
+      }
+      const reason = typeof quantityChangeReason === 'string' ? quantityChangeReason.trim() : '';
+      if (!reason) {
+        throw new AppError(
+          'A reason is required when adjusting stock quantity',
+          400,
+          'VALIDATION_ERROR'
+        );
+      }
+      stockAdjustment = {
+        oldQty,
+        newQty,
+        delta: newQty - oldQty,
+        reason,
+        notes: typeof quantityChangeNotes === 'string' ? quantityChangeNotes.trim() : '',
+      };
+    }
   }
 
   // Check for duplicate name (if name is being changed)
@@ -243,17 +290,23 @@ export const updateMaterial = asyncHandler(async (req, res) => {
   if (quantity !== undefined) updateData.quantity = parseFloat(quantity);
   if (imageUrl !== undefined) updateData.imageUrl = imageUrl;
 // Status Toggle Logic
+  let reactivationResetWins = false;
   if (isActive !== undefined) {
     const newStatus = Boolean(isActive);
-    
+
     // Check if we are transitioning from INACTIVE (false) to ACTIVE (true)
     if (newStatus === true && material.isActive === false) {
       updateData.quantity = 0; // FORCE reset to 0 on reactivation
       updateData.isActive = true;
+      // If the caller also tried to set quantity, the reactivation reset wins.
+      // Skip the stock-adjustment audit so we don't claim an adjustment that
+      // never actually applied.
+      reactivationResetWins = true;
     } else {
       updateData.isActive = newStatus;
     }
   }
+  if (reactivationResetWins) stockAdjustment = null;
   // --- UNIT SYNCHRONIZATION LOGIC ---
   // We use a transaction to ensure units and material details are updated safely
   const result = await req.db.$transaction(async (tx) => {
@@ -283,6 +336,14 @@ export const updateMaterial = asyncHandler(async (req, res) => {
 
       // B. Upsert (Update existing / Create new)
       for (const unit of alternateUnits) {
+        // Persist the global-unit FK on both branches. Without this, alt units
+        // added via the edit modal were saving with unitId=null, so the
+        // dropdown couldn't pre-select on the next edit. Changes to the unit
+        // selection on existing rows were also being silently dropped.
+        const unitIdValue = unit.unitId !== undefined && unit.unitId !== null && unit.unitId !== ''
+          ? parseInt(unit.unitId)
+          : null;
+
         if (unit.id) {
           // Update existing
           await tx.materialUnit.update({
@@ -290,7 +351,8 @@ export const updateMaterial = asyncHandler(async (req, res) => {
             data: {
               name: unit.name,
               factor: parseFloat(unit.factor),
-              price: parseFloat(unit.price)
+              price: parseFloat(unit.price),
+              unitId: unitIdValue,
             }
           });
         } else {
@@ -300,7 +362,8 @@ export const updateMaterial = asyncHandler(async (req, res) => {
               materialId: parseInt(id),
               name: unit.name,
               factor: parseFloat(unit.factor),
-              price: parseFloat(unit.price)
+              price: parseFloat(unit.price),
+              unitId: unitIdValue,
             }
           });
         }
@@ -324,6 +387,22 @@ export const updateMaterial = asyncHandler(async (req, res) => {
       description: `Updated material: ${result.name}`,
     },
   });
+
+  // Dedicated audit row for manual stock adjustments so variances in the
+  // inventory snapshot can be traced back to a who/when/why.
+  if (stockAdjustment) {
+    const sign = stockAdjustment.delta >= 0 ? '+' : '';
+    const notesPart = stockAdjustment.notes ? `. Notes: ${stockAdjustment.notes}` : '';
+    await req.db.auditLog.create({
+      data: {
+        userId: req.user.id,
+        action: 'STOCK_ADJUSTMENT',
+        entity: 'Material',
+        entityId: result.id,
+        description: `Manual stock adjustment for ${result.name}: ${stockAdjustment.oldQty} → ${stockAdjustment.newQty} (Δ ${sign}${stockAdjustment.delta}). Reason: ${stockAdjustment.reason}${notesPart}`,
+      },
+    });
+  }
 
   // Fetch fresh data including units to return
   const finalMaterial = await req.db.material.findUnique({

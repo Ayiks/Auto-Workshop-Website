@@ -319,7 +319,7 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
     } else if (!isValidPhone(formData.clientPhone)) {
       newErrors.clientPhone = 'Please enter a valid phone number';
     }
-    if (!formData.problemType.trim()) newErrors.problemType = 'Problem type is required';
+    if (!formData.problemType.trim()) newErrors.problemType = 'Issue summary is required';
 
     if (formData.vehicleYear) {
       const y = parseInt(formData.vehicleYear, 10);
@@ -352,31 +352,44 @@ export default function JobForm({ job, onSubmit, onCancel, isLoading }) {
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return newErrors;
   };
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (validate()) {
-      onSubmit({
-        ...formData,
-        vehicleYear: formData.vehicleYear ? parseInt(formData.vehicleYear, 10) : undefined,
-        labourCost: parseFloat(formData.labourCost),
-        miscellaneousCost: parseFloat(formData.miscellaneousCost || 0),
-        materials: materials.map((m) => ({
-          materialId: m.isExternal ? undefined : parseInt(m.materialId),
-          materialName: m.materialName,
-          quantity: parseFloat(m.quantity),
-          unitPrice: parseFloat(m.unitPrice),
-          isExternal: m.isExternal,
-        })),
-        beforePhotos,
-        reminderEnabled,
-        reminderIntervalMonths: reminderEnabled ? reminderIntervalMonths : undefined,
-        reminderTypes: reminderEnabled ? reminderTypes : [],
-        reminderChannels: reminderEnabled ? reminderChannels : [],
-      });
+    const validationErrors = validate();
+
+    if (Object.keys(validationErrors).length > 0) {
+      // The submit button lives in the sticky sidebar, so inline field errors are
+      // easy to miss. Surface the first problem and jump to the offending field.
+      const firstKey = Object.keys(validationErrors)[0];
+      toast.error(validationErrors[firstKey] || 'Please fill in all required fields');
+      const el = document.querySelector(`[name="${firstKey}"]`);
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        el.focus?.({ preventScroll: true });
+      }
+      return;
     }
+
+    onSubmit({
+      ...formData,
+      vehicleYear: formData.vehicleYear ? parseInt(formData.vehicleYear, 10) : undefined,
+      labourCost: parseFloat(formData.labourCost),
+      miscellaneousCost: parseFloat(formData.miscellaneousCost || 0),
+      materials: materials.map((m) => ({
+        materialId: m.isExternal ? undefined : parseInt(m.materialId),
+        materialName: m.materialName,
+        quantity: parseFloat(m.quantity),
+        unitPrice: parseFloat(m.unitPrice),
+        isExternal: m.isExternal,
+      })),
+      beforePhotos,
+      reminderEnabled,
+      reminderIntervalMonths: reminderEnabled ? reminderIntervalMonths : undefined,
+      reminderTypes: reminderEnabled ? reminderTypes : [],
+      reminderChannels: reminderEnabled ? reminderChannels : [],
+    });
   };
 
   const inputClass = (hasError) => `w-full px-2 sm:px-3 py-1.5 sm:py-2 bg-white border rounded-lg text-xs sm:text-sm transition-shadow focus:outline-none focus:ring-1 focus:ring-black focus:border-black ${

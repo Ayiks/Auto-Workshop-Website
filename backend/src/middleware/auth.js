@@ -93,6 +93,28 @@ export const authorize = (...roles) => {
 };
 
 // ==========================================================================
+// ACTION ALIASES
+// The permission catalog (frontend) is the source of truth and uses 'update'.
+// Historically many routes/controllers ask for 'edit'. Treat them as the same
+// action so a granted permission works regardless of which spelling is used.
+// Comparison is canonical in BOTH directions: a route asking for 'edit' is
+// satisfied by an 'update' grant, and vice versa.
+// ==========================================================================
+const ACTION_ALIASES = {
+  edit: 'update',
+  editOwn: 'updateOwn',
+};
+
+const canonicalAction = (action) => ACTION_ALIASES[action] || action;
+
+// True if the granted permission list satisfies the requested action.
+const grantsAction = (grantedActions, action) => {
+  if (grantedActions.includes('*')) return true;
+  const wanted = canonicalAction(action);
+  return grantedActions.some((granted) => canonicalAction(granted) === wanted);
+};
+
+// ==========================================================================
 // 3. GRANULAR PERMISSIONS (The one you need)
 // Checks if user has specific permission OR is Admin
 // ==========================================================================
@@ -113,8 +135,8 @@ export const requirePermission = (resource, action) => {
     const userPermissions = req.user.permissions || {};
     const resourcePermissions = userPermissions[resource] || [];
 
-    // We check if the array includes the action OR if they have a wildcard '*'
-    if (resourcePermissions.includes(action) || resourcePermissions.includes('*')) {
+    // We check if the array includes the action (or an alias) OR a wildcard '*'
+    if (grantsAction(resourcePermissions, action)) {
       return next();
     }
 
@@ -146,13 +168,13 @@ export const canAccessResource = (resource, action) => {
     const resourcePermissions = userPermissions[resource] || [];
 
     // 1. Check for Full Permission (e.g. "view")
-    if (resourcePermissions.includes(action) || resourcePermissions.includes('*')) {
+    if (grantsAction(resourcePermissions, action)) {
       return next();
     }
 
     // 2. Check for "Own" Permission (e.g. "viewOwn")
     const ownAction = `${action}Own`;
-    if (resourcePermissions.includes(ownAction)) {
+    if (grantsAction(resourcePermissions, ownAction)) {
       req.isOwnResource = true; // Controller must use this flag to filter DB query
       return next();
     }
@@ -181,11 +203,14 @@ export const requireJobTypeAccess = (req, res, next) => {
 
   const allowedJobType = roleToJobType[req.user.role];
 
-  if (!allowedJobType) {
-    throw new AppError('Role not authorized for jobs', 403, 'PERMISSION_DENIED');
+  // Worker roles (mechanic/sprayer/bodyworks) are scoped to their own job type.
+  // Other roles (e.g. salesperson) are NOT job-type restricted — actual access
+  // is governed by canAccessResource('jobs', ...) on the route. Leaving
+  // allowedJobType unset means no jobType filtering (same as admin).
+  if (allowedJobType) {
+    req.allowedJobType = allowedJobType;
   }
 
-  req.allowedJobType = allowedJobType;
   next();
 };
 
@@ -212,5 +237,5 @@ export const hasPermission = (user, module, action) => {
   const userPermissions = user.permissions || {};
   const modulePermissions = userPermissions[module] || [];
 
-  return modulePermissions.includes(action);
+  return grantsAction(modulePermissions, action);
 };

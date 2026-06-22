@@ -15,9 +15,11 @@ const router = express.Router();
 router.use(protect);
 
 // == Read Routes ==
-// All authenticated staff can look up customers (mechanics need this for job cards)
-router.get('/', getCustomers);
-router.get('/:id', getCustomer);
+// Requires customers.view. Note: the permissions UI auto-grants customers.view
+// as a dependency of jobs.create / sales.create, so staff who create job cards
+// or sales still get customer lookup automatically.
+router.get('/', requirePermission('customers', 'view'), getCustomers);
+router.get('/:id', requirePermission('customers', 'view'), getCustomer);
 
 // == Write Routes ==
 // was authorize('admin', 'customer', 'create') which is wrong usage

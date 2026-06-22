@@ -41,10 +41,10 @@ router.get(
   getExpenseReport
 );
 
-// Profit & Loss statement (advanced permission)
+// Profit & Loss statement
 router.get(
   '/profit-loss',
-  requirePermission('reports', 'viewAdvanced'),
+  requirePermission('reports', 'view'),
   getProfitLoss
 );
 

@@ -17,23 +17,23 @@ const router = express.Router();
 router.use(protect);
 
 // Special routes (before /:id to avoid conflict)
-router.get('/stats', getInvoiceStats);
-router.get('/outstanding', getOutstandingInvoices);
-router.get('/number/:invoiceNumber', getInvoiceByNumber);
+router.get('/stats', requirePermission('invoices', 'view'), getInvoiceStats);
+router.get('/outstanding', requirePermission('invoices', 'view'), getOutstandingInvoices);
+router.get('/number/:invoiceNumber', requirePermission('invoices', 'view'), getInvoiceByNumber);
 
 // CRUD routes
 router
   .route('/')
-  .get(getInvoices)
-  .post(generateInvoice);
+  .get(requirePermission('invoices', 'view'), getInvoices)
+  .post(requirePermission('invoices', 'create'), generateInvoice);
 
 router
   .route('/:id')
-  .get(getInvoice)
+  .get(requirePermission('invoices', 'view'), getInvoice)
   .put(authorize('admin'), updateInvoice);
 
 router
   .route('/:id/void')
-  .post(requirePermission('void_invoices'), authorize('admin'), voidInvoice);
+  .post(authorize('admin'), voidInvoice);
 
 export default router;

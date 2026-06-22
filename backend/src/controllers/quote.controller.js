@@ -247,13 +247,35 @@ export const convertToJob = asyncHandler(async (req, res) => {
         data: {
           jobId: job.id,
           businessId: req.user.businessId,
-          name: item.materialName,
+          materialName: item.materialName,
           quantity: item.quantity,
           unitPrice: item.unitPrice,
           subtotal: item.subtotal,
           isExternal: item.isExternal,
         },
       });
+    }
+
+    // 2.5 Ensure the client exists in the customer table (deduped by phone) and
+    //     link it to the job. Phone is the unique identity per business
+    //     (@@unique([phone, businessId])). Mirrors createJob behaviour.
+    const phone = quote.clientPhone?.trim();
+    if (phone) {
+      const name = (quote.clientName || '').trim();
+      const customer = await tx.customer.upsert({
+        where: { phone_businessId: { phone, businessId: req.user.businessId } },
+        update: {
+          ...(quote.clientEmail?.trim() && { email: quote.clientEmail.trim() }),
+        },
+        create: {
+          firstName: name.split(' ')[0] || 'Customer',
+          lastName: name.split(' ').slice(1).join(' ') || null,
+          phone,
+          email: quote.clientEmail?.trim() || null,
+          businessId: req.user.businessId,
+        },
+      });
+      await tx.job.update({ where: { id: job.id }, data: { customerId: customer.id } });
     }
 
     // 3. Link the quote to the new job

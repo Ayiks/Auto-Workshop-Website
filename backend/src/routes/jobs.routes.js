@@ -35,7 +35,7 @@ router
 router.put(
   '/:id/complete',
   requireJobTypeAccess,
-  canAccessResource('jobs', 'edit'),
+  canAccessResource('jobs', 'complete'),
   completeJob
 );
 

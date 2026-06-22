@@ -108,7 +108,7 @@ export default function Jobs() {
         toast.success('Job created successfully');
       }
     },
-    onError: (e) => toast.error(e.response?.data?.error || 'Failed to create job'),
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to create job'),
   });
 
   const updateMutation = useMutation({
@@ -119,7 +119,7 @@ export default function Jobs() {
       setSelectedJob(null);
       toast.success('Job updated successfully');
     },
-    onError: (e) => toast.error(e.response?.data?.error || 'Failed to update job'),
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to update job'),
   });
 
   const deleteMutation = useMutation({
@@ -131,7 +131,7 @@ export default function Jobs() {
       setSelectedJob(null);
       toast.success('Job deleted');
     },
-    onError: (e) => toast.error(e.response?.data?.error || 'Failed to delete job'),
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to delete job'),
   });
 
   const updateStatusMutation = useMutation({
@@ -141,7 +141,7 @@ export default function Jobs() {
       queryClient.invalidateQueries(['jobs-stats']);
       toast.success('Status updated');
     },
-    onError: (e) => toast.error(e.response?.data?.error || 'Failed to update status'),
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to update status'),
   });
 
   const completeMutation = useMutation({
@@ -151,7 +151,7 @@ export default function Jobs() {
       queryClient.invalidateQueries(['jobs-stats']);
       toast.success('Job marked as complete');
     },
-    onError: (e) => toast.error(e.response?.data?.error || 'Failed to complete job'),
+    onError: (e) => toast.error(e.response?.data?.error?.message || 'Failed to complete job'),
   });
 
   // Filters

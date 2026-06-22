@@ -1,5 +1,22 @@
 import { AppError, asyncHandler } from '../middleware/errorHandler.js';
 
+// Prisma `select` fragment for the linked customer, used to resolve the
+// canonical client name on invoices.
+const CUSTOMER_NAME_SELECT = { firstName: true, lastName: true };
+
+// Build a customer's full name from first/last.
+const customerFullName = (customer) =>
+  [customer?.firstName, customer?.lastName].filter(Boolean).join(' ').trim();
+
+// Overwrite job.clientName with the linked customer's canonical name (the
+// customer table, deduped by phone, is the source of truth). Falls back to the
+// job's stored free-text name when no customer is linked. Mutates and returns.
+const applyCanonicalClientName = (invoice) => {
+  const name = customerFullName(invoice?.job?.customer);
+  if (name && invoice.job) invoice.job.clientName = name;
+  return invoice;
+};
+
 // Helper function to generate invoice number
 const generateInvoiceNumber = async (db) => {
   const prefix = 'INV';
@@ -95,6 +112,32 @@ export const generateInvoice = asyncHandler(async (req, res) => {
 
   // Create invoice in transaction
   const result = await req.db.$transaction(async (tx) => {
+    // 0. Ensure the client exists in the customer table (deduped by phone).
+    //    Phone is the unique identity per business (@@unique([phone, businessId])).
+    //    This is a catch-all for jobs created via paths that didn't upsert a
+    //    customer (e.g. quote conversion), so every invoiced client is on record.
+    const phone = job.clientPhone?.trim();
+    if (phone) {
+      const name = (job.clientName || '').trim();
+      const customer = await tx.customer.upsert({
+        where: { phone_businessId: { phone, businessId: req.user.businessId } },
+        update: {
+          ...(job.clientEmail?.trim() && { email: job.clientEmail.trim() }),
+        },
+        create: {
+          firstName: name.split(' ')[0] || 'Customer',
+          lastName: name.split(' ').slice(1).join(' ') || null,
+          phone,
+          email: job.clientEmail?.trim() || null,
+          businessId: req.user.businessId,
+        },
+      });
+      // Link the customer to the job if not already linked
+      if (!job.customerId) {
+        await tx.job.update({ where: { id: job.id }, data: { customerId: customer.id } });
+      }
+    }
+
     // 1. Generate invoice number
     const invoiceNumber = await generateInvoiceNumber(tx);
 
@@ -197,6 +240,7 @@ export const getInvoices = asyncHandler(async (req, res) => {
           vehicleMake: true,
           vehicleModel: true,
           assignedTo: true,
+          customer: { select: CUSTOMER_NAME_SELECT },
           user: {
             select: {
               fullName: true,
@@ -220,7 +264,7 @@ export const getInvoices = asyncHandler(async (req, res) => {
   res.status(200).json({
     success: true,
     count: invoices.length,
-    data: invoices,
+    data: invoices.map(applyCanonicalClientName),
   });
 });
 
@@ -244,6 +288,7 @@ export const getInvoice = asyncHandler(async (req, res) => {
               },
             },
           },
+          customer: { select: CUSTOMER_NAME_SELECT },
           user: {
             select: {
               id: true,
@@ -280,6 +325,8 @@ export const getInvoice = asyncHandler(async (req, res) => {
     throw new AppError('Invoice not found', 404, 'NOT_FOUND');
   }
 
+  applyCanonicalClientName(invoice);
+
   const businessSettings = await req.db.businessSettings.findFirst({
     select: { name: true, logo: true, address: true, phone: true, email: true },
   });
@@ -302,6 +349,7 @@ export const getInvoiceByNumber = asyncHandler(async (req, res) => {
       job: {
         include: {
           materials: true,
+          customer: { select: CUSTOMER_NAME_SELECT },
           user: {
             select: {
               fullName: true,
@@ -330,7 +378,7 @@ export const getInvoiceByNumber = asyncHandler(async (req, res) => {
 
   res.status(200).json({
     success: true,
-    data: invoice,
+    data: applyCanonicalClientName(invoice),
   });
 });
 
@@ -352,6 +400,7 @@ export const getOutstandingInvoices = asyncHandler(async (req, res) => {
           clientName: true,
           clientPhone: true,
           vehicleRegNumber: true,
+          customer: { select: CUSTOMER_NAME_SELECT },
           user: {
             select: {
               fullName: true,
@@ -381,7 +430,7 @@ export const getOutstandingInvoices = asyncHandler(async (req, res) => {
     success: true,
     count: invoices.length,
     totalOutstanding,
-    data: invoices,
+    data: invoices.map(applyCanonicalClientName),
   });
 });
 
@@ -484,6 +533,7 @@ export const getInvoiceStats = asyncHandler(async (req, res) => {
           select: {
             clientName: true,
             jobType: true,
+            customer: { select: CUSTOMER_NAME_SELECT },
           },
         },
       },
@@ -500,7 +550,7 @@ export const getInvoiceStats = asyncHandler(async (req, res) => {
       totalPaid: totalInvoices._sum.amountPaid || 0,
       totalOutstanding: totalInvoices._sum.amountDue || 0,
       invoicesByStatus,
-      recentInvoices,
+      recentInvoices: recentInvoices.map(applyCanonicalClientName),
     },
   });
 });

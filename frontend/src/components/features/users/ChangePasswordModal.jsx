@@ -24,7 +24,7 @@ export default function ChangePasswordModal({ isOpen, onClose, user }) {
       setFormData({ newPassword: '', confirmPassword: '' });
       toast.success('Password changed successfully');
     },
-    onError: (error) => toast.error(error.response?.data?.error || 'Failed to change password'),
+    onError: (error) => toast.error(error.response?.data?.error?.message || 'Failed to change password'),
   });
 
   const handleChange = (e) => {

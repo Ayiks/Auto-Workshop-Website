@@ -48,7 +48,7 @@ export default function RecordPaymentModal({ isOpen, onClose, invoice }) {
       onClose();
       toast.success('Payment recorded successfully');
     },
-    onError: (error) => toast.error(error.response?.data?.error || 'Failed to record payment'),
+    onError: (error) => toast.error(error.response?.data?.error?.message || 'Failed to record payment'),
   });
 
   const handleChange = (e) => {

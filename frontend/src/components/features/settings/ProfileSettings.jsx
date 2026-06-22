@@ -76,7 +76,7 @@ export default function ProfileSettings() {
       setShowPasswordSection(false);
       toast.success('Password changed successfully');
     },
-    onError: (error) => toast.error(error.response?.data?.error || 'Failed to change password'),
+    onError: (error) => toast.error(error.response?.data?.error?.message || 'Failed to change password'),
   });
 
   const handleProfileChange = (e) => {

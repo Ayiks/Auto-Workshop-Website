@@ -106,7 +106,7 @@ export default function Invoices() {
       setShowGenerateModal(false);
       toast.success('Invoice generated successfully');
     },
-    onError: (error) => toast.error(error.response?.data?.error || 'Failed to generate invoice'),
+    onError: (error) => toast.error(error.response?.data?.error?.message || 'Failed to generate invoice'),
   });
 
   // Filter job invoices by search term

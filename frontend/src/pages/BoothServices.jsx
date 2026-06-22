@@ -46,7 +46,7 @@ export default function BoothServices() {
       setShowCreateModal(false);
       toast.success('Booth service created');
     },
-    onError: (error) => toast.error(error.response?.data?.error || 'Failed to create booth service'),
+    onError: (error) => toast.error(error.response?.data?.error?.message || 'Failed to create booth service'),
   });
 
   const updateMutation = useMutation({
@@ -57,7 +57,7 @@ export default function BoothServices() {
       setSelectedService(null);
       toast.success('Booth service updated');
     },
-    onError: (error) => toast.error(error.response?.data?.error || 'Failed to update booth service'),
+    onError: (error) => toast.error(error.response?.data?.error?.message || 'Failed to update booth service'),
   });
 
   const deleteMutation = useMutation({
@@ -67,7 +67,7 @@ export default function BoothServices() {
       queryClient.invalidateQueries(['booth-service-stats']);
       toast.success('Booth service deleted');
     },
-    onError: (error) => toast.error(error.response?.data?.error || 'Failed to delete booth service'),
+    onError: (error) => toast.error(error.response?.data?.error?.message || 'Failed to delete booth service'),
   });
 
   const toggleMutation = useMutation({
@@ -76,7 +76,7 @@ export default function BoothServices() {
       queryClient.invalidateQueries(['booth-services']);
       queryClient.invalidateQueries(['booth-service-stats']);
     },
-    onError: (error) => toast.error(error.response?.data?.error || 'Failed to update booth service status'),
+    onError: (error) => toast.error(error.response?.data?.error?.message || 'Failed to update booth service status'),
   });
 
   const filteredServices = services.filter((service) => {

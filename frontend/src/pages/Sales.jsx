@@ -117,7 +117,7 @@ export default function Sales() {
       setSelectedReceipt(response.data.receipt);
       setShowReceiptModal(true);
     },
-    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.error || "Failed to create sale"),
+    onError: (error) => toast.error(error.response?.data?.error?.message || "Failed to create sale"),
   });
 
   // Top Up Mutation
@@ -131,7 +131,7 @@ export default function Sales() {
       setSelectedReceipt(response.data.receipt);
       setShowReceiptModal(true);
     },
-    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.error || "Failed to process payment"),
+    onError: (error) => toast.error(error.response?.data?.error?.message || "Failed to process payment"),
   });
 
   // Update sale mutation
@@ -147,7 +147,7 @@ export default function Sales() {
       setSelectedSale(null);
       toast.success("Sale updated successfully");
     },
-    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.error || "Failed to update sale"),
+    onError: (error) => toast.error(error.response?.data?.error?.message || "Failed to update sale"),
   });
 
   // Delete sale mutation
@@ -160,7 +160,7 @@ export default function Sales() {
       setSelectedSale(null);
       toast.success("Sale deleted");
     },
-    onError: (error) => toast.error(error.response?.data?.error?.message || error.response?.data?.error || "Failed to delete sale"),
+    onError: (error) => toast.error(error.response?.data?.error?.message || "Failed to delete sale"),
   });
 
   const handleTopUp = (formData) =>

@@ -68,7 +68,7 @@ export default function BusinessSettings() {
       setIsEditing(false);
       toast.success('Business settings updated');
     },
-    onError: (error) => toast.error(error.response?.data?.error || 'Failed to update settings'),
+    onError: (error) => toast.error(error.response?.data?.error?.message || 'Failed to update settings'),
   });
 
   const handleChange = (e) => {

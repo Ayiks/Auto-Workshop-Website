@@ -66,7 +66,7 @@ export default function PermissionsModal({ isOpen, onClose, user }) {
       onClose();
       toast.success('Permissions updated');
     },
-    onError: (error) => toast.error(error.response?.data?.error || 'Failed to update permissions'),
+    onError: (error) => toast.error(error.response?.data?.error?.message || 'Failed to update permissions'),
   });
 
   // --- LOGIC: Recursive Permission Adder ---

@@ -6,7 +6,7 @@ import { startScheduler } from './utils/scheduler.js';
 // Load environment variables
 dotenv.config();
 
-const PORT = process.env.PORT || 6000;
+const PORT = process.env.PORT || 5000;
 
 // Start server
 const server = app.listen(PORT, async () => {

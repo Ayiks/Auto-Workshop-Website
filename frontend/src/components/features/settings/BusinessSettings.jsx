@@ -39,6 +39,12 @@ export default function BusinessSettings() {
     email: settings?.email || '',
     website: settings?.website || '',
     enabledJobTypes: settings?.enabledJobTypes ?? ['mechanic', 'sprayer', 'bodyworks', 'other'],
+    bankName: settings?.bankName || '',
+    bankAccountName: settings?.bankAccountName || '',
+    bankAccountNumber: settings?.bankAccountNumber || '',
+    momoNumber: settings?.momoNumber || '',
+    momoName: settings?.momoName || '',
+    invoicePaymentNote: settings?.invoicePaymentNote || '',
   });
 
   // Re-sync state when data loads
@@ -249,6 +255,92 @@ export default function BusinessSettings() {
               disabled={!isEditing}
                         className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
             />
+          </div>
+        </div>
+
+        <hr className="border-gray-100" />
+
+        {/* Invoice Payment Details */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 items-start">
+          <div>
+            <label className="block text-xs sm:text-sm text-gray-700">Invoice Payment Details</label>
+            <p className="text-[11px] text-gray-400 mt-0.5">Bank and mobile money details shown in the Payment Information section of invoices.</p>
+          </div>
+          <div className="sm:col-span-2 space-y-3 sm:space-y-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Bank Name</label>
+                <input
+                  type="text"
+                  name="bankName"
+                  value={isEditing ? formData.bankName : settings?.bankName || ''}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  placeholder="e.g. Access Bank"
+                  className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Account Name</label>
+                <input
+                  type="text"
+                  name="bankAccountName"
+                  value={isEditing ? formData.bankAccountName : settings?.bankAccountName || ''}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Account Number</label>
+              <input
+                type="text"
+                name="bankAccountNumber"
+                value={isEditing ? formData.bankAccountNumber : settings?.bankAccountNumber || ''}
+                onChange={handleChange}
+                disabled={!isEditing}
+                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Mobile Money Number</label>
+                <input
+                  type="text"
+                  name="momoNumber"
+                  value={isEditing ? formData.momoNumber : settings?.momoNumber || ''}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  placeholder="e.g. 0553239370"
+                  className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-gray-500 mb-1">Mobile Money Name</label>
+                <input
+                  type="text"
+                  name="momoName"
+                  value={isEditing ? formData.momoName : settings?.momoName || ''}
+                  onChange={handleChange}
+                  disabled={!isEditing}
+                  className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-gray-500 mb-1">Payment Note (shown in red on invoice)</label>
+              <input
+                type="text"
+                name="invoicePaymentNote"
+                value={isEditing ? formData.invoicePaymentNote : settings?.invoicePaymentNote || ''}
+                onChange={handleChange}
+                disabled={!isEditing}
+                placeholder="e.g. Transfer Fees to be Paid Upon Receipt of Car"
+                maxLength={200}
+                className="block w-full rounded-lg p-2 border border-gray-300 shadow-sm focus:border-gray-900 focus:ring-gray-900 text-xs sm:text-sm disabled:bg-gray-50 disabled:text-gray-500 transition-colors"
+              />
+            </div>
           </div>
         </div>
 

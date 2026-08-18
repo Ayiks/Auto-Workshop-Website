@@ -38,7 +38,10 @@ export const getSettings = asyncHandler(async (req, res) => {
 // @route   PUT /api/settings/business
 // @access  Private (requires 'settings:update' permission)
 export const updateSettings = asyncHandler(async (req, res) => {
-  const { name, logo, address, phone, email, website, arkeselSenderId, arkeselWhatsAppSenderId, smsEnabled, enabledJobTypes } = req.body;
+  const {
+    name, logo, address, phone, email, website, arkeselSenderId, arkeselWhatsAppSenderId, smsEnabled, enabledJobTypes,
+    bankName, bankAccountName, bankAccountNumber, momoNumber, momoName, invoicePaymentNote,
+  } = req.body;
 
   if (email) {
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -85,6 +88,13 @@ export const updateSettings = asyncHandler(async (req, res) => {
   }
   if (smsEnabled !== undefined) updateData.smsEnabled = Boolean(smsEnabled);
   if (Array.isArray(enabledJobTypes) && enabledJobTypes.length) updateData.enabledJobTypes = enabledJobTypes;
+  // Invoice payment details — empty string clears the field
+  if (bankName !== undefined) updateData.bankName = bankName?.trim() || null;
+  if (bankAccountName !== undefined) updateData.bankAccountName = bankAccountName?.trim() || null;
+  if (bankAccountNumber !== undefined) updateData.bankAccountNumber = bankAccountNumber?.trim() || null;
+  if (momoNumber !== undefined) updateData.momoNumber = momoNumber?.trim() || null;
+  if (momoName !== undefined) updateData.momoName = momoName?.trim() || null;
+  if (invoicePaymentNote !== undefined) updateData.invoicePaymentNote = invoicePaymentNote?.trim() || null;
 
   if (settings) {
     settings = await req.db.businessSettings.update({

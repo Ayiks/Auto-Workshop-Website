@@ -289,6 +289,13 @@ export const getInvoice = asyncHandler(async (req, res) => {
             },
           },
           customer: { select: CUSTOMER_NAME_SELECT },
+          vehicle: {
+            select: {
+              vin: true,
+              mileage: true,
+              year: true,
+            },
+          },
           user: {
             select: {
               id: true,

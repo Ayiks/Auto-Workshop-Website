@@ -30,6 +30,7 @@ function quoteToInvoiceShape(quote) {
       vehicleModel: quote.vehicleModel,
       vehicleRegNumber: quote.vehicleRegNumber,
       jobType: quote.jobType,
+      problemType: quote.problemType,
       materials: (quote.items || []).map((item) => ({
         materialName: item.materialName,
         quantity: item.quantity,

@@ -23,9 +23,14 @@ export default function Invoice({ invoice, onRecordPayment, businessSettings }) 
     const el = document.querySelector('.invoice-print-root');
     if (!el) { window.print(); return; }
 
-    // Collect all Tailwind/Vite injected styles
+    // Collect app CSS: <style> tags (dev — Vite injects Tailwind inline) AND
+    // <link rel="stylesheet"> tags (production build — CSS is a separate file).
+    // Use l.href (absolute URL) so links resolve inside the about:blank popup.
     const styles = Array.from(document.querySelectorAll('style'))
       .map((s) => s.innerHTML)
+      .join('\n');
+    const styleLinks = Array.from(document.querySelectorAll('link[rel="stylesheet"]'))
+      .map((l) => `<link rel="stylesheet" href="${l.href}">`)
       .join('\n');
 
     const html = `<!DOCTYPE html>
@@ -33,6 +38,7 @@ export default function Invoice({ invoice, onRecordPayment, businessSettings }) 
 <head>
   <meta charset="utf-8"/>
   <title>Invoice ${invoice.invoiceNumber}</title>
+  ${styleLinks}
   <style>${styles}</style>
   <style>
     @page { size: A4; margin: 12mm; }
@@ -59,7 +65,19 @@ export default function Invoice({ invoice, onRecordPayment, businessSettings }) 
     win.document.open();
     win.document.write(html);
     win.document.close();
-    setTimeout(() => { win.print(); win.close(); }, 400);
+
+    // Print only after stylesheets and the logo image have loaded,
+    // with a fallback timeout in case the load event never fires.
+    let printed = false;
+    const printOnce = () => {
+      if (printed) return;
+      printed = true;
+      win.focus();
+      win.print();
+      win.close();
+    };
+    win.addEventListener('load', () => setTimeout(printOnce, 150));
+    setTimeout(printOnce, 2500);
   };
 
   const materialsCost = parseFloat(invoice.materialsCost || 0);
